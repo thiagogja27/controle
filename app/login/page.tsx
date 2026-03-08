@@ -1,13 +1,14 @@
 'use client'
 
 import { useState } from "react"
+import Image from "next/image"
 import { useRouter } from "next/navigation"
 import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
-import { useAuth } from "@/hooks/use-auth" // This hook will be created next
-import { Loader2, ShieldCheck } from "lucide-react"
+import { useAuth } from "@/hooks/use-auth"
+import { Loader2 } from "lucide-react"
 
 export default function LoginPage() {
   const [email, setEmail] = useState("")
@@ -33,13 +34,18 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background p-4">
+    <div className="relative flex min-h-screen items-center justify-center bg-background p-4">
+      <div className="absolute left-5 top-5">
+        <Image 
+          src="/baltech-logo.png" 
+          alt="BalTech Solutions Logo" 
+          width={350} 
+          height={98}
+        />
+      </div>
       <Card className="w-full max-w-md shadow-2xl">
         <CardHeader className="text-center">
-          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
-            <ShieldCheck className="h-8 w-8 text-primary" />
-          </div>
-          <CardTitle className="text-2xl font-bold">Acesso Restrito</CardTitle>
+          <CardTitle className="pt-8 text-2xl font-bold">Acesso Restrito</CardTitle>
           <CardDescription>Faça login para gerenciar o sistema de controle.</CardDescription>
         </CardHeader>
         <CardContent>
