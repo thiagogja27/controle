@@ -34,8 +34,14 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="relative flex min-h-screen items-center justify-center bg-background p-4">
-      <div className="absolute left-5 top-5">
+    <div className="relative flex min-h-screen flex-col items-center justify-center bg-background p-4">
+      <div className="mb-8 flex items-center justify-center gap-8">
+        <Image 
+          src="/teag-logo.png" 
+          alt="TEG/TEAG Logo" 
+          width={350} 
+          height={98}
+        />
         <Image 
           src="/baltech-logo.png" 
           alt="BalTech Solutions Logo" 
@@ -80,6 +86,9 @@ export default function LoginPage() {
           </form>
         </CardContent>
       </Card>
+      <footer className="absolute bottom-4 text-center text-sm text-muted-foreground">
+        <p>© 2026 BalTech Solutions. Todos os direitos reservados.</p>
+      </footer>
     </div>
   )
 }
