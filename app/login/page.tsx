@@ -52,7 +52,7 @@ export default function LoginPage() {
       <Card className="w-full max-w-md shadow-2xl">
         <CardHeader className="text-center">
           <CardTitle className="pt-8 text-2xl font-bold">Acesso Restrito</CardTitle>
-          <CardDescription>Faça login para gerenciar o sistema de controle.</CardDescription>
+          <CardDescription>Faça login para gerenciar o sistema de controle patrimonial.</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleLogin} className="space-y-4">

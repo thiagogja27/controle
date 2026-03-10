@@ -45,7 +45,7 @@ export default function DashboardPage() {
     <div className="flex min-h-screen flex-col bg-background">
       <Header />
       <Navigation activeSection={activeSection} onSectionChange={setActiveSection} />
-      <main className="flex-1 p-6">
+      <main className="dark flex-1 p-6">
         {renderSection()}
       </main>
       <footer className="border-t border-border bg-card px-6 py-4">

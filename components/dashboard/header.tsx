@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { useAuth } from "@/hooks/use-auth"
 import { useRouter } from 'next/navigation'
+import { ThemeToggle } from "@/components/theme-toggle"
 
 export function Header() {
   const { user, logout } = useAuth()
@@ -38,6 +39,7 @@ export function Header() {
       </div>
       
       <div className="flex items-center gap-2">
+        <ThemeToggle />
         <Button variant="ghost" size="icon" className="relative">
           <Bell className="h-5 w-5" />
           <span className="absolute -right-0.5 -top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[10px] font-medium text-primary-foreground">

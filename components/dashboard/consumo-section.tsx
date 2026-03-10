@@ -1,17 +1,24 @@
-"use client"
+'use client'
 
 import { useState } from "react"
-import { LogOut, Plus, Search, Ship, Truck, Users, X, Loader2 } from "lucide-react"
+import { LogOut, Plus, Search, Ship, Truck, Users, X, Loader2, FilePenLine, Trash2, MoreVertical } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import {
   Select,
   SelectContent,
@@ -24,416 +31,278 @@ import { type ConsumoBordo, type Individuo } from "@/lib/store"
 import { useConsumos } from "@/hooks/use-firebase"
 import { cn } from "@/lib/utils"
 
+const initialFormState: Omit<ConsumoBordo, "id" | "data" | "hora"> = {
+  individuos: [{ id: `new-${Date.now()}`, nome: "", status: "presente" }],
+  veiculo: "",
+  placa: "",
+  produto: "",
+  notaFiscal: "",
+  navio: "",
+  terminal: "teg",
+  empresa: "",
+  vigilante: "",
+}
+
 export function ConsumoSection() {
-  const { data: consumos, loading, addItem, updateItem } = useConsumos()
+  const { data: consumos, loading, addItem, updateItem, deleteItem } = useConsumos()
   const [search, setSearch] = useState("")
-  const [isDialogOpen, setIsDialogOpen] = useState(false)
+  const [isFormOpen, setIsFormOpen] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
-  const [newConsumo, setNewConsumo] = useState({
-    individuos: [{ id: "temp-1", nome: "" }] as Individuo[],
-    veiculo: "",
-    placa: "",
-    produto: "",
-    notaFiscal: "",
-    navio: "",
-    terminal: "teg" as "teg" | "teag",
-    empresa: "",
-    vigilante: ""
-  })
+  const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false)
+  const [selectedConsumo, setSelectedConsumo] = useState<ConsumoBordo | null>(null)
+  const [formState, setFormState] = useState(initialFormState)
 
-  const totalRegistros = consumos.length
-  const presentes = consumos.filter(c => c.status === "presente").length
-  const totalIndividuos = consumos.reduce((acc, c) => acc + (c.individuos?.length || 0), 0)
-
-  const filteredConsumos = consumos.filter(c => {
+  const filteredConsumos = consumos.filter(consumo => {
     const searchLower = search.toLowerCase()
-    return (
-      (c.individuos?.some(ind => ind.nome.toLowerCase().includes(searchLower)) ?? false) ||
-      c.veiculo.toLowerCase().includes(searchLower) ||
-      c.placa.toLowerCase().includes(searchLower) ||
-      c.produto.toLowerCase().includes(searchLower) ||
-      c.navio.toLowerCase().includes(searchLower) ||
-      c.empresa.toLowerCase().includes(searchLower)
+    if (!searchLower) return true // Show all if search is empty
+
+    const matchInConsumo =
+      consumo.veiculo.toLowerCase().includes(searchLower) ||
+      consumo.placa.toLowerCase().includes(searchLower) ||
+      consumo.produto.toLowerCase().includes(searchLower) ||
+      consumo.navio.toLowerCase().includes(searchLower) ||
+      consumo.empresa.toLowerCase().includes(searchLower)
+
+    const matchInIndividuos = consumo.individuos.some(individuo =>
+      individuo.nome.toLowerCase().includes(searchLower)
     )
+
+    return matchInConsumo || matchInIndividuos
   })
 
-  const handleAddIndividuo = () => {
-    setNewConsumo({
-      ...newConsumo,
-      individuos: [...newConsumo.individuos, { id: `temp-${Date.now()}`, nome: "" }]
-    })
+  const allIndividuos = consumos.flatMap(c => c.individuos || [])
+  const totalRegistros = consumos.length
+  const presentes = allIndividuos.filter(i => i.status === "presente").length
+  const totalIndividuos = allIndividuos.length
+  const totalTeg = consumos.filter(c => c.terminal === "teg").length
+  const totalTeag = consumos.filter(c => c.terminal === "teag").length
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { id, value } = e.target
+    setFormState(prev => ({ ...prev, [id]: value }))
   }
 
-  const handleRemoveIndividuo = (id: string) => {
-    if (newConsumo.individuos.length > 1) {
-      setNewConsumo({
-        ...newConsumo,
-        individuos: newConsumo.individuos.filter(ind => ind.id !== id)
-      })
+  const handleSelectChange = (id: string, value: string) => {
+    setFormState(prev => ({ ...prev, [id]: value }))
+  }
+
+  const handleIndividuoChange = (index: number, name: string) => {
+    const newIndividuos = [...formState.individuos]
+    newIndividuos[index] = { ...newIndividuos[index], nome: name }
+    setFormState(prev => ({ ...prev, individuos: newIndividuos }))
+  }
+
+  const addIndividuo = () => {
+    setFormState(prev => ({
+      ...prev,
+      individuos: [...prev.individuos, { id: `new-${Date.now()}`, nome: "", status: "presente" }],
+    }))
+  }
+
+  const removeIndividuo = (index: number) => {
+    if (formState.individuos.length > 1) {
+      setFormState(prev => ({ ...prev, individuos: prev.individuos.filter((_, i) => i !== index) }))
     }
   }
 
-  const handleIndividuoChange = (id: string, nome: string) => {
-    setNewConsumo({
-      ...newConsumo,
-      individuos: newConsumo.individuos.map(ind =>
-        ind.id === id ? { ...ind, nome } : ind
-      )
-    })
+  const handleAddNew = () => {
+    setSelectedConsumo(null)
+    setFormState(initialFormState)
+    setIsFormOpen(true)
   }
 
-  const handleAddConsumo = async () => {
+  const handleEdit = (consumoId: string) => {
+    const consumoToEdit = consumos.find(c => c.id === consumoId)
+    if (consumoToEdit) {
+      setSelectedConsumo(consumoToEdit)
+      setFormState(consumoToEdit)
+      setIsFormOpen(true)
+    }
+  }
+
+  const handleDelete = (consumoId: string) => {
+    const consumoToDelete = consumos.find(c => c.id === consumoId)
+    if (consumoToDelete) {
+      setSelectedConsumo(consumoToDelete)
+      setIsDeleteConfirmOpen(true)
+    }
+  }
+
+  const handleConfirmDelete = async () => {
+    if (!selectedConsumo) return
     setIsSaving(true)
     try {
-      const now = new Date()
-      const entry: Omit<ConsumoBordo, "id"> = {
-        individuos: newConsumo.individuos.filter(ind => ind.nome.trim() !== ""),
-        veiculo: newConsumo.veiculo,
-        placa: newConsumo.placa,
-        produto: newConsumo.produto,
-        notaFiscal: newConsumo.notaFiscal,
-        navio: newConsumo.navio,
-        terminal: newConsumo.terminal,
-        empresa: newConsumo.empresa,
-        vigilante: newConsumo.vigilante,
-        data: now.toISOString().split("T")[0],
-        hora: now.toTimeString().slice(0, 5),
-        status: "presente"
-      }
-      await addItem(entry)
-      setNewConsumo({
-        individuos: [{ id: "temp-1", nome: "" }],
-        veiculo: "",
-        placa: "",
-        produto: "",
-        notaFiscal: "",
-        navio: "",
-        terminal: "teg",
-        empresa: "",
-        vigilante: ""
-      })
-      setIsDialogOpen(false)
+      await deleteItem(selectedConsumo.id)
+      setIsDeleteConfirmOpen(false)
+      setSelectedConsumo(null)
     } catch (error) {
-      console.error("Erro ao adicionar consumo:", error)
+      console.error("Erro ao excluir consumo:", error)
     } finally {
       setIsSaving(false)
     }
   }
 
-  const handleSaida = async (id: string) => {
+  const handleSave = async () => {
+    setIsSaving(true)
     try {
-      const now = new Date()
-      await updateItem(id, {
-        horaSaida: now.toTimeString().slice(0, 5),
-        status: "saiu"
-      })
+      const individuosToSave = formState.individuos.filter(ind => ind.nome.trim() !== "").map(ind => ({ ...ind, status: ind.status || 'presente' }))
+      if (individuosToSave.length === 0) {
+        setIsSaving(false)
+        return
+      }
+
+      if (selectedConsumo) {
+        await updateItem(selectedConsumo.id, { ...formState, individuos: individuosToSave })
+      } else {
+        const now = new Date()
+        const entry: Omit<ConsumoBordo, "id"> = {
+          ...formState,
+          individuos: individuosToSave.map(ind => ({ ...ind, id: `ind-${now.getTime()}-${Math.random().toString(36).substring(2, 9)}` })),
+          data: now.toISOString().split("T")[0],
+          hora: now.toTimeString().slice(0, 5),
+        }
+        await addItem(entry)
+      }
+      setIsFormOpen(false)
     } catch (error) {
-      console.error("Erro ao registrar saída:", error)
+      console.error("Erro ao salvar consumo:", error)
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  const handleSaida = async (consumoId: string, individuoId: string) => {
+    const consumo = consumos.find(c => c.id === consumoId)
+    if (!consumo) return
+
+    const now = new Date()
+    const updatedIndividuos = consumo.individuos.map(ind =>
+      ind.id === individuoId
+        ? { ...ind, status: "saiu", horaSaida: now.toTimeString().slice(0, 5) }
+        : ind
+    )
+
+    try {
+      await updateItem(consumoId, { individuos: updatedIndividuos })
+    } catch (error) {
+      console.error("Erro ao registrar saída do indivíduo:", error)
     }
   }
 
   const formatDateTime = (data: string, hora: string) => {
+    if(!data || !hora) return "-";
     const [year, month, day] = data.split("-")
     return `${day}/${month}/${year} ${hora}`
   }
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    )
+    return <div className="flex items-center justify-center py-12"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
   }
 
   return (
     <div className="space-y-6">
-      {/* Stats Cards */}
-      <div className="grid gap-4 md:grid-cols-3">
-        <Card>
-          <CardContent className="flex items-center gap-4 p-4">
-            <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10">
-              <Truck className="h-6 w-6 text-primary" />
-            </div>
-            <div>
-              <p className="text-2xl font-bold">{totalRegistros}</p>
-              <p className="text-sm text-muted-foreground">Total Registros</p>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="flex items-center gap-4 p-4">
-            <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-blue-400/10">
-              <Ship className="h-6 w-6 text-blue-400" />
-            </div>
-            <div>
-              <p className="text-2xl font-bold">{presentes}</p>
-              <p className="text-sm text-muted-foreground">Presentes</p>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="flex items-center gap-4 p-4">
-            <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-purple-400/10">
-              <Users className="h-6 w-6 text-purple-400" />
-            </div>
-            <div>
-              <p className="text-2xl font-bold">{totalIndividuos}</p>
-              <p className="text-sm text-muted-foreground">Total Indivíduos</p>
-            </div>
-          </CardContent>
-        </Card>
+      {/* Stats Cards ... */}
+      <div className="grid gap-4 md:grid-cols-5">
+        <Card><CardContent className="flex items-center gap-4 p-4"><div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10"><Truck className="h-6 w-6 text-primary" /></div><div><p className="text-2xl font-bold">{totalRegistros}</p><p className="text-sm text-muted-foreground">Total Registros</p></div></CardContent></Card>
+        <Card><CardContent className="flex items-center gap-4 p-4"><div className="flex h-12 w-12 items-center justify-center rounded-lg bg-blue-400/10"><Ship className="h-6 w-6 text-blue-400" /></div><div><p className="text-2xl font-bold">{presentes}</p><p className="text-sm text-muted-foreground">A Bordo</p></div></CardContent></Card>
+        <Card><CardContent className="flex items-center gap-4 p-4"><div className="flex h-12 w-12 items-center justify-center rounded-lg bg-purple-400/10"><Users className="h-6 w-6 text-purple-400" /></div><div><p className="text-2xl font-bold">{totalIndividuos}</p><p className="text-sm text-muted-foreground">Total Indivíduos</p></div></CardContent></Card>
+        <Card><CardContent className="flex items-center gap-4 p-4"><div className="flex h-11 w-11 items-center justify-center rounded-lg bg-secondary"><span className="text-xs font-bold text-muted-foreground">TEG</span></div><div><p className="text-2xl font-bold">{totalTeg}</p><p className="text-sm text-muted-foreground">Pier TEG</p></div></CardContent></Card>
+        <Card><CardContent className="flex items-center gap-4 p-4"><div className="flex h-11 w-11 items-center justify-center rounded-lg bg-secondary"><span className="text-xs font-bold text-muted-foreground">TEAG</span></div><div><p className="text-2xl font-bold">{totalTeag}</p><p className="text-sm text-muted-foreground">Pier TEAG</p></div></CardContent></Card>
       </div>
 
       {/* Search and Actions */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="relative max-w-sm flex-1">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            placeholder="Buscar por nome, veículo, placa, navio..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="pl-10"
-          />
-        </div>
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogTrigger asChild>
-            <Button>
-              <Plus className="mr-2 h-4 w-4" />
-              Novo Registro
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
-            <DialogHeader>
-              <DialogTitle>Registrar Consumo de Bordo</DialogTitle>
-            </DialogHeader>
-            <div className="grid gap-4 py-4">
-              {/* Individuos */}
-              <div className="grid gap-2">
-                <div className="flex items-center justify-between">
-                  <Label>Indivíduos</Label>
-                  <Button type="button" variant="outline" size="sm" onClick={handleAddIndividuo}>
-                    <Plus className="mr-1 h-3 w-3" />
-                    Adicionar
-                  </Button>
-                </div>
-                <div className="space-y-2">
-                  {newConsumo.individuos.map((ind, index) => (
-                    <div key={ind.id} className="flex gap-2">
-                      <Input
-                        placeholder={`Nome do indivíduo ${index + 1}`}
-                        value={ind.nome}
-                        onChange={(e) => handleIndividuoChange(ind.id, e.target.value)}
-                      />
-                      {newConsumo.individuos.length > 1 && (
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleRemoveIndividuo(ind.id)}
-                          className="shrink-0 text-destructive hover:text-destructive"
-                        >
-                          <X className="h-4 w-4" />
-                        </Button>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="grid gap-2">
-                  <Label htmlFor="veiculo">Veículo</Label>
-                  <Input
-                    id="veiculo"
-                    placeholder="Ex: Caminhão Baú"
-                    value={newConsumo.veiculo}
-                    onChange={(e) => setNewConsumo({ ...newConsumo, veiculo: e.target.value })}
-                  />
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="placa">Placa</Label>
-                  <Input
-                    id="placa"
-                    placeholder="Ex: ABC-1234"
-                    value={newConsumo.placa}
-                    onChange={(e) => setNewConsumo({ ...newConsumo, placa: e.target.value })}
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="grid gap-2">
-                  <Label htmlFor="produto">Produto</Label>
-                  <Input
-                    id="produto"
-                    placeholder="Ex: Água Mineral"
-                    value={newConsumo.produto}
-                    onChange={(e) => setNewConsumo({ ...newConsumo, produto: e.target.value })}
-                  />
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="notaFiscal">Nota Fiscal</Label>
-                  <Input
-                    id="notaFiscal"
-                    placeholder="Ex: NF-001234"
-                    value={newConsumo.notaFiscal}
-                    onChange={(e) => setNewConsumo({ ...newConsumo, notaFiscal: e.target.value })}
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="grid gap-2">
-                  <Label htmlFor="navio">Navio</Label>
-                  <Input
-                    id="navio"
-                    placeholder="Nome do navio"
-                    value={newConsumo.navio}
-                    onChange={(e) => setNewConsumo({ ...newConsumo, navio: e.target.value })}
-                  />
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="terminal">Terminal</Label>
-                  <Select
-                    value={newConsumo.terminal}
-                    onValueChange={(value: "teg" | "teag") =>
-                      setNewConsumo({ ...newConsumo, terminal: value })
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="teg">TEG</SelectItem>
-                      <SelectItem value="teag">TEAG</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="grid gap-2">
-                  <Label htmlFor="empresa">Empresa</Label>
-                  <Input
-                    id="empresa"
-                    placeholder="Nome da empresa"
-                    value={newConsumo.empresa}
-                    onChange={(e) => setNewConsumo({ ...newConsumo, empresa: e.target.value })}
-                  />
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="vigilante">Vigilante</Label>
-                  <Input
-                    id="vigilante"
-                    placeholder="Nome do vigilante"
-                    value={newConsumo.vigilante}
-                    onChange={(e) => setNewConsumo({ ...newConsumo, vigilante: e.target.value })}
-                  />
-                </div>
-              </div>
-
-              <Button onClick={handleAddConsumo} className="mt-2" disabled={isSaving}>
-                {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Registrar Entrada
-              </Button>
-            </div>
-          </DialogContent>
-        </Dialog>
+        <div className="relative max-w-sm flex-1"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" /><Input placeholder="Buscar por nome, veículo, placa, navio..." value={search} onChange={e => setSearch(e.target.value)} className="pl-10" /></div>
+        <Button onClick={handleAddNew}><Plus className="mr-2 h-4 w-4" />Novo Registro</Button>
       </div>
 
-      {/* Consumo Table */}
+      {/* Add/Edit Dialog */}
+      <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
+          <DialogHeader><DialogTitle>{selectedConsumo ? "Editar Registro" : "Registrar Consumo de Bordo"}</DialogTitle></DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2"><div className="flex items-center justify-between"><Label>Indivíduos</Label><Button type="button" variant="outline" size="sm" onClick={addIndividuo}><Plus className="mr-1 h-3 w-3" />Adicionar</Button></div><div className="space-y-2">{formState.individuos.map((ind, index) => (<div key={ind.id || index} className="flex gap-2"><Input placeholder={`Nome do indivíduo ${index + 1}`} value={ind.nome} onChange={e => handleIndividuoChange(index, e.target.value)} />{formState.individuos.length > 1 && <Button type="button" variant="ghost" size="icon" onClick={() => removeIndividuo(index)} className="shrink-0 text-destructive hover:text-destructive"><X className="h-4 w-4" /></Button>}</div>))}</div></div>
+            <div className="grid grid-cols-2 gap-4"><div className="grid gap-2"><Label htmlFor="veiculo">Veículo</Label><Input id="veiculo" placeholder="Ex: Caminhão Baú" value={formState.veiculo} onChange={handleInputChange} /></div><div className="grid gap-2"><Label htmlFor="placa">Placa</Label><Input id="placa" placeholder="Ex: ABC-1234" value={formState.placa} onChange={handleInputChange} /></div></div>
+            <div className="grid grid-cols-2 gap-4"><div className="grid gap-2"><Label htmlFor="produto">Produto</Label><Input id="produto" placeholder="Ex: Água Mineral" value={formState.produto} onChange={handleInputChange} /></div><div className="grid gap-2"><Label htmlFor="notaFiscal">Nota Fiscal</Label><Input id="notaFiscal" placeholder="Ex: NF-001234" value={formState.notaFiscal} onChange={handleInputChange} /></div></div>
+            <div className="grid grid-cols-2 gap-4"><div className="grid gap-2"><Label htmlFor="navio">Navio</Label><Input id="navio" placeholder="Nome do navio" value={formState.navio} onChange={handleInputChange} /></div><div className="grid gap-2"><Label htmlFor="terminal">Terminal</Label><Select value={formState.terminal} onValueChange={v => handleSelectChange("terminal", v)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="teg">TEG</SelectItem><SelectItem value="teag">TEAG</SelectItem></SelectContent></Select></div></div>
+            <div className="grid grid-cols-2 gap-4"><div className="grid gap-2"><Label htmlFor="empresa">Empresa</Label><Input id="empresa" placeholder="Nome da empresa" value={formState.empresa} onChange={handleInputChange} /></div><div className="grid gap-2"><Label htmlFor="vigilante">Vigilante</Label><Input id="vigilante" placeholder="Nome do vigilante" value={formState.vigilante} onChange={handleInputChange} /></div></div>
+          </div>
+          <Button onClick={handleSave} className="mt-2" disabled={isSaving}>{isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}{selectedConsumo ? "Salvar Alterações" : "Registrar Entrada"}</Button>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={isDeleteConfirmOpen} onOpenChange={setIsDeleteConfirmOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Confirmar Exclusão</DialogTitle>
+            <DialogDescription>Tem certeza de que deseja excluir o registro de consumo para o navio "{selectedConsumo?.navio}"? Todos os indivíduos associados serão removidos. Esta ação não pode ser desfeita.</DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:justify-end">
+            <Button variant="outline" onClick={() => setIsDeleteConfirmOpen(false)} disabled={isSaving}>Cancelar</Button>
+            <Button variant="destructive" onClick={handleConfirmDelete} disabled={isSaving}>{isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}Excluir</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <Card>
-        <CardHeader>
-          <CardTitle>Registro de Consumo de Bordo</CardTitle>
-        </CardHeader>
+        <CardHeader><CardTitle>Registro de Consumo de Bordo</CardTitle></CardHeader>
         <CardContent>
           <div className="overflow-x-auto">
-            <table className="w-full">
+            <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-border text-left">
-                  <th className="pb-3 text-sm font-medium text-muted-foreground">Data / Hora</th>
-                  <th className="pb-3 text-sm font-medium text-muted-foreground">Nome(s)</th>
-                  <th className="pb-3 text-sm font-medium text-muted-foreground">Veículo</th>
-                  <th className="pb-3 text-sm font-medium text-muted-foreground">Placa</th>
-                  <th className="pb-3 text-sm font-medium text-muted-foreground">Produto</th>
-                  <th className="pb-3 text-sm font-medium text-muted-foreground">Nota Fiscal</th>
-                  <th className="pb-3 text-sm font-medium text-muted-foreground">Navio</th>
-                  <th className="pb-3 text-sm font-medium text-muted-foreground">Terminal</th>
-                  <th className="pb-3 text-sm font-medium text-muted-foreground">Empresa</th>
-                  <th className="pb-3 text-sm font-medium text-muted-foreground">Vigilante</th>
-                  <th className="pb-3 text-sm font-medium text-muted-foreground">Saída</th>
-                  <th className="pb-3 text-sm font-medium text-muted-foreground">Ações</th>
+                <tr className="border-b border-border text-left text-xs text-muted-foreground uppercase">
+                  <th className="px-4 py-3 font-medium">Nome</th>
+                  <th className="px-4 py-3 font-medium">Status</th>
+                  <th className="px-4 py-3 font-medium">Entrada</th>
+                  <th className="px-4 py-3 font-medium">Saída</th>
+                  <th className="px-4 py-3 font-medium">Empresa</th>
+                  <th className="px-4 py-3 font-medium">Navio</th>
+                  <th className="px-4 py-3 font-medium">Terminal</th>
+                  <th className="px-4 py-3 font-medium">Produto</th>
+                  <th className="px-4 py-3 font-medium">Veículo</th>
+                  <th className="px-4 py-3 font-medium">Placa</th>
+                  <th className="px-4 py-3 font-medium">Vigilante</th>
+                  <th className="px-4 py-3 font-medium text-right">Ações</th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="divide-y divide-border/50">
                 {filteredConsumos.length === 0 ? (
-                  <tr>
-                    <td colSpan={12} className="py-8 text-center text-sm text-muted-foreground">
-                      Nenhum registro encontrado.
-                    </td>
-                  </tr>
+                  <tr><td colSpan={12} className="py-8 text-center text-muted-foreground">Nenhum registro encontrado.</td></tr>
                 ) : (
-                  filteredConsumos.map((consumo) => (
-                    <tr key={consumo.id} className="border-b border-border/50">
-                      <td className="py-4 text-sm tabular-nums">
-                        {formatDateTime(consumo.data, consumo.hora)}
-                      </td>
-                      <td className="py-4">
-                        <div className="flex flex-col gap-0.5">
-                          {(consumo.individuos || []).map((ind, idx) => (
-                            <span key={ind.id || idx} className="text-sm font-medium">
-                              {ind.nome}
-                            </span>
-                          ))}
-                        </div>
-                      </td>
-                      <td className="py-4 text-sm">{consumo.veiculo}</td>
-                      <td className="py-4 text-sm font-mono">{consumo.placa}</td>
-                      <td className="py-4 text-sm">{consumo.produto}</td>
-                      <td className="py-4 text-sm font-mono">{consumo.notaFiscal}</td>
-                      <td className="py-4 text-sm">{consumo.navio}</td>
-                      <td className="py-4">
-                        <span
-                          className={cn(
-                            "inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium",
-                            consumo.terminal === "teg"
-                              ? "bg-primary/10 text-primary"
-                              : "bg-blue-400/10 text-blue-400"
-                          )}
-                        >
-                          {consumo.terminal.toUpperCase()}
-                        </span>
-                      </td>
-                      <td className="py-4 text-sm">{consumo.empresa}</td>
-                      <td className="py-4 text-sm">{consumo.vigilante}</td>
-                      <td className="py-4">
-                        {consumo.horaSaida ? (
-                          <span className="text-sm tabular-nums text-muted-foreground">
-                            {consumo.horaSaida}
-                          </span>
-                        ) : (
-                          <span className="text-sm text-muted-foreground">—</span>
-                        )}
-                      </td>
-                      <td className="py-4">
-                        {consumo.status === "presente" ? (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleSaida(consumo.id)}
-                            className="gap-1.5 border-primary/50 text-primary hover:bg-primary hover:text-primary-foreground"
-                          >
-                            <LogOut className="h-3.5 w-3.5" />
-                            Dar Saída
-                          </Button>
-                        ) : (
-                          <span className="inline-flex items-center gap-1.5 rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium text-muted-foreground">
-                            Finalizado
-                          </span>
-                        )}
-                      </td>
-                    </tr>
-                  ))
+                  filteredConsumos.map(consumo =>
+                    consumo.individuos.map((individuo, individuoIndex) => (
+                      <tr key={individuo.id} className={cn(individuoIndex === 0 && consumos.length > 1 && "border-t-2 border-primary/10")}>
+                        <td className="px-4 py-3 font-medium">{individuo.nome}</td>
+                        <td className="px-4 py-3"><span className={cn("inline-flex items-center rounded-full px-2 py-1 text-xs font-semibold", individuo.status === "presente" ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300" : "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300")}>{individuo.status === "presente" ? "A Bordo" : "Saiu"}</span></td>
+                        <td className="px-4 py-3 tabular-nums text-muted-foreground">{formatDateTime(consumo.data, consumo.hora)}</td>
+                        <td className="px-4 py-3 tabular-nums text-muted-foreground">{individuo.horaSaida || "-"}</td>
+                        <td className="px-4 py-3 text-muted-foreground">{consumo.empresa}</td>
+                        <td className="px-4 py-3 text-muted-foreground">{consumo.navio}</td>
+                        <td className="px-4 py-3"><span className={cn("font-semibold", consumo.terminal === "teg" ? "text-primary" : "text-info")}>{consumo.terminal.toUpperCase()}</span></td>
+                        <td className="px-4 py-3 text-muted-foreground">{consumo.produto}</td>
+                        <td className="px-4 py-3 text-muted-foreground">{consumo.veiculo}</td>
+                        <td className="px-4 py-3 font-mono text-muted-foreground">{consumo.placa}</td>
+                        <td className="px-4 py-3 text-muted-foreground">{consumo.vigilante}</td>
+                        <td className="px-4 py-3 text-right">
+                           <div className="flex items-center justify-end gap-2">
+                            {individuo.status === "presente" && (
+                              <Button size="sm" variant="outline" onClick={() => handleSaida(consumo.id, individuo.id)} className="flex items-center gap-2"><LogOut className="h-4 w-4" /><span>Sair</span></Button>
+                            )}
+                            {individuoIndex === 0 && (
+                             <DropdownMenu>
+                                <DropdownMenuTrigger asChild><Button variant="ghost" size="icon"><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                  <DropdownMenuItem onClick={() => handleEdit(consumo.id)}><FilePenLine className="mr-2 h-4 w-4" />Editar Grupo</DropdownMenuItem>
+                                  <DropdownMenuItem onClick={() => handleDelete(consumo.id)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4" />Excluir Grupo</DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )
                 )}
               </tbody>
             </table>
