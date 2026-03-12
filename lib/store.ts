@@ -14,6 +14,7 @@ export interface Visitante {
   notaFiscal?: string
   placa?: string
   observacoes?: string
+  diversos?: boolean
 }
 
 export interface IndividuoRefeicao {

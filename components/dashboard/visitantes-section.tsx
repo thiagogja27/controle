@@ -15,6 +15,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
+import { Checkbox } from "@/components/ui/checkbox"
 import { type Visitante } from "@/lib/store"
 import { useVisitantes } from "@/hooks/use-firebase"
 import { cn } from "@/lib/utils"
@@ -30,6 +31,7 @@ const initialFormState: Omit<Visitante, "id" | "dataEntrada" | "status"> = {
   observacoes: "",
   horaEntrada: "",
   horaSaida: "",
+  diversos: false,
 }
 
 export function VisitantesSection() {
@@ -54,6 +56,7 @@ export function VisitantesSection() {
         notaFiscal: visitante.notaFiscal || "",
         placa: visitante.placa || "",
         observacoes: visitante.observacoes || "",
+        diversos: visitante.diversos || false,
         horaEntrada: now.toTimeString().slice(0, 5),
         horaSaida: "",
     });
@@ -73,6 +76,7 @@ export function VisitantesSection() {
           notaFiscal: selectedVisitante.notaFiscal || "",
           placa: selectedVisitante.placa || "",
           observacoes: selectedVisitante.observacoes || "",
+          diversos: selectedVisitante.diversos || false,
           horaEntrada: selectedVisitante.horaEntrada,
           horaSaida: selectedVisitante.horaSaida || "",
         });
@@ -98,6 +102,10 @@ export function VisitantesSection() {
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { id, value } = e.target
     setFormState(prev => ({ ...prev, [id]: value }))
+  }
+
+  const handleCheckboxChange = (id: string, checked: boolean) => {
+    setFormState(prev => ({ ...prev, [id]: checked }))
   }
 
   const handleAddNew = () => {
@@ -210,6 +218,7 @@ export function VisitantesSection() {
             {/* Hide Hora Saída when creating a new entry or re-entry */}
             {(selectedVisitante) && <div className="grid gap-2"><Label htmlFor="horaSaida">Hora Saída</Label><Input id="horaSaida" type="time" value={formState.horaSaida || ""} onChange={handleInputChange} /></div>}
             <div className="grid gap-2 md:col-span-2"><Label htmlFor="observacoes">Observações</Label><Textarea id="observacoes" value={formState.observacoes || ""} onChange={handleInputChange} /></div>
+            <div className="flex items-center space-x-2"><Checkbox id="diversos" checked={formState.diversos} onCheckedChange={(checked) => handleCheckboxChange("diversos", checked as boolean)} /><Label htmlFor="diversos">Diversos</Label></div>
           </div>
           <Button onClick={handleSave} className="mt-2 w-full" disabled={isSaving}>
             {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
@@ -250,6 +259,7 @@ export function VisitantesSection() {
                   <th className="px-4 py-3 font-medium">Placa</th>
                   <th className="px-4 py-3 font-medium">Nota Fiscal</th>
                   <th className="px-4 py-3 font-medium">Observações</th>
+                  <th className="px-4 py-3 font-medium">Diversos</th>
                   <th className="px-4 py-3 font-medium">Data & Hora</th>
                   <th className="px-4 py-3 font-medium">Status</th>
                   <th className="px-4 py-3 font-medium text-right">Ações</th>
@@ -257,7 +267,7 @@ export function VisitantesSection() {
               </thead>
               <tbody className="divide-y divide-border/50">
                 {filteredVisitantes.length === 0 ? (
-                  <tr><td colSpan={11} className="py-8 text-center text-muted-foreground">Nenhum visitante registrado.</td></tr>
+                  <tr><td colSpan={12} className="py-8 text-center text-muted-foreground">Nenhum visitante registrado.</td></tr>
                 ) : (
                   filteredVisitantes.map(v => (
                     <tr key={v.id}>
@@ -269,6 +279,7 @@ export function VisitantesSection() {
                       <td className="px-4 py-3">{v.placa}</td>
                       <td className="px-4 py-3">{v.notaFiscal}</td>
                       <td className="px-4 py-3">{v.observacoes}</td>
+                      <td className="px-4 py-3">{v.diversos ? "Sim" : "Não"}</td>
                       <td className="px-4 py-3"><div className="text-xs">{new Date(v.dataEntrada + 'T00:00:00-03:00').toLocaleDateString('pt-BR')}</div><div><span className="font-medium">Ent:</span> {v.horaEntrada}</div><div><span className="font-medium">Saí:</span> {v.horaSaida || "-"}</div></td>
                       <td className="px-4 py-3"><span className={cn("inline-flex items-center rounded-full px-2 py-1 text-xs font-semibold", v.status === "presente" ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300" : "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300")}>{v.status === "presente" ? "Presente" : "Saiu"}</span></td>
                       <td className="px-4 py-3">

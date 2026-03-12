@@ -64,7 +64,7 @@ export function ConsumoSection() {
         placa: consumo.placa,
         produto: consumo.produto,
         notaFiscal: consumo.notaFiscal,
-        tipoServico: consumo.tipoServico,
+        tipoServico: consumo.tipoServico || "",
         navio: consumo.navio,
         terminal: consumo.terminal,
         empresa: consumo.empresa,
