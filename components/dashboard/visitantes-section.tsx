@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from "react"
-import { Plus, Search, UserCheck, UserX, Clock, Building2, Loader2, FilePenLine, Trash2 } from "lucide-react"
+import { Plus, Search, UserCheck, UserX, Clock, Building2, Loader2, FilePenLine, Trash2, LogIn } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -41,28 +41,49 @@ export function VisitantesSection() {
   const [selectedVisitante, setSelectedVisitante] = useState<Visitante | null>(null)
   const [formState, setFormState] = useState(initialFormState)
 
-  useEffect(() => {
-    if (selectedVisitante) {
-      setFormState({
-        nome: selectedVisitante.nome,
-        documento: selectedVisitante.documento,
-        empresa: selectedVisitante.empresa,
-        motivo: selectedVisitante.motivo,
-        destino: selectedVisitante.destino,
-        notaFiscal: selectedVisitante.notaFiscal || "",
-        placa: selectedVisitante.placa || "",
-        observacoes: selectedVisitante.observacoes || "",
-        horaEntrada: selectedVisitante.horaEntrada,
-        horaSaida: selectedVisitante.horaSaida || "",
-      })
-    } else {
-      const now = new Date()
-      setFormState({
+  const handleReEntry = (visitante: Visitante) => {
+    setSelectedVisitante(null); // Ensure we are creating a new entry
+    const now = new Date();
+    setFormState({
         ...initialFormState,
+        nome: visitante.nome,
+        documento: visitante.documento,
+        empresa: visitante.empresa,
+        motivo: visitante.motivo,
+        destino: visitante.destino,
+        notaFiscal: visitante.notaFiscal || "",
+        placa: visitante.placa || "",
+        observacoes: visitante.observacoes || "",
         horaEntrada: now.toTimeString().slice(0, 5),
-      })
+        horaSaida: "",
+    });
+    setIsFormOpen(true);
+  };
+
+  useEffect(() => {
+    if (isFormOpen) {
+      if (selectedVisitante) {
+        // Editing existing entry
+        setFormState({
+          nome: selectedVisitante.nome,
+          documento: selectedVisitante.documento,
+          empresa: selectedVisitante.empresa,
+          motivo: selectedVisitante.motivo,
+          destino: selectedVisitante.destino,
+          notaFiscal: selectedVisitante.notaFiscal || "",
+          placa: selectedVisitante.placa || "",
+          observacoes: selectedVisitante.observacoes || "",
+          horaEntrada: selectedVisitante.horaEntrada,
+          horaSaida: selectedVisitante.horaSaida || "",
+        });
+      } else if (!formState.nome) {
+        // Creating a completely new entry
+        const now = new Date();
+        setFormState({ ...initialFormState, horaEntrada: now.toTimeString().slice(0, 5) });
+      }
+      // Otherwise, the form state is already set (for re-entry), so we do nothing
     }
-  }, [selectedVisitante])
+  }, [isFormOpen, selectedVisitante, formState.nome]);
 
   const presentes = visitantes.filter(v => v.status === "presente").length
   const sairam = visitantes.filter(v => v.status === "saiu").length
@@ -81,8 +102,7 @@ export function VisitantesSection() {
 
   const handleAddNew = () => {
     setSelectedVisitante(null)
-    const now = new Date()
-    setFormState({ ...initialFormState, horaEntrada: now.toTimeString().slice(0, 5) })
+    setFormState(initialFormState) // Clear form for new entry
     setIsFormOpen(true)
   }
 
@@ -113,9 +133,11 @@ export function VisitantesSection() {
   const handleSave = async () => {
     setIsSaving(true)
     try {
+      const status = formState.horaSaida ? "saiu" : "presente"
+
       if (selectedVisitante) {
         // Update existing visitante
-        await updateItem(selectedVisitante.id, formState)
+        await updateItem(selectedVisitante.id, { ...formState, status })
       } else {
         // Add new visitante
         const now = new Date()
@@ -124,6 +146,7 @@ export function VisitantesSection() {
           placa: formState.placa || "N/A",
           dataEntrada: now.toISOString().split("T")[0],
           status: "presente",
+          horaSaida: "", // Explicitly clear horaSaida for new entries
         }
         await addItem(newV)
       }
@@ -184,7 +207,8 @@ export function VisitantesSection() {
             <div className="grid gap-2"><Label htmlFor="notaFiscal">Nota Fiscal</Label><Input id="notaFiscal" value={formState.notaFiscal || ""} onChange={handleInputChange} /></div>
             <div className="grid gap-2"><Label htmlFor="placa">Placa</Label><Input id="placa" placeholder="N/A se não houver" value={formState.placa || ""} onChange={handleInputChange} /></div>
             <div className="grid gap-2"><Label htmlFor="horaEntrada">Hora Entrada</Label><Input id="horaEntrada" type="time" value={formState.horaEntrada} onChange={handleInputChange} /></div>
-            <div className="grid gap-2"><Label htmlFor="horaSaida">Hora Saída</Label><Input id="horaSaida" type="time" value={formState.horaSaida || ""} onChange={handleInputChange} /></div>
+            {/* Hide Hora Saída when creating a new entry or re-entry */}
+            {(selectedVisitante) && <div className="grid gap-2"><Label htmlFor="horaSaida">Hora Saída</Label><Input id="horaSaida" type="time" value={formState.horaSaida || ""} onChange={handleInputChange} /></div>}
             <div className="grid gap-2 md:col-span-2"><Label htmlFor="observacoes">Observações</Label><Textarea id="observacoes" value={formState.observacoes || ""} onChange={handleInputChange} /></div>
           </div>
           <Button onClick={handleSave} className="mt-2 w-full" disabled={isSaving}>
@@ -249,7 +273,11 @@ export function VisitantesSection() {
                       <td className="px-4 py-3"><span className={cn("inline-flex items-center rounded-full px-2 py-1 text-xs font-semibold", v.status === "presente" ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300" : "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300")}>{v.status === "presente" ? "Presente" : "Saiu"}</span></td>
                       <td className="px-4 py-3">
                         <div className="flex items-center justify-end gap-2">
-                          {v.status === "presente" && <Button size="sm" variant="outline" onClick={() => handleRegistrarSaida(v.id)} className="flex items-center gap-2"><Clock className="h-4 w-4" /><span>Sair</span></Button>}
+                          {v.status === "presente" ? (
+                            <Button size="sm" variant="outline" onClick={() => handleRegistrarSaida(v.id)} className="flex items-center gap-2"><Clock className="h-4 w-4" /><span>Sair</span></Button>
+                          ) : (
+                            <Button size="sm" variant="outline" onClick={() => handleReEntry(v)} className="flex items-center gap-2"><LogIn className="h-4 w-4" /><span>Nova Entrada</span></Button>
+                          )}
                           <Button size="icon" variant="ghost" onClick={() => handleEdit(v)}><FilePenLine className="h-4 w-4" /></Button>
                           <Button size="icon" variant="ghost" onClick={() => handleDelete(v)} className="text-destructive hover:text-destructive/90"><Trash2 className="h-4 w-4" /></Button>
                         </div>

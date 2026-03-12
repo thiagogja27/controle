@@ -4,6 +4,7 @@ import { useState } from "react"
 import { useAuth } from "@/hooks/use-auth"
 import { Header } from "@/components/dashboard/header"
 import { Navigation } from "@/components/dashboard/navigation"
+import { DashboardSection } from "@/components/dashboard/dashboard-section"
 import { VisitantesSection } from "@/components/dashboard/visitantes-section"
 import { RefeicoesSection } from "@/components/dashboard/refeicoes-section"
 import { TPAsSection } from "@/components/dashboard/tpas-section"
@@ -12,10 +13,12 @@ import { Loader2 } from "lucide-react"
 
 export default function DashboardPage() {
   const { user, loading } = useAuth()
-  const [activeSection, setActiveSection] = useState("visitantes")
+  const [activeSection, setActiveSection] = useState("dashboard") // Default to dashboard
 
   const renderSection = () => {
     switch (activeSection) {
+      case "dashboard":
+        return <DashboardSection />
       case "visitantes":
         return <VisitantesSection />
       case "refeicoes":
@@ -25,7 +28,7 @@ export default function DashboardPage() {
       case "consumo":
         return <ConsumoSection />
       default:
-        return <VisitantesSection />
+        return <DashboardSection />
     }
   }
 

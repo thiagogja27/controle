@@ -1,7 +1,7 @@
-"use client"
+'use client'
 
 import { cn } from "@/lib/utils"
-import { Users, Utensils, CreditCard, Package } from "lucide-react"
+import { LayoutDashboard, Users, Utensils, CreditCard, Package } from "lucide-react"
 
 interface NavigationProps {
   activeSection: string
@@ -9,6 +9,12 @@ interface NavigationProps {
 }
 
 const sections = [
+  {
+    id: "dashboard",
+    label: "Painel de Controle",
+    icon: LayoutDashboard,
+    description: "Visão geral do sistema"
+  },
   {
     id: "visitantes",
     label: "Controle de Visitantes",

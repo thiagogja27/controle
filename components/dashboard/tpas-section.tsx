@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from "react"
-import { LogOut, Plus, Search, Ship, Users, Loader2, FilePenLine, Trash2 } from "lucide-react"
+import { LogIn, LogOut, Plus, Search, Ship, Users, Loader2, FilePenLine, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent } from "@/components/ui/card"
@@ -47,6 +47,25 @@ export function TPAsSection() {
   const [selectedTPA, setSelectedTPA] = useState<TPA | null>(null)
   const [formState, setFormState] = useState(initialFormState)
 
+  const handleReEntry = (tpa: TPA) => {
+    setSelectedTPA(null); // Ensure we are creating a new entry
+    const now = new Date();
+    setFormState({
+        ...initialFormState,
+        nome: tpa.nome,
+        funcao: tpa.funcao,
+        documento: tpa.documento,
+        destino: tpa.destino,
+        navio: tpa.navio,
+        pier: tpa.pier,
+        observacao: tpa.observacao,
+        vigilante: tpa.vigilante,
+        hora: now.toTimeString().slice(0, 5),
+        horaSaida: "",
+    });
+    setIsFormOpen(true);
+  };
+
   useEffect(() => {
     if (isFormOpen) {
       if (selectedTPA) {
@@ -62,12 +81,12 @@ export function TPAsSection() {
           hora: selectedTPA.hora,
           horaSaida: selectedTPA.horaSaida || "",
         })
-      } else {
+      } else if (!formState.nome) {
         const now = new Date()
         setFormState({ ...initialFormState, hora: now.toTimeString().slice(0, 5) })
       }
     }
-  }, [selectedTPA, isFormOpen])
+  }, [selectedTPA, isFormOpen, formState.nome])
 
   const totalPresentes = registros.filter(r => r.status === "presente").length
   const totalTeg = registros.filter(r => r.pier === "teg").length
@@ -94,6 +113,7 @@ export function TPAsSection() {
 
   const handleAddNew = () => {
     setSelectedTPA(null)
+    setFormState(initialFormState)
     setIsFormOpen(true)
   }
 
@@ -132,7 +152,8 @@ export function TPAsSection() {
         const entry: Omit<TPA, "id"> = {
           ...formState,
           data: now.toISOString().split("T")[0],
-          status,
+          status: "presente",
+          horaSaida: "",
         }
         await addItem(entry)
       }
@@ -208,7 +229,7 @@ export function TPAsSection() {
             </div>
             <div className="grid grid-cols-2 gap-4">
                  <div className="grid gap-2"><Label htmlFor="hora">Hora Entrada</Label><Input id="hora" type="time" value={formState.hora} onChange={handleInputChange} /></div>
-                 <div className="grid gap-2"><Label htmlFor="horaSaida">Hora Saída</Label><Input id="horaSaida" type="time" value={formState.horaSaida || ""} onChange={handleInputChange} /></div>
+                 {selectedTPA && <div className="grid gap-2"><Label htmlFor="horaSaida">Hora Saída</Label><Input id="horaSaida" type="time" value={formState.horaSaida || ""} onChange={handleInputChange} /></div>}
             </div>
             <div className="grid gap-2"><Label htmlFor="vigilante">Vigilante</Label><Input id="vigilante" placeholder="Nome do vigilante responsável" value={formState.vigilante} onChange={handleInputChange} /></div>
             <div className="grid gap-2"><Label htmlFor="observacao">Observação</Label><Textarea id="observacao" placeholder="Observações adicionais (opcional)" value={formState.observacao} onChange={handleInputChange} rows={2} /></div>
@@ -243,7 +264,7 @@ export function TPAsSection() {
               <th className="px-4 py-3 text-sm font-medium text-muted-foreground">Navio</th>
               <th className="px-4 py-3 text-sm font-medium text-muted-foreground">Pier</th>
               <th className="px-4 py-3 text-sm font-medium text-muted-foreground">Vigilante</th>
-              <th className="px-4 py-3 text-sm font-medium text-muted-foreground whitespace-nowrap">Hora Saída</th>
+              <th className="px-4 py-3 text-sm font-medium text-muted-foreground whitespace-nowrap">Status</th>
               <th className="px-4 py-3 text-sm font-medium text-muted-foreground text-right">Ações</th>
             </tr>
           </thead>
@@ -260,9 +281,14 @@ export function TPAsSection() {
                   <td className="px-4 py-3 whitespace-nowrap text-foreground">{r.navio}</td>
                   <td className="px-4 py-3"><span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ${r.pier === "teg" ? "bg-primary/10 text-primary" : "bg-info/10 text-info"}`}>{r.pier.toUpperCase()}</span></td>
                   <td className="px-4 py-3 whitespace-nowrap text-foreground">{r.vigilante}</td>
-                  <td className="px-4 py-3 whitespace-nowrap tabular-nums text-muted-foreground">{r.horaSaida ?? <Button size="sm" variant="outline" onClick={() => handleSaida(r.id)} className="gap-1.5 border-primary/50 text-primary hover:bg-primary hover:text-primary-foreground whitespace-nowrap text-xs"><LogOut className="h-3 w-3" />Registrar</Button>}</td>
+                  <td className="px-4 py-3 whitespace-nowrap tabular-nums text-muted-foreground">{r.horaSaida || "-"}</td>
                   <td className="px-4 py-3">
                     <div className="flex items-center justify-end gap-2">
+                        {r.status === "presente" ? (
+                            <Button size="sm" variant="outline" onClick={() => handleSaida(r.id)} className="gap-1.5 border-primary/50 text-primary hover:bg-primary hover:text-primary-foreground whitespace-nowrap text-xs"><LogOut className="h-3 w-3" />Registrar Saída</Button>
+                        ) : (
+                            <Button size="sm" variant="outline" onClick={() => handleReEntry(r)} className="gap-1.5 border-primary/50 text-primary hover:bg-primary hover:text-primary-foreground whitespace-nowrap text-xs"><LogIn className="h-3 w-3" />Nova Entrada</Button>
+                        )}
                       <Button size="icon" variant="ghost" onClick={() => handleEdit(r)}><FilePenLine className="h-4 w-4" /></Button>
                       <Button size="icon" variant="ghost" onClick={() => handleDelete(r)} className="text-destructive hover:text-destructive/90"><Trash2 className="h-4 w-4" /></Button>
                     </div>

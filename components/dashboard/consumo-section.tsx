@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from "react"
-import { LogOut, Plus, Search, Ship, Truck, Users, X, Loader2, FilePenLine, Trash2, MoreVertical } from "lucide-react"
+import { LogIn, LogOut, Plus, Search, Ship, Truck, Users, X, Loader2, FilePenLine, Trash2, MoreVertical } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -53,6 +53,33 @@ export function ConsumoSection() {
   const [selectedConsumo, setSelectedConsumo] = useState<ConsumoBordo | null>(null)
   const [formState, setFormState] = useState(initialFormState)
 
+  const handleReEntry = (consumo: ConsumoBordo, individuo: Individuo) => {
+    setSelectedConsumo(null);
+    const now = new Date();
+    
+    // Create a new group entry, pre-filled with the data from the old one
+    // but with only the re-entering individual.
+    setFormState({
+        ...initialFormState, // Start with a clean slate
+        veiculo: consumo.veiculo,
+        placa: consumo.placa,
+        produto: consumo.produto,
+        notaFiscal: consumo.notaFiscal,
+        navio: consumo.navio,
+        terminal: consumo.terminal,
+        empresa: consumo.empresa,
+        vigilante: consumo.vigilante, // Or maybe a new vigilante?
+        hora: now.toTimeString().slice(0, 5),
+        individuos: [{
+            id: `new-${Date.now()}`,
+            nome: individuo.nome,
+            status: "presente",
+            horaSaida: "",
+        }],
+    });
+    setIsFormOpen(true);
+  };
+
   useEffect(() => {
     if (isFormOpen) {
       if (selectedConsumo) {
@@ -60,7 +87,7 @@ export function ConsumoSection() {
           ...selectedConsumo,
           individuos: selectedConsumo.individuos.map(ind => ({ ...ind, horaSaida: ind.horaSaida || "" })),
         })
-      } else {
+      } else if (!formState.veiculo) {
         const now = new Date()
         setFormState({
           ...initialFormState,
@@ -69,7 +96,7 @@ export function ConsumoSection() {
         })
       }
     }
-  }, [isFormOpen, selectedConsumo])
+  }, [isFormOpen, selectedConsumo, formState.veiculo])
 
   const filteredConsumos = consumos.filter(consumo => {
     const searchLower = search.toLowerCase()
@@ -124,6 +151,7 @@ export function ConsumoSection() {
 
   const handleAddNew = () => {
     setSelectedConsumo(null)
+    setFormState(initialFormState); // Reset the form state completely
     setIsFormOpen(true)
   }
 
@@ -243,7 +271,7 @@ export function ConsumoSection() {
         <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
           <DialogHeader><DialogTitle>{selectedConsumo ? "Editar Registro" : "Registrar Consumo de Bordo"}</DialogTitle></DialogHeader>
           <div className="grid gap-4 py-4">
-            <div className="rounded-lg border bg-secondary/30 p-4 space-y-3"><div className="flex items-center justify-between"><Label>Indivíduos</Label><Button type="button" variant="outline" size="sm" onClick={addIndividuo}><Plus className="mr-1 h-3 w-3" />Adicionar</Button></div><div className="space-y-3">{formState.individuos.map((ind, index) => (<div key={ind.id || index} className="grid grid-cols-[1fr_auto_auto] items-end gap-2"><Input placeholder={`Nome do indivíduo ${index + 1}`} value={ind.nome} onChange={e => handleIndividuoChange(index, "nome", e.target.value)} /><div className="grid w-full gap-1.5"><Label htmlFor={`horaSaida-${index}`} className="text-xs">H. Saída</Label><Input type="time" id={`horaSaida-${index}`} value={ind.horaSaida || ""} onChange={e => handleIndividuoChange(index, "horaSaida", e.target.value)} /></div>{formState.individuos.length > 1 && <Button type="button" variant="ghost" size="icon" onClick={() => removeIndividuo(index)} className="shrink-0 text-destructive hover:text-destructive"><X className="h-4 w-4" /></Button>}</div>))}</div></div>
+            <div className="rounded-lg border bg-secondary/30 p-4 space-y-3"><div className="flex items-center justify-between"><Label>Indivíduos</Label><Button type="button" variant="outline" size="sm" onClick={addIndividuo}><Plus className="mr-1 h-3 w-3" />Adicionar</Button></div><div className="space-y-3">{formState.individuos.map((ind, index) => (<div key={ind.id || index} className="grid grid-cols-[1fr_auto_auto] items-end gap-2"><Input placeholder={`Nome do indivíduo ${index + 1}`} value={ind.nome} onChange={e => handleIndividuoChange(index, "nome", e.target.value)} />{selectedConsumo && <div className="grid w-full gap-1.5"><Label htmlFor={`horaSaida-${index}`} className="text-xs">H. Saída</Label><Input type="time" id={`horaSaida-${index}`} value={ind.horaSaida || ""} onChange={e => handleIndividuoChange(index, "horaSaida", e.target.value)} /></div>}{formState.individuos.length > 1 && !selectedConsumo && <Button type="button" variant="ghost" size="icon" onClick={() => removeIndividuo(index)} className="shrink-0 text-destructive hover:text-destructive"><X className="h-4 w-4" /></Button>}</div>))}</div></div>
             <div className="grid grid-cols-2 gap-4"><div className="grid gap-2"><Label htmlFor="veiculo">Veículo</Label><Input id="veiculo" placeholder="Ex: Caminhão Baú" value={formState.veiculo} onChange={handleInputChange} /></div><div className="grid gap-2"><Label htmlFor="placa">Placa</Label><Input id="placa" placeholder="Ex: ABC-1234" value={formState.placa} onChange={handleInputChange} /></div></div>
             <div className="grid grid-cols-2 gap-4"><div className="grid gap-2"><Label htmlFor="produto">Produto</Label><Input id="produto" placeholder="Ex: Água Mineral" value={formState.produto} onChange={handleInputChange} /></div><div className="grid gap-2"><Label htmlFor="notaFiscal">Nota Fiscal</Label><Input id="notaFiscal" placeholder="Ex: NF-001234" value={formState.notaFiscal} onChange={handleInputChange} /></div></div>
             <div className="grid grid-cols-2 gap-4"><div className="grid gap-2"><Label htmlFor="navio">Navio</Label><Input id="navio" placeholder="Nome do navio" value={formState.navio} onChange={handleInputChange} /></div><div className="grid gap-2"><Label htmlFor="terminal">Terminal</Label><Select value={formState.terminal} onValueChange={v => handleSelectChange("terminal", v)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="teg">TEG</SelectItem><SelectItem value="teag">TEAG</SelectItem></SelectContent></Select></div></div>
@@ -299,7 +327,16 @@ export function ConsumoSection() {
                         <td className="px-4 py-3 font-medium">{individuo.nome}</td>
                         <td className="px-4 py-3"><span className={cn("inline-flex items-center rounded-full px-2 py-1 text-xs font-semibold", individuo.status === "presente" ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300" : "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300")}>{individuo.status === "presente" ? "A Bordo" : "Saiu"}</span></td>
                         <td className="px-4 py-3 tabular-nums text-muted-foreground">{individuoIndex === 0 ? formatDateTime(consumo.data, consumo.hora) : ''}</td>
-                        <td className="px-4 py-3 tabular-nums text-muted-foreground">{individuo.horaSaida || (individuo.status === 'presente' ? <Button size="xs" variant="outline" onClick={() => handleSaida(consumo.id, individuo.id)}>Sair</Button> : '-')}</td>
+                        <td className="px-4 py-3 tabular-nums text-muted-foreground">
+                          {individuo.status === 'presente' ? (
+                            <Button size="xs" variant="outline" onClick={() => handleSaida(consumo.id, individuo.id)}>Sair</Button>
+                          ) : individuo.horaSaida ? (
+                            <div className="flex items-center gap-2">
+                              <span>{individuo.horaSaida}</span>
+                              <Button size="xs" variant="outline" onClick={() => handleReEntry(consumo, individuo)}><LogIn className="h-3 w-3 mr-1" />Nova Entrada</Button>
+                            </div>
+                          ) : '-'}
+                        </td>
                         {individuoIndex === 0 ? (
                            <>
                             <td rowSpan={consumo.individuos.length} className="px-4 py-3 text-muted-foreground align-top">{consumo.empresa}</td>

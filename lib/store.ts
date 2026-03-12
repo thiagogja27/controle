@@ -16,16 +16,21 @@ export interface Visitante {
   observacoes?: string
 }
 
-export interface RefeicaoPolicial {
+export interface IndividuoRefeicao {
   id: string
   nome: string
+  status: "presente" | "saiu"
+  horaSaida?: string
+}
+
+export interface RefeicaoPolicial {
+  id: string
+  individuos: IndividuoRefeicao[]
   prefixo: string
   categoria: "pm" | "civil"
   vigilante: string
   data: string
   hora: string
-  horaSaida?: string
-  status: "presente" | "saiu"
 }
 
 export interface TPA {
