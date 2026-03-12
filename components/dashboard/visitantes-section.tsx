@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Plus, Search, UserCheck, UserX, Clock, Building2, Loader2, FilePenLine, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -13,14 +13,13 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
 import { type Visitante } from "@/lib/store"
 import { useVisitantes } from "@/hooks/use-firebase"
 import { cn } from "@/lib/utils"
 
-const initialFormState: Omit<Visitante, "id" | "dataEntrada" | "horaEntrada" | "status" | "horaSaida"> = {
+const initialFormState: Omit<Visitante, "id" | "dataEntrada" | "status"> = {
   nome: "",
   documento: "",
   empresa: "",
@@ -29,6 +28,8 @@ const initialFormState: Omit<Visitante, "id" | "dataEntrada" | "horaEntrada" | "
   notaFiscal: "",
   placa: "",
   observacoes: "",
+  horaEntrada: "",
+  horaSaida: "",
 }
 
 export function VisitantesSection() {
@@ -39,6 +40,29 @@ export function VisitantesSection() {
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false)
   const [selectedVisitante, setSelectedVisitante] = useState<Visitante | null>(null)
   const [formState, setFormState] = useState(initialFormState)
+
+  useEffect(() => {
+    if (selectedVisitante) {
+      setFormState({
+        nome: selectedVisitante.nome,
+        documento: selectedVisitante.documento,
+        empresa: selectedVisitante.empresa,
+        motivo: selectedVisitante.motivo,
+        destino: selectedVisitante.destino,
+        notaFiscal: selectedVisitante.notaFiscal || "",
+        placa: selectedVisitante.placa || "",
+        observacoes: selectedVisitante.observacoes || "",
+        horaEntrada: selectedVisitante.horaEntrada,
+        horaSaida: selectedVisitante.horaSaida || "",
+      })
+    } else {
+      const now = new Date()
+      setFormState({
+        ...initialFormState,
+        horaEntrada: now.toTimeString().slice(0, 5),
+      })
+    }
+  }, [selectedVisitante])
 
   const presentes = visitantes.filter(v => v.status === "presente").length
   const sairam = visitantes.filter(v => v.status === "saiu").length
@@ -57,22 +81,13 @@ export function VisitantesSection() {
 
   const handleAddNew = () => {
     setSelectedVisitante(null)
-    setFormState(initialFormState)
+    const now = new Date()
+    setFormState({ ...initialFormState, horaEntrada: now.toTimeString().slice(0, 5) })
     setIsFormOpen(true)
   }
 
   const handleEdit = (visitante: Visitante) => {
     setSelectedVisitante(visitante)
-    setFormState({
-      nome: visitante.nome,
-      documento: visitante.documento,
-      empresa: visitante.empresa,
-      motivo: visitante.motivo,
-      destino: visitante.destino,
-      notaFiscal: visitante.notaFiscal || "",
-      placa: visitante.placa || "",
-      observacoes: visitante.observacoes || "",
-    })
     setIsFormOpen(true)
   }
 
@@ -108,7 +123,6 @@ export function VisitantesSection() {
           ...formState,
           placa: formState.placa || "N/A",
           dataEntrada: now.toISOString().split("T")[0],
-          horaEntrada: now.toTimeString().slice(0, 5),
           status: "presente",
         }
         await addItem(newV)
@@ -169,6 +183,8 @@ export function VisitantesSection() {
             <div className="grid gap-2"><Label htmlFor="destino">Destino</Label><Input id="destino" value={formState.destino} onChange={handleInputChange} /></div>
             <div className="grid gap-2"><Label htmlFor="notaFiscal">Nota Fiscal</Label><Input id="notaFiscal" value={formState.notaFiscal || ""} onChange={handleInputChange} /></div>
             <div className="grid gap-2"><Label htmlFor="placa">Placa</Label><Input id="placa" placeholder="N/A se não houver" value={formState.placa || ""} onChange={handleInputChange} /></div>
+            <div className="grid gap-2"><Label htmlFor="horaEntrada">Hora Entrada</Label><Input id="horaEntrada" type="time" value={formState.horaEntrada} onChange={handleInputChange} /></div>
+            <div className="grid gap-2"><Label htmlFor="horaSaida">Hora Saída</Label><Input id="horaSaida" type="time" value={formState.horaSaida || ""} onChange={handleInputChange} /></div>
             <div className="grid gap-2 md:col-span-2"><Label htmlFor="observacoes">Observações</Label><Textarea id="observacoes" value={formState.observacoes || ""} onChange={handleInputChange} /></div>
           </div>
           <Button onClick={handleSave} className="mt-2 w-full" disabled={isSaving}>
@@ -205,6 +221,11 @@ export function VisitantesSection() {
                   <th className="px-4 py-3 font-medium">Visitante</th>
                   <th className="px-4 py-3 font-medium">Documento</th>
                   <th className="px-4 py-3 font-medium">Empresa</th>
+                  <th className="px-4 py-3 font-medium">Motivo</th>
+                  <th className="px-4 py-3 font-medium">Destino</th>
+                  <th className="px-4 py-3 font-medium">Placa</th>
+                  <th className="px-4 py-3 font-medium">Nota Fiscal</th>
+                  <th className="px-4 py-3 font-medium">Observações</th>
                   <th className="px-4 py-3 font-medium">Data & Hora</th>
                   <th className="px-4 py-3 font-medium">Status</th>
                   <th className="px-4 py-3 font-medium text-right">Ações</th>
@@ -212,13 +233,18 @@ export function VisitantesSection() {
               </thead>
               <tbody className="divide-y divide-border/50">
                 {filteredVisitantes.length === 0 ? (
-                  <tr><td colSpan={6} className="py-8 text-center text-muted-foreground">Nenhum visitante registrado.</td></tr>
+                  <tr><td colSpan={11} className="py-8 text-center text-muted-foreground">Nenhum visitante registrado.</td></tr>
                 ) : (
                   filteredVisitantes.map(v => (
                     <tr key={v.id}>
-                      <td className="px-4 py-3"><div className="font-medium">{v.nome}</div><div className="text-xs text-muted-foreground">{v.motivo}</div></td>
+                      <td className="px-4 py-3 font-medium">{v.nome}</td>
                       <td className="px-4 py-3">{v.documento}</td>
                       <td className="px-4 py-3">{v.empresa}</td>
+                      <td className="px-4 py-3">{v.motivo}</td>
+                      <td className="px-4 py-3">{v.destino}</td>
+                      <td className="px-4 py-3">{v.placa}</td>
+                      <td className="px-4 py-3">{v.notaFiscal}</td>
+                      <td className="px-4 py-3">{v.observacoes}</td>
                       <td className="px-4 py-3"><div className="text-xs">{new Date(v.dataEntrada + 'T00:00:00-03:00').toLocaleDateString('pt-BR')}</div><div><span className="font-medium">Ent:</span> {v.horaEntrada}</div><div><span className="font-medium">Saí:</span> {v.horaSaida || "-"}</div></td>
                       <td className="px-4 py-3"><span className={cn("inline-flex items-center rounded-full px-2 py-1 text-xs font-semibold", v.status === "presente" ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300" : "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300")}>{v.status === "presente" ? "Presente" : "Saiu"}</span></td>
                       <td className="px-4 py-3">

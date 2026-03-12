@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { LogOut, Plus, Search, Shield, Users, Loader2, FilePenLine, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -24,11 +24,13 @@ const categoriaConfig = {
   civil: { label: "Civil", icon: Users, color: "text-amber-400", bg: "bg-amber-400/10" },
 }
 
-const initialFormState: Omit<RefeicaoPolicial, "id" | "data" | "hora" | "status" | "horaSaida"> = {
+const initialFormState: Omit<RefeicaoPolicial, "id" | "data" | "status"> = {
   nome: "",
   prefixo: "",
   categoria: "pm",
   vigilante: "",
+  hora: "",
+  horaSaida: "",
 }
 
 export function RefeicoesSection() {
@@ -39,6 +41,22 @@ export function RefeicoesSection() {
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false)
   const [selectedRefeicao, setSelectedRefeicao] = useState<RefeicaoPolicial | null>(null)
   const [formState, setFormState] = useState(initialFormState)
+
+  useEffect(() => {
+    if (selectedRefeicao) {
+      setFormState({
+        nome: selectedRefeicao.nome,
+        prefixo: selectedRefeicao.prefixo,
+        categoria: selectedRefeicao.categoria,
+        vigilante: selectedRefeicao.vigilante,
+        hora: selectedRefeicao.hora,
+        horaSaida: selectedRefeicao.horaSaida || "",
+      })
+    } else {
+      const now = new Date()
+      setFormState({ ...initialFormState, hora: now.toTimeString().slice(0, 5) })
+    }
+  }, [selectedRefeicao, isFormOpen])
 
   const totalPM = refeicoes.filter(r => r.categoria === "pm").length
   const totalCivil = refeicoes.filter(r => r.categoria === "civil").length
@@ -61,18 +79,11 @@ export function RefeicoesSection() {
 
   const handleAddNew = () => {
     setSelectedRefeicao(null)
-    setFormState(initialFormState)
     setIsFormOpen(true)
   }
 
   const handleEdit = (refeicao: RefeicaoPolicial) => {
     setSelectedRefeicao(refeicao)
-    setFormState({
-      nome: refeicao.nome,
-      prefixo: refeicao.prefixo,
-      categoria: refeicao.categoria,
-      vigilante: refeicao.vigilante,
-    })
     setIsFormOpen(true)
   }
 
@@ -99,21 +110,19 @@ export function RefeicoesSection() {
     if (!formState.nome.trim() || !formState.vigilante.trim()) return
     setIsSaving(true)
     try {
+      const status = formState.horaSaida ? "saiu" : "presente"
       if (selectedRefeicao) {
-        await updateItem(selectedRefeicao.id, formState)
+        await updateItem(selectedRefeicao.id, { ...formState, status })
       } else {
         const now = new Date()
         const entry: Omit<RefeicaoPolicial, "id"> = {
           ...formState,
           data: now.toISOString().split("T")[0],
-          hora: now.toTimeString().slice(0, 5),
-          status: "presente",
+          status,
         }
         await addItem(entry)
       }
       setIsFormOpen(false)
-      setFormState(initialFormState)
-      setSelectedRefeicao(null)
     } catch (error) {
       console.error("Erro ao salvar refeição:", error)
     } finally {
@@ -133,6 +142,7 @@ export function RefeicoesSection() {
   }
 
   const formatDateTime = (data: string, hora: string) => {
+    if (!data) return ""
     const [year, month, day] = data.split("-")
     return `${day}/${month}/${year} ${hora}`
   }
@@ -165,13 +175,17 @@ export function RefeicoesSection() {
         <DialogContent className="sm:max-w-md">
           <DialogHeader><DialogTitle>{selectedRefeicao ? "Editar Refeição" : "Registrar Refeição"}</DialogTitle></DialogHeader>
           <div className="grid gap-5 py-4">
-            <div className="grid gap-2"><Label htmlFor="prefixo">Prefixo</Label><Input id="prefixo" placeholder="Ex: Sgt, Cb, Sd, Del..." value={formState.prefixo} onChange={handleInputChange} /></div>
-            <div className="grid gap-2"><Label htmlFor="nome">Nome</Label><Input id="nome" placeholder="Nome completo" value={formState.nome} onChange={handleInputChange} /></div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-2"><Label htmlFor="prefixo">Prefixo</Label><Input id="prefixo" placeholder="Ex: Sgt, Cb, Sd, Del..." value={formState.prefixo} onChange={handleInputChange} /></div>
+              <div className="grid gap-2"><Label htmlFor="nome">Nome</Label><Input id="nome" placeholder="Nome completo" value={formState.nome} onChange={handleInputChange} /></div>
+              <div className="grid gap-2"><Label htmlFor="hora">Hora Entrada</Label><Input id="hora" type="time" value={formState.hora} onChange={handleInputChange} /></div>
+              <div className="grid gap-2"><Label htmlFor="horaSaida">Hora Saída</Label><Input id="horaSaida" type="time" value={formState.horaSaida || ""} onChange={handleInputChange} /></div>
+            </div>
             <div className="grid gap-2"><Label htmlFor="vigilante">Vigilante</Label><Input id="vigilante" placeholder="Nome do vigilante responsável" value={formState.vigilante} onChange={handleInputChange} /></div>
             <div className="grid gap-3"><Label>Categoria</Label>
-              <div className="grid gap-3">
-                <div className="flex items-center gap-3 rounded-lg border border-border bg-secondary/30 p-3"><Checkbox id="cat-pm" checked={formState.categoria === "pm"} onCheckedChange={() => handleCategoryChange("pm")} /><Label htmlFor="cat-pm" className="flex cursor-pointer items-center gap-2 font-normal"><Shield className="h-4 w-4 text-blue-400" />PM (Polícia Militar)</Label></div>
-                <div className="flex items-center gap-3 rounded-lg border border-border bg-secondary/30 p-3"><Checkbox id="cat-civil" checked={formState.categoria === "civil"} onCheckedChange={() => handleCategoryChange("civil")} /><Label htmlFor="cat-civil" className="flex cursor-pointer items-center gap-2 font-normal"><Users className="h-4 w-4 text-amber-400" />Civil (Polícia Civil)</Label></div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="flex items-center gap-3 rounded-lg border border-border bg-secondary/30 p-3"><Checkbox id="cat-pm" checked={formState.categoria === "pm"} onCheckedChange={() => handleCategoryChange("pm")} /><Label htmlFor="cat-pm" className="flex cursor-pointer items-center gap-2 font-normal"><Shield className="h-4 w-4 text-blue-400" />PM</Label></div>
+                <div className="flex items-center gap-3 rounded-lg border border-border bg-secondary/30 p-3"><Checkbox id="cat-civil" checked={formState.categoria === "civil"} onCheckedChange={() => handleCategoryChange("civil")} /><Label htmlFor="cat-civil" className="flex cursor-pointer items-center gap-2 font-normal"><Users className="h-4 w-4 text-amber-400" />Civil</Label></div>
               </div>
             </div>
             <Button onClick={handleSave} className="mt-2" disabled={!formState.nome.trim() || !formState.vigilante.trim() || isSaving}>{isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}{selectedRefeicao ? "Salvar Alterações" : "Registrar"}</Button>
@@ -200,7 +214,7 @@ export function RefeicoesSection() {
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
-                <tr className="border-b border-border text-left"><th className="pb-3 text-sm font-medium text-muted-foreground">Data / Hora</th><th className="pb-3 text-sm font-medium text-muted-foreground">Nome</th><th className="pb-3 text-sm font-medium text-muted-foreground">Prefixo</th><th className="pb-3 text-sm font-medium text-muted-foreground">PM / Civil</th><th className="pb-3 text-sm font-medium text-muted-foreground">Vigilante</th><th className="pb-3 text-sm font-medium text-muted-foreground">Saída</th><th className="pb-3 text-sm font-medium text-muted-foreground text-right">Ações</th></tr>
+                <tr className="border-b border-border text-left"><th className="pb-3 text-sm font-medium text-muted-foreground">Data / Hora</th><th className="pb-3 text-sm font-medium text-muted-foreground">Nome</th><th className="pb-3 text-sm font-medium text-muted-foreground">Prefixo</th><th className="pb-3 text-sm font-medium text-muted-foreground">Categoria</th><th className="pb-3 text-sm font-medium text-muted-foreground">Vigilante</th><th className="pb-3 text-sm font-medium text-muted-foreground">Saída</th><th className="pb-3 text-sm font-medium text-muted-foreground text-right">Ações</th></tr>
               </thead>
               <tbody>
                 {filteredRefeicoes.length === 0 ? (
@@ -211,12 +225,11 @@ export function RefeicoesSection() {
                       <td className="py-4 text-sm tabular-nums text-muted-foreground">{formatDateTime(r.data, r.hora)}</td>
                       <td className="py-4 font-medium">{r.nome}</td>
                       <td className="py-4"><span className="rounded bg-secondary px-2 py-0.5 text-xs font-semibold text-muted-foreground">{r.prefixo || "—"}</span></td>
-                      <td className="py-4"><div className="flex items-center gap-3"><span className={cn("font-medium text-sm", r.categoria === "pm" ? "text-blue-400" : "text-muted-foreground")}>PM</span><span className={cn("font-medium text-sm", r.categoria === "civil" ? "text-amber-400" : "text-muted-foreground")}>Civil</span></div></td>
+                      <td className="py-4"><span className={cn("font-semibold", r.categoria === 'pm' ? categoriaConfig.pm.color : categoriaConfig.civil.color)}>{r.categoria.toUpperCase()}</span></td>
                       <td className="py-4 font-medium">{r.vigilante}</td>
-                      <td className="py-4">{r.horaSaida ? <span className="text-sm tabular-nums text-muted-foreground">{r.horaSaida}</span> : <span className="text-sm text-muted-foreground">—</span>}</td>
+                      <td className="py-4">{r.horaSaida ? <span className="text-sm tabular-nums text-muted-foreground">{r.horaSaida}</span> : <Button size="sm" variant="outline" onClick={() => handleSaida(r.id)} className="gap-1.5 border-primary/50 text-primary hover:bg-primary hover:text-primary-foreground text-xs"><LogOut className="h-3 w-3" />Registrar</Button>}</td>
                       <td className="py-4">
                         <div className="flex items-center justify-end gap-2">
-                          {r.status === "presente" && <Button size="sm" variant="outline" onClick={() => handleSaida(r.id)} className="gap-1.5 border-primary/50 text-primary hover:bg-primary hover:text-primary-foreground"><LogOut className="h-3.5 w-3.5" />Dar Saída</Button>}
                           <Button size="icon" variant="ghost" onClick={() => handleEdit(r)}><FilePenLine className="h-4 w-4" /></Button>
                           <Button size="icon" variant="ghost" onClick={() => handleDelete(r)} className="text-destructive hover:text-destructive/90"><Trash2 className="h-4 w-4" /></Button>
                         </div>

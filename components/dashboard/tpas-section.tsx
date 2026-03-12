@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { LogOut, Plus, Search, Ship, Users, Loader2, FilePenLine, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -25,7 +25,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { type TPA } from "@/lib/store"
 import { useTPAs } from "@/hooks/use-firebase"
 
-const initialFormState: Omit<TPA, "id" | "data" | "hora" | "status" | "horaSaida"> = {
+const initialFormState: Omit<TPA, "id" | "data" | "status"> = {
   nome: "",
   funcao: "",
   documento: "",
@@ -34,6 +34,8 @@ const initialFormState: Omit<TPA, "id" | "data" | "hora" | "status" | "horaSaida
   pier: "teg",
   observacao: "",
   vigilante: "",
+  hora: "",
+  horaSaida: "",
 }
 
 export function TPAsSection() {
@@ -45,6 +47,28 @@ export function TPAsSection() {
   const [selectedTPA, setSelectedTPA] = useState<TPA | null>(null)
   const [formState, setFormState] = useState(initialFormState)
 
+  useEffect(() => {
+    if (isFormOpen) {
+      if (selectedTPA) {
+        setFormState({
+          nome: selectedTPA.nome,
+          funcao: selectedTPA.funcao,
+          documento: selectedTPA.documento,
+          destino: selectedTPA.destino,
+          navio: selectedTPA.navio,
+          pier: selectedTPA.pier,
+          observacao: selectedTPA.observacao,
+          vigilante: selectedTPA.vigilante,
+          hora: selectedTPA.hora,
+          horaSaida: selectedTPA.horaSaida || "",
+        })
+      } else {
+        const now = new Date()
+        setFormState({ ...initialFormState, hora: now.toTimeString().slice(0, 5) })
+      }
+    }
+  }, [selectedTPA, isFormOpen])
+
   const totalPresentes = registros.filter(r => r.status === "presente").length
   const totalTeg = registros.filter(r => r.pier === "teg").length
   const totalTeag = registros.filter(r => r.pier === "teag").length
@@ -52,12 +76,11 @@ export function TPAsSection() {
   const filtered = registros.filter(r => {
     const searchLower = search.toLowerCase().trim()
     if (!searchLower) return true
-
-    const nomeMatch = r.nome ? r.nome.toLowerCase().includes(searchLower) : false
-    const docMatch = r.documento ? r.documento.toLowerCase().includes(searchLower) : false
-    const navioMatch = r.navio ? r.navio.toLowerCase().includes(searchLower) : false
-
-    return nomeMatch || docMatch || navioMatch
+    return (
+      r.nome?.toLowerCase().includes(searchLower) ||
+      r.documento?.toLowerCase().includes(searchLower) ||
+      r.navio?.toLowerCase().includes(searchLower)
+    )
   })
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -71,22 +94,11 @@ export function TPAsSection() {
 
   const handleAddNew = () => {
     setSelectedTPA(null)
-    setFormState(initialFormState)
     setIsFormOpen(true)
   }
 
   const handleEdit = (tpa: TPA) => {
     setSelectedTPA(tpa)
-    setFormState({
-      nome: tpa.nome,
-      funcao: tpa.funcao,
-      documento: tpa.documento,
-      destino: tpa.destino,
-      navio: tpa.navio,
-      pier: tpa.pier,
-      observacao: tpa.observacao,
-      vigilante: tpa.vigilante,
-    })
     setIsFormOpen(true)
   }
 
@@ -112,21 +124,19 @@ export function TPAsSection() {
   const handleSave = async () => {
     setIsSaving(true)
     try {
+      const status = formState.horaSaida ? "saiu" : "presente"
       if (selectedTPA) {
-        await updateItem(selectedTPA.id, formState)
+        await updateItem(selectedTPA.id, { ...formState, status })
       } else {
         const now = new Date()
         const entry: Omit<TPA, "id"> = {
           ...formState,
           data: now.toISOString().split("T")[0],
-          hora: now.toTimeString().slice(0, 5),
-          status: "presente",
+          status,
         }
         await addItem(entry)
       }
       setIsFormOpen(false)
-      setFormState(initialFormState)
-      setSelectedTPA(null)
     } catch (error) {
       console.error("Erro ao salvar TPA:", error)
     } finally {
@@ -135,29 +145,11 @@ export function TPAsSection() {
   }
 
   const handleSaida = async (id: string) => {
-    const tpaToUpdate = registros.find(r => r.id === id)
-    if (!tpaToUpdate) {
-      console.error("TPA não encontrado para registrar a saída.")
-      return
-    }
-
-    const updatedData = {
-      nome: tpaToUpdate.nome,
-      funcao: tpaToUpdate.funcao,
-      documento: tpaToUpdate.documento,
-      destino: tpaToUpdate.destino,
-      navio: tpaToUpdate.navio,
-      pier: tpaToUpdate.pier,
-      observacao: tpaToUpdate.observacao,
-      vigilante: tpaToUpdate.vigilante,
-      data: tpaToUpdate.data,
-      hora: tpaToUpdate.hora,
-      status: "saiu",
-      horaSaida: new Date().toTimeString().slice(0, 5),
-    }
-
     try {
-      await updateItem(id, updatedData)
+      await updateItem(id, {
+        status: "saiu",
+        horaSaida: new Date().toTimeString().slice(0, 5),
+      })
     } catch (error) {
       console.error("Erro ao registrar saída:", error)
     }
@@ -214,6 +206,10 @@ export function TPAsSection() {
               <div className="grid gap-2"><Label htmlFor="navio">Navio</Label><Input id="navio" placeholder="Nome do navio" value={formState.navio} onChange={handleInputChange} /></div>
               <div className="grid gap-2"><Label htmlFor="pier">Pier</Label><Select value={formState.pier} onValueChange={v => handleSelectChange("pier", v as "teg" | "teag")}><SelectTrigger id="pier"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="teg">TEG</SelectItem><SelectItem value="teag">TEAG</SelectItem></SelectContent></Select></div>
             </div>
+            <div className="grid grid-cols-2 gap-4">
+                 <div className="grid gap-2"><Label htmlFor="hora">Hora Entrada</Label><Input id="hora" type="time" value={formState.hora} onChange={handleInputChange} /></div>
+                 <div className="grid gap-2"><Label htmlFor="horaSaida">Hora Saída</Label><Input id="horaSaida" type="time" value={formState.horaSaida || ""} onChange={handleInputChange} /></div>
+            </div>
             <div className="grid gap-2"><Label htmlFor="vigilante">Vigilante</Label><Input id="vigilante" placeholder="Nome do vigilante responsável" value={formState.vigilante} onChange={handleInputChange} /></div>
             <div className="grid gap-2"><Label htmlFor="observacao">Observação</Label><Textarea id="observacao" placeholder="Observações adicionais (opcional)" value={formState.observacao} onChange={handleInputChange} rows={2} /></div>
             <Button onClick={handleSave} disabled={!isFormValid || isSaving} className="mt-2">{isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}{selectedTPA ? "Salvar Alterações" : "Registrar Entrada"}</Button>
@@ -264,10 +260,9 @@ export function TPAsSection() {
                   <td className="px-4 py-3 whitespace-nowrap text-foreground">{r.navio}</td>
                   <td className="px-4 py-3"><span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ${r.pier === "teg" ? "bg-primary/10 text-primary" : "bg-info/10 text-info"}`}>{r.pier.toUpperCase()}</span></td>
                   <td className="px-4 py-3 whitespace-nowrap text-foreground">{r.vigilante}</td>
-                  <td className="px-4 py-3 whitespace-nowrap tabular-nums text-muted-foreground">{r.horaSaida ?? <span className="text-border">—</span>}</td>
+                  <td className="px-4 py-3 whitespace-nowrap tabular-nums text-muted-foreground">{r.horaSaida ?? <Button size="sm" variant="outline" onClick={() => handleSaida(r.id)} className="gap-1.5 border-primary/50 text-primary hover:bg-primary hover:text-primary-foreground whitespace-nowrap text-xs"><LogOut className="h-3 w-3" />Registrar</Button>}</td>
                   <td className="px-4 py-3">
                     <div className="flex items-center justify-end gap-2">
-                      {r.status === "presente" && <Button size="sm" variant="outline" onClick={() => handleSaida(r.id)} className="gap-1.5 border-primary/50 text-primary hover:bg-primary hover:text-primary-foreground whitespace-nowrap"><LogOut className="h-3.5 w-3.5" />Dar Saída</Button>}
                       <Button size="icon" variant="ghost" onClick={() => handleEdit(r)}><FilePenLine className="h-4 w-4" /></Button>
                       <Button size="icon" variant="ghost" onClick={() => handleDelete(r)} className="text-destructive hover:text-destructive/90"><Trash2 className="h-4 w-4" /></Button>
                     </div>
