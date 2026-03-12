@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { useAuth } from "@/hooks/use-auth"
 import { Loader2 } from "lucide-react"
+import { ParticlesBackground } from "@/components/ui/particles-background"
 
 export default function LoginPage() {
   const [email, setEmail] = useState("")
@@ -34,8 +35,9 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="dark relative flex min-h-screen flex-col items-center justify-center bg-background p-4">
-      <div className="mb-8 flex items-center justify-center gap-8">
+    <div className="dark relative flex min-h-screen flex-col items-center justify-center p-4">
+      <ParticlesBackground />
+      <div className="z-10 mb-8 flex items-center justify-center gap-8">
         <Image 
           src="/teag-logo.png" 
           alt="TEG/TEAG Logo" 
@@ -49,7 +51,7 @@ export default function LoginPage() {
           height={98}
         />
       </div>
-      <Card className="w-full max-w-md shadow-2xl">
+      <Card className="z-10 w-full max-w-md shadow-2xl">
         <CardHeader className="text-center">
           <CardTitle className="pt-8 text-2xl font-bold">Acesso Restrito</CardTitle>
           <CardDescription>Faça login para gerenciar o sistema de controle patrimonial.</CardDescription>
@@ -86,7 +88,7 @@ export default function LoginPage() {
           </form>
         </CardContent>
       </Card>
-      <footer className="absolute bottom-4 text-center text-sm text-muted-foreground">
+      <footer className="absolute bottom-4 z-10 text-center text-sm text-muted-foreground">
         <p>© 2026 BalTech Solutions. Todos os direitos reservados.</p>
       </footer>
     </div>
