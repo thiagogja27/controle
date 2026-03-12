@@ -63,6 +63,7 @@ export interface ConsumoBordo {
   placa: string
   produto: string
   notaFiscal: string
+  tipoServico: string // Added service type
   navio: string
   terminal: "teg" | "teag"
   empresa: string

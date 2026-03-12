@@ -254,7 +254,7 @@ export function TPAsSection() {
 
       {/* Table */}
       <div className="rounded-lg border border-border bg-card overflow-x-auto">
-        <table className="w-full min-w-[900px] text-sm">
+        <table className="w-full min-w-[1200px] text-sm">
           <thead>
             <tr className="border-b border-border text-left">
               <th className="px-4 py-3 text-sm font-medium text-muted-foreground whitespace-nowrap">Data / Hora</th>
@@ -262,15 +262,17 @@ export function TPAsSection() {
               <th className="px-4 py-3 text-sm font-medium text-muted-foreground">Função</th>
               <th className="px-4 py-3 text-sm font-medium text-muted-foreground">Documento</th>
               <th className="px-4 py-3 text-sm font-medium text-muted-foreground">Navio</th>
+              <th className="px-4 py-3 text-sm font-medium text-muted-foreground">Destino</th>
               <th className="px-4 py-3 text-sm font-medium text-muted-foreground">Pier</th>
               <th className="px-4 py-3 text-sm font-medium text-muted-foreground">Vigilante</th>
-              <th className="px-4 py-3 text-sm font-medium text-muted-foreground whitespace-nowrap">Status</th>
+              <th className="px-4 py-3 text-sm font-medium text-muted-foreground">Observações</th>
+              <th className="px-4 py-3 text-sm font-medium text-muted-foreground whitespace-nowrap">Hora Saída</th>
               <th className="px-4 py-3 text-sm font-medium text-muted-foreground text-right">Ações</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
             {filtered.length === 0 ? (
-              <tr><td colSpan={9} className="py-8 text-center text-sm text-muted-foreground">Nenhum registro encontrado.</td></tr>
+              <tr><td colSpan={11} className="py-8 text-center text-sm text-muted-foreground">Nenhum registro encontrado.</td></tr>
             ) : (
               filtered.map(r => (
                 <tr key={r.id} className="hover:bg-secondary/30 transition-colors">
@@ -279,8 +281,10 @@ export function TPAsSection() {
                   <td className="px-4 py-3 text-muted-foreground">{r.funcao}</td>
                   <td className="px-4 py-3 tabular-nums text-muted-foreground">{r.documento}</td>
                   <td className="px-4 py-3 whitespace-nowrap text-foreground">{r.navio}</td>
+                  <td className="px-4 py-3 text-muted-foreground">{r.destino}</td>
                   <td className="px-4 py-3"><span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ${r.pier === "teg" ? "bg-primary/10 text-primary" : "bg-info/10 text-info"}`}>{r.pier.toUpperCase()}</span></td>
                   <td className="px-4 py-3 whitespace-nowrap text-foreground">{r.vigilante}</td>
+                  <td className="px-4 py-3 text-muted-foreground max-w-xs truncate">{r.observacao}</td>
                   <td className="px-4 py-3 whitespace-nowrap tabular-nums text-muted-foreground">{r.horaSaida || "-"}</td>
                   <td className="px-4 py-3">
                     <div className="flex items-center justify-end gap-2">

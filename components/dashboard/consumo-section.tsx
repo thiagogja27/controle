@@ -37,6 +37,7 @@ const initialFormState: Omit<ConsumoBordo, "id" | "data"> = {
   placa: "",
   produto: "",
   notaFiscal: "",
+  tipoServico: "",
   navio: "",
   terminal: "teg",
   empresa: "",
@@ -57,18 +58,17 @@ export function ConsumoSection() {
     setSelectedConsumo(null);
     const now = new Date();
     
-    // Create a new group entry, pre-filled with the data from the old one
-    // but with only the re-entering individual.
     setFormState({
-        ...initialFormState, // Start with a clean slate
+        ...initialFormState,
         veiculo: consumo.veiculo,
         placa: consumo.placa,
         produto: consumo.produto,
         notaFiscal: consumo.notaFiscal,
+        tipoServico: consumo.tipoServico,
         navio: consumo.navio,
         terminal: consumo.terminal,
         empresa: consumo.empresa,
-        vigilante: consumo.vigilante, // Or maybe a new vigilante?
+        vigilante: consumo.vigilante,
         hora: now.toTimeString().slice(0, 5),
         individuos: [{
             id: `new-${Date.now()}`,
@@ -85,6 +85,7 @@ export function ConsumoSection() {
       if (selectedConsumo) {
         setFormState({
           ...selectedConsumo,
+          tipoServico: selectedConsumo.tipoServico || "",
           individuos: selectedConsumo.individuos.map(ind => ({ ...ind, horaSaida: ind.horaSaida || "" })),
         })
       } else if (!formState.veiculo) {
@@ -105,6 +106,8 @@ export function ConsumoSection() {
       consumo.veiculo.toLowerCase().includes(searchLower) ||
       consumo.placa.toLowerCase().includes(searchLower) ||
       consumo.produto.toLowerCase().includes(searchLower) ||
+      consumo.notaFiscal.toLowerCase().includes(searchLower) ||
+      (consumo.tipoServico && consumo.tipoServico.toLowerCase().includes(searchLower)) ||
       consumo.navio.toLowerCase().includes(searchLower) ||
       consumo.empresa.toLowerCase().includes(searchLower)
     const matchInIndividuos = consumo.individuos.some(individuo =>
@@ -151,7 +154,7 @@ export function ConsumoSection() {
 
   const handleAddNew = () => {
     setSelectedConsumo(null)
-    setFormState(initialFormState); // Reset the form state completely
+    setFormState(initialFormState);
     setIsFormOpen(true)
   }
 
@@ -262,7 +265,7 @@ export function ConsumoSection() {
 
       {/* Search and Actions */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="relative max-w-sm flex-1"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" /><Input placeholder="Buscar por nome, veículo, placa, navio..." value={search} onChange={e => setSearch(e.target.value)} className="pl-10" /></div>
+        <div className="relative max-w-sm flex-1"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" /><Input placeholder="Buscar por nome, placa, servico, navio..." value={search} onChange={e => setSearch(e.target.value)} className="pl-10" /></div>
         <Button onClick={handleAddNew}><Plus className="mr-2 h-4 w-4" />Novo Registro</Button>
       </div>
 
@@ -273,10 +276,10 @@ export function ConsumoSection() {
           <div className="grid gap-4 py-4">
             <div className="rounded-lg border bg-secondary/30 p-4 space-y-3"><div className="flex items-center justify-between"><Label>Indivíduos</Label><Button type="button" variant="outline" size="sm" onClick={addIndividuo}><Plus className="mr-1 h-3 w-3" />Adicionar</Button></div><div className="space-y-3">{formState.individuos.map((ind, index) => (<div key={ind.id || index} className="grid grid-cols-[1fr_auto_auto] items-end gap-2"><Input placeholder={`Nome do indivíduo ${index + 1}`} value={ind.nome} onChange={e => handleIndividuoChange(index, "nome", e.target.value)} />{selectedConsumo && <div className="grid w-full gap-1.5"><Label htmlFor={`horaSaida-${index}`} className="text-xs">H. Saída</Label><Input type="time" id={`horaSaida-${index}`} value={ind.horaSaida || ""} onChange={e => handleIndividuoChange(index, "horaSaida", e.target.value)} /></div>}{formState.individuos.length > 1 && !selectedConsumo && <Button type="button" variant="ghost" size="icon" onClick={() => removeIndividuo(index)} className="shrink-0 text-destructive hover:text-destructive"><X className="h-4 w-4" /></Button>}</div>))}</div></div>
             <div className="grid grid-cols-2 gap-4"><div className="grid gap-2"><Label htmlFor="veiculo">Veículo</Label><Input id="veiculo" placeholder="Ex: Caminhão Baú" value={formState.veiculo} onChange={handleInputChange} /></div><div className="grid gap-2"><Label htmlFor="placa">Placa</Label><Input id="placa" placeholder="Ex: ABC-1234" value={formState.placa} onChange={handleInputChange} /></div></div>
-            <div className="grid grid-cols-2 gap-4"><div className="grid gap-2"><Label htmlFor="produto">Produto</Label><Input id="produto" placeholder="Ex: Água Mineral" value={formState.produto} onChange={handleInputChange} /></div><div className="grid gap-2"><Label htmlFor="notaFiscal">Nota Fiscal</Label><Input id="notaFiscal" placeholder="Ex: NF-001234" value={formState.notaFiscal} onChange={handleInputChange} /></div></div>
-            <div className="grid grid-cols-2 gap-4"><div className="grid gap-2"><Label htmlFor="navio">Navio</Label><Input id="navio" placeholder="Nome do navio" value={formState.navio} onChange={handleInputChange} /></div><div className="grid gap-2"><Label htmlFor="terminal">Terminal</Label><Select value={formState.terminal} onValueChange={v => handleSelectChange("terminal", v)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="teg">TEG</SelectItem><SelectItem value="teag">TEAG</SelectItem></SelectContent></Select></div></div>
-            <div className="grid grid-cols-2 gap-4"><div className="grid gap-2"><Label htmlFor="empresa">Empresa</Label><Input id="empresa" placeholder="Nome da empresa" value={formState.empresa} onChange={handleInputChange} /></div><div className="grid gap-2"><Label htmlFor="vigilante">Vigilante</Label><Input id="vigilante" placeholder="Nome do vigilante" value={formState.vigilante} onChange={handleInputChange} /></div></div>
-            <div className="grid gap-2"><Label htmlFor="hora">Hora de Entrada do Grupo</Label><Input id="hora" type="time" value={formState.hora} onChange={handleInputChange} /></div>
+            <div className="grid grid-cols-2 gap-4"><div className="grid gap-2"><Label htmlFor="produto">Produto</Label><Input id="produto" placeholder="Ex: Água Mineral" value={formState.produto} onChange={handleInputChange} /></div><div className="grid gap-2"><Label htmlFor="tipoServico">Tipo de Serviço</Label><Input id="tipoServico" placeholder="Ex: Manutenção" value={formState.tipoServico} onChange={handleInputChange} /></div></div>
+            <div className="grid grid-cols-2 gap-4"><div className="grid gap-2"><Label htmlFor="notaFiscal">Nota Fiscal</Label><Input id="notaFiscal" placeholder="Ex: NF-001234" value={formState.notaFiscal} onChange={handleInputChange} /></div><div className="grid gap-2"><Label htmlFor="navio">Navio</Label><Input id="navio" placeholder="Nome do navio" value={formState.navio} onChange={handleInputChange} /></div></div>
+            <div className="grid grid-cols-2 gap-4"><div className="grid gap-2"><Label htmlFor="terminal">Terminal</Label><Select value={formState.terminal} onValueChange={v => handleSelectChange("terminal", v)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="teg">TEG</SelectItem><SelectItem value="teag">TEAG</SelectItem></SelectContent></Select></div><div className="grid gap-2"><Label htmlFor="empresa">Empresa</Label><Input id="empresa" placeholder="Nome da empresa" value={formState.empresa} onChange={handleInputChange} /></div></div>
+            <div className="grid grid-cols-2 gap-4"><div className="grid gap-2"><Label htmlFor="vigilante">Vigilante</Label><Input id="vigilante" placeholder="Nome do vigilante" value={formState.vigilante} onChange={handleInputChange} /></div><div className="grid gap-2"><Label htmlFor="hora">Hora de Entrada do Grupo</Label><Input id="hora" type="time" value={formState.hora} onChange={handleInputChange} /></div></div>
           </div>
           <Button onClick={handleSave} className="mt-2" disabled={isSaving}>{isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}{selectedConsumo ? "Salvar Alterações" : "Registrar Entrada"}</Button>
         </DialogContent>
@@ -311,6 +314,8 @@ export function ConsumoSection() {
                   <th className="px-4 py-3 font-medium">Navio</th>
                   <th className="px-4 py-3 font-medium">Terminal</th>
                   <th className="px-4 py-3 font-medium">Produto</th>
+                  <th className="px-4 py-3 font-medium">Tipo de Serviço</th>
+                  <th className="px-4 py-3 font-medium">Nota Fiscal</th>
                   <th className="px-4 py-3 font-medium">Veículo</th>
                   <th className="px-4 py-3 font-medium">Placa</th>
                   <th className="px-4 py-3 font-medium">Vigilante</th>
@@ -319,7 +324,7 @@ export function ConsumoSection() {
               </thead>
               <tbody className="divide-y divide-border/50">
                 {filteredConsumos.length === 0 ? (
-                  <tr><td colSpan={12} className="py-8 text-center text-muted-foreground">Nenhum registro encontrado.</td></tr>
+                  <tr><td colSpan={14} className="py-8 text-center text-muted-foreground">Nenhum registro encontrado.</td></tr>
                 ) : (
                   filteredConsumos.map(consumo =>
                     consumo.individuos.map((individuo, individuoIndex) => (
@@ -343,6 +348,8 @@ export function ConsumoSection() {
                             <td rowSpan={consumo.individuos.length} className="px-4 py-3 text-muted-foreground align-top">{consumo.navio}</td>
                             <td rowSpan={consumo.individuos.length} className="px-4 py-3 align-top"><span className={cn("font-semibold", consumo.terminal === "teg" ? "text-primary" : "text-info")}>{consumo.terminal.toUpperCase()}</span></td>
                             <td rowSpan={consumo.individuos.length} className="px-4 py-3 text-muted-foreground align-top">{consumo.produto}</td>
+                            <td rowSpan={consumo.individuos.length} className="px-4 py-3 text-muted-foreground align-top">{consumo.tipoServico}</td>
+                            <td rowSpan={consumo.individuos.length} className="px-4 py-3 text-muted-foreground align-top">{consumo.notaFiscal}</td>
                             <td rowSpan={consumo.individuos.length} className="px-4 py-3 text-muted-foreground align-top">{consumo.veiculo}</td>
                             <td rowSpan={consumo.individuos.length} className="px-4 py-3 font-mono text-muted-foreground align-top">{consumo.placa}</td>
                             <td rowSpan={consumo.individuos.length} className="px-4 py-3 text-muted-foreground align-top">{consumo.vigilante}</td>
