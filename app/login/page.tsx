@@ -34,7 +34,7 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="relative flex min-h-screen flex-col items-center justify-center bg-background p-4">
+    <div className="dark relative flex min-h-screen flex-col items-center justify-center bg-background p-4">
       <div className="mb-8 flex items-center justify-center gap-8">
         <Image 
           src="/teag-logo.png" 
