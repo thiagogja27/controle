@@ -165,13 +165,13 @@ export function DashboardSection() {
   }, [visitantes, refeicoes, tpas, consumos]);
 
   return (
-    <div className="space-y-8">
-        <div className="grid gap-4 md:grid-cols-5">
-            <Card className="cursor-pointer hover:bg-muted/50" onClick={() => openModal('Presentes no TEG', presentesTEG)}><CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">Presentes no TEG</CardTitle><Users className="h-4 w-4 text-muted-foreground" /></CardHeader><CardContent><div className="text-2xl font-bold">{totalTEG}</div></CardContent></Card>
-            <Card className="cursor-pointer hover:bg-muted/50" onClick={() => openModal('Presentes no TEAG', presentesTEAG)}><CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">Presentes no TEAG</CardTitle><Users className="h-4 w-4 text-muted-foreground" /></CardHeader><CardContent><div className="text-2xl font-bold">{totalTEAG}</div></CardContent></Card>
-            <Card><CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">Visitantes Presentes</CardTitle><Users className="h-4 w-4 text-muted-foreground" /></CardHeader><CardContent><div className="text-2xl font-bold">{totalVisitantesPresentes}</div></CardContent></Card>
-            <Card><CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">Policiais Presentes</CardTitle><Shield className="h-4 w-4 text-muted-foreground" /></CardHeader><CardContent><div className="text-2xl font-bold">{totalPoliciaisPresentes}</div></CardContent></Card>
-            <Card><CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">TPAs Presentes</CardTitle><FileText className="h-4 w-4 text-muted-foreground" /></CardHeader><CardContent><div className="text-2xl font-bold">{totalTPAsPresentes}</div></CardContent></Card>
+    <div className="space-y-4 md:space-y-8">
+        <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
+            <Card className="cursor-pointer sm:col-span-1 md:col-span-1 lg:col-span-1 hover:bg-muted/50" onClick={() => openModal('Presentes no TEG', presentesTEG)}><CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">Presentes no TEG</CardTitle><Users className="h-4 w-4 text-muted-foreground" /></CardHeader><CardContent><div className="text-2xl font-bold">{totalTEG}</div></CardContent></Card>
+            <Card className="cursor-pointer sm:col-span-1 md:col-span-1 lg:col-span-1 hover:bg-muted/50" onClick={() => openModal('Presentes no TEAG', presentesTEAG)}><CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">Presentes no TEAG</CardTitle><Users className="h-4 w-4 text-muted-foreground" /></CardHeader><CardContent><div className="text-2xl font-bold">{totalTEAG}</div></CardContent></Card>
+            <Card className="sm:col-span-1 md:col-span-1 lg:col-span-1"><CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">Visitantes Presentes</CardTitle><Users className="h-4 w-4 text-muted-foreground" /></CardHeader><CardContent><div className="text-2xl font-bold">{totalVisitantesPresentes}</div></CardContent></Card>
+            <Card className="sm:col-span-1 md:col-span-1 lg:col-span-1"><CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">Policiais Presentes</CardTitle><Shield className="h-4 w-4 text-muted-foreground" /></CardHeader><CardContent><div className="text-2xl font-bold">{totalPoliciaisPresentes}</div></CardContent></Card>
+            <Card className="sm:col-span-2 md:col-span-1 lg:col-span-1"><CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">TPAs Presentes</CardTitle><FileText className="h-4 w-4 text-muted-foreground" /></CardHeader><CardContent><div className="text-2xl font-bold">{totalTPAsPresentes}</div></CardContent></Card>
         </div>
 
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-5">
@@ -225,36 +225,38 @@ export function DashboardSection() {
          <Card>
             <CardHeader><CardTitle>Atividades Recentes</CardTitle></CardHeader>
             <CardContent>
-                <ul className="space-y-4">
-                    {recentActivity.map((activity) => (
-                        <li key={activity.id} className="flex items-center gap-4 p-2 rounded-lg hover:bg-secondary/50">
-                           <div className={`flex h-10 w-10 items-center justify-center rounded-full bg-secondary text-secondary-foreground`}>
-                                {activity.type === 'Visitante' && <Users className="h-5 w-5" />}
-                                {activity.type === 'Refeição Policial' && <Utensils className="h-5 w-5" />}
-                                {activity.type === 'TPA' && <FileText className="h-5 w-5" />}
-                                {activity.type === 'Consumo de Bordo' && <Ship className="h-5 w-5" />}
-                            </div>
-                            <div className="flex-grow">
-                                <p className="font-semibold">
-                                    {activity.type === 'Visitante' ? activity.nome :
-                                    activity.type === 'Refeição Policial' ? `${(activity as any).individuos.length} policial(s)` :
-                                    activity.type === 'TPA' ? activity.nome :
-                                    activity.type === 'Consumo de Bordo' ? `${(activity as any).individuos.length} pessoa(s) no veículo ${(activity as any).placa}` : ''}
-                                </p>
-                                <p className="text-sm text-muted-foreground flex items-center gap-2">
-                                    <span className="font-medium text-primary">{activity.type}</span>
-                                    <ArrowRight className="h-3 w-3" /> 
-                                    <span className="flex items-center gap-1"><Clock className="h-3 w-3" />{activity.date.toLocaleString()}</span>
-                                </p>
-                            </div>
-                        </li>
-                    ))}
-                </ul>
+                <div className="overflow-x-auto">
+                    <ul className="space-y-4 md:space-y-0 md:divide-y md:divide-border">
+                        {recentActivity.map((activity) => (
+                            <li key={activity.id} className="flex flex-col gap-2 rounded-lg p-2 hover:bg-secondary/50 md:flex-row md:items-center md:gap-4">
+                               <div className={`flex h-10 w-10 items-center justify-center rounded-full bg-secondary text-secondary-foreground`}>
+                                    {activity.type === 'Visitante' && <Users className="h-5 w-5" />}
+                                    {activity.type === 'Refeição Policial' && <Utensils className="h-5 w-5" />}
+                                    {activity.type === 'TPA' && <FileText className="h-5 w-5" />}
+                                    {activity.type === 'Consumo de Bordo' && <Ship className="h-5 w-5" />}
+                                </div>
+                                <div className="flex-grow">
+                                    <p className="font-semibold">
+                                        {activity.type === 'Visitante' ? activity.nome :
+                                        activity.type === 'Refeição Policial' ? `${(activity as any).individuos.length} policial(s)` :
+                                        activity.type === 'TPA' ? activity.nome :
+                                        activity.type === 'Consumo de Bordo' ? `${(activity as any).individuos.length} pessoa(s) no veículo ${(activity as any).placa}` : ''}
+                                    </p>
+                                    <p className="text-sm text-muted-foreground flex flex-wrap items-center gap-x-2 gap-y-1">
+                                        <span className="font-medium text-primary">{activity.type}</span>
+                                        <ArrowRight className="h-3 w-3 hidden md:inline-block" /> 
+                                        <span className="flex items-center gap-1"><Clock className="h-3 w-3" />{activity.date.toLocaleString()}</span>
+                                    </p>
+                                </div>
+                            </li>
+                        ))}
+                    </ul>
+                </div>
             </CardContent>
         </Card>
 
         <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-            <DialogContent className="sm:max-w-[825px]">
+            <DialogContent className="max-w-md mx-auto sm:max-w-lg md:max-w-2xl lg:max-w-4xl">
                 <DialogHeader>
                     <DialogTitle>{modalData.title}</DialogTitle>
                     <DialogDescription>
@@ -262,15 +264,15 @@ export function DashboardSection() {
                     </DialogDescription>
                 </DialogHeader>
                 <div className="grid gap-4 py-4">
-                    <div className="max-h-[400px] overflow-auto">
+                    <div className="max-h-[60vh] overflow-auto">
                         <ul className="space-y-3">
                             {modalData.data.map(person => (
-                                <li key={person.id} className="rounded-lg border bg-card p-4">
-                                    <div className="flex items-center justify-between">
-                                        <span className="font-semibold text-lg">{person.nome}</span>
-                                        <span className="rounded-full bg-secondary px-3 py-1 text-sm font-medium text-secondary-foreground">{person.type}</span>
+                                <li key={person.id} className="rounded-lg border bg-card p-3 md:p-4">
+                                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                                        <span className="font-semibold text-base md:text-lg">{person.nome}</span>
+                                        <span className="self-start rounded-full bg-secondary px-3 py-1 text-xs font-medium text-secondary-foreground sm:self-auto">{person.type}</span>
                                     </div>
-                                    <div className="mt-3 grid grid-cols-1 md:grid-cols-3 gap-x-4 gap-y-2 text-sm">
+                                    <div className="mt-3 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-4 gap-y-2 text-sm">
                                         {person.details.map((detail: { label: string; value: string | undefined }) => (
                                             detail.value && (
                                                 <div key={detail.label} className="flex flex-col">

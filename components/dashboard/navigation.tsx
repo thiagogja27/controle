@@ -12,44 +12,44 @@ const sections = [
   {
     id: "dashboard",
     label: "Painel de Controle",
+    description: "Visão geral do sistema",
     icon: LayoutDashboard,
-    description: "Visão geral do sistema"
   },
   {
     id: "visitantes",
     label: "Controle de Visitantes",
+    description: "Gerenciar entrada e saída",
     icon: Users,
-    description: "Gerenciar entrada e saída"
   },
   {
     id: "refeicoes",
     label: "Refeições Policiais",
+    description: "Controle de refeições",
     icon: Utensils,
-    description: "Controle de refeições"
   },
   {
     id: "tpas",
     label: "Controle TPAs",
+    description: "Terminais de pagamento",
     icon: CreditCard,
-    description: "Terminais de pagamento"
   },
   {
     id: "consumo",
     label: "Consumo de Bordo",
+    description: "Gestão de estoque",
     icon: Package,
-    description: "Gestão de estoque"
   },
   {
     id: "reports",
     label: "Relatórios",
+    description: "Geração e exportação de relatórios",
     icon: BarChart,
-    description: "Geração e exportação de relatórios"
   }
 ]
 
 export function Navigation({ activeSection, onSectionChange }: NavigationProps) {
   return (
-    <nav className="flex flex-wrap gap-2 border-b border-border bg-card px-6 py-3">
+    <nav className="flex flex-wrap items-center justify-start sm:justify-center gap-4">
       {sections.map((section) => {
         const Icon = section.icon
         const isActive = activeSection === section.id
@@ -59,17 +59,13 @@ export function Navigation({ activeSection, onSectionChange }: NavigationProps) 
             key={section.id}
             onClick={() => onSectionChange(section.id)}
             className={cn(
-              "flex items-center gap-3 rounded-lg px-4 py-3 text-left transition-all",
-              isActive
-                ? "bg-primary/10 text-primary"
-                : "text-muted-foreground hover:bg-secondary hover:text-foreground"
+              "flex items-center gap-3 rounded-lg p-3 text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary",
+              isActive && "bg-primary/10 text-primary dark:bg-primary/20 dark:text-primary"
             )}
           >
-            <Icon className={cn("h-5 w-5", isActive && "text-primary")} />
-            <div>
-              <p className={cn("text-sm font-medium", isActive && "text-primary")}>
-                {section.label}
-              </p>
+            <Icon className="h-7 w-7" />
+            <div className="flex flex-col items-start">
+              <p className="text-sm font-medium">{section.label}</p>
               <p className="text-xs text-muted-foreground">{section.description}</p>
             </div>
           </button>

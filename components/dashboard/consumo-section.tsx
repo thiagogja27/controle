@@ -12,6 +12,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  DialogClose
 } from "@/components/ui/dialog"
 import {
   DropdownMenu,
@@ -253,9 +254,9 @@ export function ConsumoSection() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 md:space-y-6">
       {/* Stats Cards */}
-      <div className="grid gap-4 md:grid-cols-5">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
         <Card><CardContent className="flex items-center gap-4 p-4"><div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10"><Truck className="h-6 w-6 text-primary" /></div><div><p className="text-2xl font-bold">{totalRegistros}</p><p className="text-sm text-muted-foreground">Total Registros</p></div></CardContent></Card>
         <Card><CardContent className="flex items-center gap-4 p-4"><div className="flex h-12 w-12 items-center justify-center rounded-lg bg-blue-400/10"><Ship className="h-6 w-6 text-blue-400" /></div><div><p className="text-2xl font-bold">{presentes}</p><p className="text-sm text-muted-foreground">A Bordo</p></div></CardContent></Card>
         <Card><CardContent className="flex items-center gap-4 p-4"><div className="flex h-12 w-12 items-center justify-center rounded-lg bg-purple-400/10"><Users className="h-6 w-6 text-purple-400" /></div><div><p className="text-2xl font-bold">{totalIndividuos}</p><p className="text-sm text-muted-foreground">Total Indivíduos</p></div></CardContent></Card>
@@ -265,23 +266,31 @@ export function ConsumoSection() {
 
       {/* Search and Actions */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="relative max-w-sm flex-1"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" /><Input placeholder="Buscar por nome, placa, servico, navio..." value={search} onChange={e => setSearch(e.target.value)} className="pl-10" /></div>
-        <Button onClick={handleAddNew}><Plus className="mr-2 h-4 w-4" />Novo Registro</Button>
+         <div className="relative flex-1 md:grow-0">
+            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input placeholder="Buscar registro..." value={search} onChange={e => setSearch(e.target.value)} className="w-full rounded-lg bg-background pl-8 md:w-[200px] lg:w-[336px]" />
+        </div>
+        <Button onClick={handleAddNew} className="w-full sm:w-auto"><Plus className="mr-2 h-4 w-4" />Novo Registro</Button>
       </div>
 
       {/* Add/Edit Dialog */}
       <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
-        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
+        <DialogContent className="max-w-2xl w-full mx-4 sm:mx-auto">
           <DialogHeader><DialogTitle>{selectedConsumo ? "Editar Registro" : "Registrar Consumo de Bordo"}</DialogTitle></DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="rounded-lg border bg-secondary/30 p-4 space-y-3"><div className="flex items-center justify-between"><Label>Indivíduos</Label><Button type="button" variant="outline" size="sm" onClick={addIndividuo}><Plus className="mr-1 h-3 w-3" />Adicionar</Button></div><div className="space-y-3">{formState.individuos.map((ind, index) => (<div key={ind.id || index} className="grid grid-cols-[1fr_auto_auto] items-end gap-2"><Input placeholder={`Nome do indivíduo ${index + 1}`} value={ind.nome} onChange={e => handleIndividuoChange(index, "nome", e.target.value)} />{selectedConsumo && <div className="grid w-full gap-1.5"><Label htmlFor={`horaSaida-${index}`} className="text-xs">H. Saída</Label><Input type="time" id={`horaSaida-${index}`} value={ind.horaSaida || ""} onChange={e => handleIndividuoChange(index, "horaSaida", e.target.value)} /></div>}{formState.individuos.length > 1 && !selectedConsumo && <Button type="button" variant="ghost" size="icon" onClick={() => removeIndividuo(index)} className="shrink-0 text-destructive hover:text-destructive"><X className="h-4 w-4" /></Button>}</div>))}</div></div>
-            <div className="grid grid-cols-2 gap-4"><div className="grid gap-2"><Label htmlFor="veiculo">Veículo</Label><Input id="veiculo" placeholder="Ex: Caminhão Baú" value={formState.veiculo} onChange={handleInputChange} /></div><div className="grid gap-2"><Label htmlFor="placa">Placa</Label><Input id="placa" placeholder="Ex: ABC-1234" value={formState.placa} onChange={handleInputChange} /></div></div>
-            <div className="grid grid-cols-2 gap-4"><div className="grid gap-2"><Label htmlFor="produto">Produto</Label><Input id="produto" placeholder="Ex: Água Mineral" value={formState.produto} onChange={handleInputChange} /></div><div className="grid gap-2"><Label htmlFor="tipoServico">Tipo de Serviço</Label><Input id="tipoServico" placeholder="Ex: Manutenção" value={formState.tipoServico} onChange={handleInputChange} /></div></div>
-            <div className="grid grid-cols-2 gap-4"><div className="grid gap-2"><Label htmlFor="notaFiscal">Nota Fiscal</Label><Input id="notaFiscal" placeholder="Ex: NF-001234" value={formState.notaFiscal} onChange={handleInputChange} /></div><div className="grid gap-2"><Label htmlFor="navio">Navio</Label><Input id="navio" placeholder="Nome do navio" value={formState.navio} onChange={handleInputChange} /></div></div>
-            <div className="grid grid-cols-2 gap-4"><div className="grid gap-2"><Label htmlFor="terminal">Terminal</Label><Select value={formState.terminal} onValueChange={v => handleSelectChange("terminal", v)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="teg">TEG</SelectItem><SelectItem value="teag">TEAG</SelectItem></SelectContent></Select></div><div className="grid gap-2"><Label htmlFor="empresa">Empresa</Label><Input id="empresa" placeholder="Nome da empresa" value={formState.empresa} onChange={handleInputChange} /></div></div>
-            <div className="grid grid-cols-2 gap-4"><div className="grid gap-2"><Label htmlFor="vigilante">Vigilante</Label><Input id="vigilante" placeholder="Nome do vigilante" value={formState.vigilante} onChange={handleInputChange} /></div><div className="grid gap-2"><Label htmlFor="hora">Hora de Entrada do Grupo</Label><Input id="hora" type="time" value={formState.hora} onChange={handleInputChange} /></div></div>
+          <div className="max-h-[80vh] overflow-y-auto p-1">
+            <div className="grid gap-4 py-4">
+              <div className="rounded-lg border bg-secondary/30 p-4 space-y-3"><div className="flex items-center justify-between"><Label>Indivíduos</Label><Button type="button" variant="outline" size="sm" onClick={addIndividuo}><Plus className="mr-1 h-3 w-3" />Adicionar</Button></div><div className="space-y-3">{formState.individuos.map((ind, index) => (<div key={ind.id || index} className="grid grid-cols-[1fr_auto] items-end gap-2"><Input placeholder={`Nome do indivíduo ${index + 1}`} value={ind.nome} onChange={e => handleIndividuoChange(index, "nome", e.target.value)} />{formState.individuos.length > 1 && !selectedConsumo && <Button type="button" variant="ghost" size="icon" onClick={() => removeIndividuo(index)} className="shrink-0 text-destructive hover:text-destructive"><X className="h-4 w-4" /></Button>}</div>))}</div></div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4"><div className="grid gap-2"><Label htmlFor="veiculo">Veículo</Label><Input id="veiculo" placeholder="Ex: Caminhão Baú" value={formState.veiculo} onChange={handleInputChange} /></div><div className="grid gap-2"><Label htmlFor="placa">Placa</Label><Input id="placa" placeholder="Ex: ABC-1234" value={formState.placa} onChange={handleInputChange} /></div></div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4"><div className="grid gap-2"><Label htmlFor="produto">Produto</Label><Input id="produto" placeholder="Ex: Água Mineral" value={formState.produto} onChange={handleInputChange} /></div><div className="grid gap-2"><Label htmlFor="tipoServico">Tipo de Serviço</Label><Input id="tipoServico" placeholder="Ex: Manutenção" value={formState.tipoServico} onChange={handleInputChange} /></div></div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4"><div className="grid gap-2"><Label htmlFor="notaFiscal">Nota Fiscal</Label><Input id="notaFiscal" placeholder="Ex: NF-001234" value={formState.notaFiscal} onChange={handleInputChange} /></div><div className="grid gap-2"><Label htmlFor="navio">Navio</Label><Input id="navio" placeholder="Nome do navio" value={formState.navio} onChange={handleInputChange} /></div></div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4"><div className="grid gap-2"><Label htmlFor="terminal">Terminal</Label><Select value={formState.terminal} onValueChange={v => handleSelectChange("terminal", v)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="teg">TEG</SelectItem><SelectItem value="teag">TEAG</SelectItem></SelectContent></Select></div><div className="grid gap-2"><Label htmlFor="empresa">Empresa</Label><Input id="empresa" placeholder="Nome da empresa" value={formState.empresa} onChange={handleInputChange} /></div></div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4"><div className="grid gap-2"><Label htmlFor="vigilante">Vigilante</Label><Input id="vigilante" placeholder="Nome do vigilante" value={formState.vigilante} onChange={handleInputChange} /></div><div className="grid gap-2"><Label htmlFor="hora">Hora de Entrada</Label><Input id="hora" type="time" value={formState.hora} onChange={handleInputChange} /></div></div>
+            </div>
           </div>
-          <Button onClick={handleSave} className="mt-2" disabled={isSaving}>{isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}{selectedConsumo ? "Salvar Alterações" : "Registrar Entrada"}</Button>
+           <DialogFooter>
+                <DialogClose asChild><Button variant="outline">Cancelar</Button></DialogClose>
+                <Button onClick={handleSave} disabled={isSaving}>{isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}{selectedConsumo ? "Salvar" : "Registrar"}</Button>
+            </DialogFooter>
         </DialogContent>
       </Dialog>
 
@@ -290,7 +299,7 @@ export function ConsumoSection() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Confirmar Exclusão</DialogTitle>
-            <DialogDescription>Tem certeza de que deseja excluir o registro de consumo para o navio "{selectedConsumo?.navio}"? Todos os indivíduos associados serão removidos. Esta ação não pode ser desfeita.</DialogDescription>
+            <DialogDescription>Tem certeza de que deseja excluir o registro de consumo para "{selectedConsumo?.navio}"? Esta ação não pode ser desfeita.</DialogDescription>
           </DialogHeader>
           <DialogFooter className="gap-2 sm:justify-end">
             <Button variant="outline" onClick={() => setIsDeleteConfirmOpen(false)} disabled={isSaving}>Cancelar</Button>
@@ -302,79 +311,137 @@ export function ConsumoSection() {
       <Card>
         <CardHeader><CardTitle>Registro de Consumo de Bordo</CardTitle></CardHeader>
         <CardContent>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-border text-left text-xs text-muted-foreground uppercase">
-                  <th className="px-4 py-3 font-medium">Nome</th>
-                  <th className="px-4 py-3 font-medium">Status</th>
-                  <th className="px-4 py-3 font-medium">Entrada</th>
-                  <th className="px-4 py-3 font-medium">Saída</th>
-                  <th className="px-4 py-3 font-medium">Empresa</th>
-                  <th className="px-4 py-3 font-medium">Navio</th>
-                  <th className="px-4 py-3 font-medium">Terminal</th>
-                  <th className="px-4 py-3 font-medium">Produto</th>
-                  <th className="px-4 py-3 font-medium">Tipo de Serviço</th>
-                  <th className="px-4 py-3 font-medium">Nota Fiscal</th>
-                  <th className="px-4 py-3 font-medium">Veículo</th>
-                  <th className="px-4 py-3 font-medium">Placa</th>
-                  <th className="px-4 py-3 font-medium">Vigilante</th>
-                  <th className="px-4 py-3 font-medium text-right">Ações</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border/50">
+             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 lg:hidden">
                 {filteredConsumos.length === 0 ? (
-                  <tr><td colSpan={14} className="py-8 text-center text-muted-foreground">Nenhum registro encontrado.</td></tr>
+                    <p className="py-8 text-center text-muted-foreground col-span-full">Nenhum registro encontrado.</p>
                 ) : (
-                  filteredConsumos.map(consumo =>
-                    consumo.individuos.map((individuo, individuoIndex) => (
-                      <tr key={individuo.id} className={cn(individuoIndex > 0 && "border-t-0", "transition-colors hover:bg-muted/50")}>
-                        <td className="px-4 py-3 font-medium">{individuo.nome}</td>
-                        <td className="px-4 py-3"><span className={cn("inline-flex items-center rounded-full px-2 py-1 text-xs font-semibold", individuo.status === "presente" ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300" : "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300")}>{individuo.status === "presente" ? "A Bordo" : "Saiu"}</span></td>
-                        <td className="px-4 py-3 tabular-nums text-muted-foreground">{individuoIndex === 0 ? formatDateTime(consumo.data, consumo.hora) : ''}</td>
-                        <td className="px-4 py-3 tabular-nums text-muted-foreground">
-                          {individuo.status === 'presente' ? (
-                            <Button size="xs" variant="outline" onClick={() => handleSaida(consumo.id, individuo.id)}>Sair</Button>
-                          ) : individuo.horaSaida ? (
-                            <div className="flex items-center gap-2">
-                              <span>{individuo.horaSaida}</span>
-                              <Button size="xs" variant="outline" onClick={() => handleReEntry(consumo, individuo)}><LogIn className="h-3 w-3 mr-1" />Nova Entrada</Button>
+                    filteredConsumos.map(consumo => (
+                        <div key={consumo.id} className="rounded-lg border bg-card p-4 space-y-4 flex flex-col">
+                            <div className="flex justify-between items-start">
+                                <div>
+                                    <p className="font-semibold">{consumo.navio} <span className="font-normal text-muted-foreground">({consumo.empresa})</span></p>
+                                    <p className="text-sm text-muted-foreground">{consumo.veiculo} - {consumo.placa}</p>
+                                </div>
+                                 <span className={cn("font-semibold text-xs", consumo.terminal === 'teg' ? "text-primary" : "text-info")}>{consumo.terminal.toUpperCase()}</span>
                             </div>
-                          ) : '-'}
-                        </td>
-                        {individuoIndex === 0 ? (
-                           <>
-                            <td rowSpan={consumo.individuos.length} className="px-4 py-3 text-muted-foreground align-top">{consumo.empresa}</td>
-                            <td rowSpan={consumo.individuos.length} className="px-4 py-3 text-muted-foreground align-top">{consumo.navio}</td>
-                            <td rowSpan={consumo.individuos.length} className="px-4 py-3 align-top"><span className={cn("font-semibold", consumo.terminal === "teg" ? "text-primary" : "text-info")}>{consumo.terminal.toUpperCase()}</span></td>
-                            <td rowSpan={consumo.individuos.length} className="px-4 py-3 text-muted-foreground align-top">{consumo.produto}</td>
-                            <td rowSpan={consumo.individuos.length} className="px-4 py-3 text-muted-foreground align-top">{consumo.tipoServico}</td>
-                            <td rowSpan={consumo.individuos.length} className="px-4 py-3 text-muted-foreground align-top">{consumo.notaFiscal}</td>
-                            <td rowSpan={consumo.individuos.length} className="px-4 py-3 text-muted-foreground align-top">{consumo.veiculo}</td>
-                            <td rowSpan={consumo.individuos.length} className="px-4 py-3 font-mono text-muted-foreground align-top">{consumo.placa}</td>
-                            <td rowSpan={consumo.individuos.length} className="px-4 py-3 text-muted-foreground align-top">{consumo.vigilante}</td>
-                           </>
-                        ) : null}
-                        <td className="px-4 py-3 text-right">
-                           <div className="flex items-center justify-end gap-2">
-                            {individuoIndex === 0 && (
-                             <DropdownMenu>
-                                <DropdownMenuTrigger asChild><Button variant="ghost" size="icon"><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger>
-                                <DropdownMenuContent align="end">
-                                  <DropdownMenuItem onClick={() => handleEdit(consumo.id)}><FilePenLine className="mr-2 h-4 w-4" />Editar Grupo</DropdownMenuItem>
-                                  <DropdownMenuItem onClick={() => handleDelete(consumo.id)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4" />Excluir Grupo</DropdownMenuItem>
-                                </DropdownMenuContent>
-                              </DropdownMenu>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
+
+                            <div className="space-y-3 flex-grow">
+                                {consumo.individuos.map(individuo => (
+                                    <div key={individuo.id} className="border-t pt-3 space-y-2">
+                                        <div className="flex justify-between items-center">
+                                            <p>{individuo.nome}</p>
+                                            <span className={cn("inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold", individuo.status === "presente" ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-800")}>{individuo.status === "presente" ? "A Bordo" : "Saiu"}</span>
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-x-4 text-sm">
+                                            <div className="flex flex-col"><span className="text-muted-foreground">Entrada</span><span>{formatDateTime(consumo.data, consumo.hora)}</span></div>
+                                            <div className="flex flex-col"><span className="text-muted-foreground">Saída</span><span>{individuo.horaSaida || '-'}</span></div>
+                                        </div>
+                                         <div className="flex items-center justify-end gap-2 pt-2">
+                                            {individuo.status === 'presente' ? (
+                                                <Button size="sm" variant="outline" onClick={() => handleSaida(consumo.id, individuo.id)}>Registrar Saída</Button>
+                                            ) : (
+                                                <Button size="sm" variant="outline" onClick={() => handleReEntry(consumo, individuo)}>Nova Entrada</Button>
+                                            )}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+
+                             <div className="border-t pt-3 text-sm space-y-2">
+                                <div className="flex justify-between"><span className="text-muted-foreground">Produto:</span><span>{consumo.produto}</span></div>
+                                {consumo.tipoServico && <div className="flex justify-between"><span className="text-muted-foreground">Serviço:</span><span>{consumo.tipoServico}</span></div>}
+                                <div className="flex justify-between"><span className="text-muted-foreground">Nota Fiscal:</span><span>{consumo.notaFiscal}</span></div>
+                                <div className="flex justify-between"><span className="text-muted-foreground">Vigilante:</span><span>{consumo.vigilante}</span></div>
+                            </div>
+
+                            <div className="border-t pt-3 flex items-center justify-end">
+                                 <DropdownMenu>
+                                    <DropdownMenuTrigger asChild><Button variant="ghost" size="icon"><MoreVertical className="h-4 w-4"/></Button></DropdownMenuTrigger>
+                                    <DropdownMenuContent align="end">
+                                        <DropdownMenuItem onClick={() => handleEdit(consumo.id)}>Editar Grupo</DropdownMenuItem>
+                                        <DropdownMenuItem onClick={() => handleDelete(consumo.id)} className="text-destructive">Excluir Grupo</DropdownMenuItem>
+                                    </DropdownMenuContent>
+                                </DropdownMenu>
+                            </div>
+                        </div>
                     ))
-                  )
                 )}
-              </tbody>
-            </table>
-          </div>
+            </div>
+            <div className="hidden lg:block overflow-x-auto">
+                 <table className="w-full text-sm">
+                    <thead>
+                        <tr className="border-b border-border text-left text-xs text-muted-foreground uppercase">
+                            <th className="px-4 py-3 font-medium">Nome</th>
+                            <th className="px-4 py-3 font-medium">Status</th>
+                            <th className="px-4 py-3 font-medium">Entrada</th>
+                            <th className="px-4 py-3 font-medium">Saída</th>
+                            <th className="px-4 py-3 font-medium">Empresa</th>
+                            <th className="px-4 py-3 font-medium">Navio</th>
+                            <th className="px-4 py-3 font-medium">Terminal</th>
+                            <th className="px-4 py-3 font-medium">Produto</th>
+                            <th className="px-4 py-3 font-medium">Tipo de Serviço</th>
+                            <th className="px-4 py-3 font-medium">Nota Fiscal</th>
+                            <th className="px-4 py-3 font-medium">Veículo</th>
+                            <th className="px-4 py-3 font-medium">Placa</th>
+                            <th className="px-4 py-3 font-medium">Vigilante</th>
+                            <th className="px-4 py-3 font-medium text-right">Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border/50">
+                        {filteredConsumos.length === 0 ? (
+                            <tr><td colSpan={14} className="py-8 text-center text-muted-foreground">Nenhum registro encontrado.</td></tr>
+                        ) : (
+                            filteredConsumos.map(consumo => (
+                                consumo.individuos.map((individuo, individuoIndex) => (
+                                <tr key={individuo.id} className="hover:bg-muted/50">
+                                    <td className="px-4 py-3 font-medium">{individuo.nome}</td>
+                                    <td className="px-4 py-3">
+                                        <span className={cn("inline-flex items-center rounded-full px-2 py-1 text-xs font-semibold", individuo.status === "presente" ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300" : "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300")}>
+                                            {individuo.status === "presente" ? "A Bordo" : "Saiu"}
+                                        </span>
+                                    </td>
+                                    <td className="px-4 py-3 text-muted-foreground">{individuoIndex === 0 ? formatDateTime(consumo.data, consumo.hora) : ''}</td>
+                                    <td className="px-4 py-3">
+                                        {individuo.status === 'presente' ? (
+                                            <Button size="xs" variant="outline" onClick={() => handleSaida(consumo.id, individuo.id)}><LogOut className="mr-1 h-3 w-3" /> Sair</Button>
+                                        ) : individuo.horaSaida ? (
+                                            <div className="flex items-center gap-2">
+                                                <span>{individuo.horaSaida}</span>
+                                                <Button size="xs" variant="outline" onClick={() => handleReEntry(consumo, individuo)}><LogIn className="mr-1 h-3 w-3" /> Nova Entrada</Button>
+                                            </div>
+                                        ) : (
+                                            '-'
+                                        )}
+                                    </td>
+                                     {individuoIndex === 0 ? (
+                                        <>
+                                            <td rowSpan={consumo.individuos.length} className="px-4 py-3 align-top">{consumo.empresa}</td>
+                                            <td rowSpan={consumo.individuos.length} className="px-4 py-3 align-top">{consumo.navio}</td>
+                                            <td rowSpan={consumo.individuos.length} className="px-4 py-3 align-top"><div className={`text-xs font-semibold ${consumo.terminal === "teg" ? "text-primary" : "text-info"}`}>{consumo.terminal.toUpperCase()}</div></td>
+                                            <td rowSpan={consumo.individuos.length} className="px-4 py-3 align-top">{consumo.produto}</td>
+                                            <td rowSpan={consumo.individuos.length} className="px-4 py-3 align-top">{consumo.tipoServico || '-'}</td>
+                                            <td rowSpan={consumo.individuos.length} className="px-4 py-3 align-top">{consumo.notaFiscal}</td>
+                                            <td rowSpan={consumo.individuos.length} className="px-4 py-3 align-top">{consumo.veiculo}</td>
+                                            <td rowSpan={consumo.individuos.length} className="px-4 py-3 align-top">{consumo.placa}</td>
+                                            <td rowSpan={consumo.individuos.length} className="px-4 py-3 align-top">{consumo.vigilante}</td>
+                                            <td rowSpan={consumo.individuos.length} className="px-4 py-3 align-top text-right">
+                                                <DropdownMenu>
+                                                    <DropdownMenuTrigger asChild><Button variant="ghost" size="icon"><MoreVertical className="h-4 w-4"/></Button></DropdownMenuTrigger>
+                                                    <DropdownMenuContent align="end">
+                                                        <DropdownMenuItem onClick={() => handleEdit(consumo.id)}>Editar Grupo</DropdownMenuItem>
+                                                        <DropdownMenuItem onClick={() => handleDelete(consumo.id)} className="text-destructive">Excluir Grupo</DropdownMenuItem>
+                                                    </DropdownMenuContent>
+                                                </DropdownMenu>
+                                            </td>
+                                        </>
+                                    ) : null}
+                                </tr>
+                                ))
+                            ))
+                        )}
+                    </tbody>
+                </table>
+            </div>
         </CardContent>
       </Card>
     </div>
