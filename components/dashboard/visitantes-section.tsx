@@ -32,6 +32,13 @@ const initialFormState: Omit<Visitante, "id" | "dataEntrada" | "status"> = {
   horaEntrada: "",
   horaSaida: "",
   diversos: false,
+  rg: "",
+  cnh: "",
+  dataNascimento: "",
+  validadeRg: "",
+  validadeCnh: "",
+  telefone: "",
+  categoriaCnh: "",
 }
 
 export function VisitantesSection() {
@@ -57,6 +64,13 @@ export function VisitantesSection() {
         placa: visitante.placa || "",
         observacoes: visitante.observacoes || "",
         diversos: visitante.diversos || false,
+        rg: visitante.rg || "",
+        cnh: visitante.cnh || "",
+        dataNascimento: visitante.dataNascimento || "",
+        validadeRg: visitante.validadeRg || "",
+        validadeCnh: visitante.validadeCnh || "",
+        telefone: visitante.telefone || "",
+        categoriaCnh: visitante.categoriaCnh || "",
         horaEntrada: now.toTimeString().slice(0, 5),
         horaSaida: "",
     });
@@ -77,6 +91,13 @@ export function VisitantesSection() {
           placa: selectedVisitante.placa || "",
           observacoes: selectedVisitante.observacoes || "",
           diversos: selectedVisitante.diversos || false,
+          rg: selectedVisitante.rg || "",
+          cnh: selectedVisitante.cnh || "",
+          dataNascimento: selectedVisitante.dataNascimento || "",
+          validadeRg: selectedVisitante.validadeRg || "",
+          validadeCnh: selectedVisitante.validadeCnh || "",
+          telefone: selectedVisitante.telefone || "",
+          categoriaCnh: selectedVisitante.categoriaCnh || "",
           horaEntrada: selectedVisitante.horaEntrada,
           horaSaida: selectedVisitante.horaSaida || "",
         });
@@ -219,6 +240,19 @@ export function VisitantesSection() {
             {(selectedVisitante) && <div className="grid gap-2"><Label htmlFor="horaSaida">Hora Saída</Label><Input id="horaSaida" type="time" value={formState.horaSaida || ""} onChange={handleInputChange} /></div>}
             <div className="grid gap-2 md:col-span-2"><Label htmlFor="observacoes">Observações</Label><Textarea id="observacoes" value={formState.observacoes || ""} onChange={handleInputChange} /></div>
             <div className="flex items-center space-x-2"><Checkbox id="diversos" checked={formState.diversos} onCheckedChange={(checked) => handleCheckboxChange("diversos", checked as boolean)} /><Label htmlFor="diversos">Diversos</Label></div>
+            
+            {formState.diversos && (
+              <>
+                <div className="grid gap-2"><Label htmlFor="rg">RG</Label><Input id="rg" value={formState.rg || ""} onChange={handleInputChange} /></div>
+                <div className="grid gap-2"><Label htmlFor="validadeRg">Validade RG</Label><Input id="validadeRg" type="date" value={formState.validadeRg || ""} onChange={handleInputChange} /></div>
+                <div className="grid gap-2"><Label htmlFor="cnh">CNH</Label><Input id="cnh" value={formState.cnh || ""} onChange={handleInputChange} /></div>
+                <div className="grid gap-2"><Label htmlFor="validadeCnh">Validade CNH</Label><Input id="validadeCnh" type="date" value={formState.validadeCnh || ""} onChange={handleInputChange} /></div>
+                <div className="grid gap-2"><Label htmlFor="categoriaCnh">Categoria CNH</Label><Input id="categoriaCnh" value={formState.categoriaCnh || ""} onChange={handleInputChange} /></div>
+                <div className="grid gap-2"><Label htmlFor="dataNascimento">Data de Nascimento</Label><Input id="dataNascimento" type="date" value={formState.dataNascimento || ""} onChange={handleInputChange} /></div>
+                <div className="grid gap-2"><Label htmlFor="telefone">Telefone</Label><Input id="telefone" value={formState.telefone || ""} onChange={handleInputChange} /></div>
+              </>
+            )}
+
           </div>
           <Button onClick={handleSave} className="mt-2 w-full" disabled={isSaving}>
             {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}

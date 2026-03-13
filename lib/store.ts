@@ -15,6 +15,13 @@ export interface Visitante {
   placa?: string
   observacoes?: string
   diversos?: boolean
+  rg?: string
+  cnh?: string
+  dataNascimento?: string
+  validadeRg?: string
+  validadeCnh?: string
+  telefone?: string
+  categoriaCnh?: string
 }
 
 export interface IndividuoRefeicao {
