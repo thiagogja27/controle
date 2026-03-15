@@ -8,8 +8,10 @@ export interface Visitante {
   destino: string
   dataEntrada: string
   horaEntrada: string
+  dataSaida?: string
   horaSaida?: string
   status: "presente" | "saiu"
+  credencial?: "azul" | "vermelho" | "verde" // Added for ISPS Code compliance
   foto?: string
   notaFiscal?: string
   placa?: string
@@ -28,6 +30,7 @@ export interface IndividuoRefeicao {
   id: string
   nome: string
   status: "presente" | "saiu"
+  dataSaida?: string // Added
   horaSaida?: string
 }
 
@@ -53,6 +56,7 @@ export interface TPA {
   vigilante: string
   data: string
   hora: string
+  dataSaida?: string // Added
   horaSaida?: string
   status: "presente" | "saiu"
 }
@@ -61,6 +65,7 @@ export interface Individuo {
   id: string
   nome: string
   status: "presente" | "saiu"
+  dataSaida?: string // Added
   horaSaida?: string
 }
 

@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from "react"
-import { LogIn, LogOut, Plus, Search, Ship, Truck, Users, X, Loader2, FilePenLine, Trash2, MoreVertical } from "lucide-react"
+import { LogIn, LogOut, Plus, Search, Ship, Truck, Users, X, Loader2, FilePenLine, Trash2, MoreVertical, XCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -32,8 +32,8 @@ import { type ConsumoBordo, type Individuo } from "@/lib/store"
 import { useConsumos } from "@/hooks/use-firebase"
 import { cn } from "@/lib/utils"
 
-const initialFormState: Omit<ConsumoBordo, "id" | "data"> = {
-  individuos: [{ id: `new-${Date.now()}`, nome: "", status: "presente", horaSaida: "" }],
+const initialFormState: Omit<ConsumoBordo, "id"> = {
+  individuos: [{ id: `new-${Date.now()}`, nome: "", status: "presente", dataSaida: "", horaSaida: "" }],
   veiculo: "",
   placa: "",
   produto: "",
@@ -43,12 +43,16 @@ const initialFormState: Omit<ConsumoBordo, "id" | "data"> = {
   terminal: "teg",
   empresa: "",
   vigilante: "",
+  data: "",
   hora: "",
 }
 
 export function ConsumoSection() {
   const { data: consumos, loading, addItem, updateItem, deleteItem } = useConsumos()
   const [search, setSearch] = useState("")
+  const [dataInicio, setDataInicio] = useState("");
+  const [dataFim, setDataFim] = useState("");
+
   const [isFormOpen, setIsFormOpen] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false)
@@ -59,22 +63,17 @@ export function ConsumoSection() {
     setSelectedConsumo(null);
     const now = new Date();
     
+    const { id, individuos, ...restOfConsumo } = consumo;
+
     setFormState({
-        ...initialFormState,
-        veiculo: consumo.veiculo,
-        placa: consumo.placa,
-        produto: consumo.produto,
-        notaFiscal: consumo.notaFiscal,
-        tipoServico: consumo.tipoServico || "",
-        navio: consumo.navio,
-        terminal: consumo.terminal,
-        empresa: consumo.empresa,
-        vigilante: consumo.vigilante,
+        ...restOfConsumo, 
+        data: now.toISOString().split("T")[0],
         hora: now.toTimeString().slice(0, 5),
         individuos: [{
             id: `new-${Date.now()}`,
-            nome: individuo.nome,
+            nome: individuo.nome, 
             status: "presente",
+            dataSaida: "",
             horaSaida: "",
         }],
     });
@@ -82,47 +81,53 @@ export function ConsumoSection() {
   };
 
   useEffect(() => {
-    if (isFormOpen) {
-      if (selectedConsumo) {
+    if (isFormOpen && selectedConsumo) {
         setFormState({
           ...selectedConsumo,
           tipoServico: selectedConsumo.tipoServico || "",
-          individuos: selectedConsumo.individuos.map(ind => ({ ...ind, horaSaida: ind.horaSaida || "" })),
+          individuos: selectedConsumo.individuos.map(ind => ({ ...ind, dataSaida: ind.dataSaida || "", horaSaida: ind.horaSaida || "" })),
         })
-      } else if (!formState.veiculo) {
-        const now = new Date()
-        setFormState({
-          ...initialFormState,
-          hora: now.toTimeString().slice(0, 5),
-          individuos: [{ id: `new-${Date.now()}`, nome: "", status: "presente", horaSaida: "" }],
-        })
-      }
     }
-  }, [isFormOpen, selectedConsumo, formState.veiculo])
+  }, [isFormOpen, selectedConsumo])
 
   const filteredConsumos = consumos.filter(consumo => {
-    const searchLower = search.toLowerCase()
-    if (!searchLower) return true
-    const matchInConsumo =
+    const searchLower = search.toLowerCase().trim();
+    const textMatch = !searchLower || (
       consumo.veiculo.toLowerCase().includes(searchLower) ||
       consumo.placa.toLowerCase().includes(searchLower) ||
       consumo.produto.toLowerCase().includes(searchLower) ||
       consumo.notaFiscal.toLowerCase().includes(searchLower) ||
       (consumo.tipoServico && consumo.tipoServico.toLowerCase().includes(searchLower)) ||
       consumo.navio.toLowerCase().includes(searchLower) ||
-      consumo.empresa.toLowerCase().includes(searchLower)
-    const matchInIndividuos = consumo.individuos.some(individuo =>
-      individuo.nome.toLowerCase().includes(searchLower)
-    )
-    return matchInConsumo || matchInIndividuos
+      consumo.empresa.toLowerCase().includes(searchLower) ||
+      consumo.individuos.some(individuo =>
+        individuo.nome.toLowerCase().includes(searchLower)
+      )
+    );
+
+    const dateMatch = (() => {
+        if (!dataInicio && !dataFim) {
+            if (searchLower) {
+                return true;
+            }
+            const today = new Date().toISOString().split('T')[0];
+            return consumo.data === today;
+        }
+        const entrada = consumo.data;
+        const afterStart = dataInicio ? entrada >= dataInicio : true;
+        const beforeEnd = dataFim ? entrada <= dataFim : true;
+        return afterStart && beforeEnd;
+    })();
+
+    return textMatch && dateMatch;
   })
 
-  const allIndividuos = consumos.flatMap(c => c.individuos || [])
-  const totalRegistros = consumos.length
+  const allIndividuos = filteredConsumos.flatMap(c => c.individuos || [])
+  const totalRegistros = filteredConsumos.length
   const presentes = allIndividuos.filter(i => i.status === "presente").length
   const totalIndividuos = allIndividuos.length
-  const totalTeg = consumos.filter(c => c.terminal === "teg").length
-  const totalTeag = consumos.filter(c => c.terminal === "teag").length
+  const totalTeg = filteredConsumos.filter(c => c.terminal === "teg").length
+  const totalTeag = filteredConsumos.filter(c => c.terminal === "teag").length
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { id, value } = e.target
@@ -133,17 +138,16 @@ export function ConsumoSection() {
     setFormState(prev => ({ ...prev, [id]: value }))
   }
 
-  const handleIndividuoChange = (index: number, field: keyof Individuo, value: string) => {
-    const newIndividuos = [...formState.individuos]
-    const newIndividuo = { ...newIndividuos[index], [field]: value }
-    newIndividuos[index] = newIndividuo as Individuo
-    setFormState(prev => ({ ...prev, individuos: newIndividuos }))
+  const handleIndividuoChange = (index: number, field: keyof Omit<Individuo, 'id'>, value: string) => {
+    const newIndividuos = [...formState.individuos];
+    (newIndividuos[index] as any)[field] = value;
+    setFormState(prev => ({ ...prev, individuos: newIndividuos }));
   }
 
   const addIndividuo = () => {
     setFormState(prev => ({
       ...prev,
-      individuos: [...prev.individuos, { id: `new-${Date.now()}`, nome: "", status: "presente", horaSaida: "" }],
+      individuos: [...prev.individuos, { id: `new-${Date.now()}`, nome: "", status: "presente", dataSaida: "", horaSaida: "" }],
     }))
   }
 
@@ -155,7 +159,13 @@ export function ConsumoSection() {
 
   const handleAddNew = () => {
     setSelectedConsumo(null)
-    setFormState(initialFormState);
+    const now = new Date();
+    setFormState({ 
+        ...initialFormState,
+        data: now.toISOString().split("T")[0],
+        hora: now.toTimeString().slice(0, 5),
+        individuos: [{ id: `new-${Date.now()}`, nome: "", status: "presente", dataSaida: "", horaSaida: "" }],
+    }); 
     setIsFormOpen(true)
   }
 
@@ -190,38 +200,51 @@ export function ConsumoSection() {
   }
 
  const handleSave = async () => {
-    setIsSaving(true)
+    setIsSaving(true);
     try {
-      const individuosToSave = formState.individuos
-        .filter(ind => ind.nome.trim() !== "")
-        .map(ind => ({ ...ind, status: ind.horaSaida ? 'saiu' : 'presente' }))
+        const individuosToSave: Individuo[] = formState.individuos
+            .filter(ind => ind.nome.trim() !== "")
+            .map((ind): Individuo => {
+                const status: "presente" | "saiu" = (ind.horaSaida && ind.dataSaida) ? 'saiu' : 'presente';
+                if (status === "presente") {
+                    return {
+                        ...ind,
+                        status: "presente",
+                        horaSaida: "",
+                        dataSaida: ""
+                    };
+                } else {
+                    return {
+                        ...ind,
+                        status: "saiu"
+                    };
+                }
+            });
 
-      if (individuosToSave.length === 0) {
-        setIsSaving(false)
-        return
-      }
-      
-      const dataToSave = { ...formState, individuos: individuosToSave };
-
-      if (selectedConsumo) {
-        await updateItem(selectedConsumo.id, dataToSave)
-      } else {
-        const now = new Date()
-        const entry: Omit<ConsumoBordo, "id"> = {
-          ...dataToSave,
-          data: now.toISOString().split("T")[0],
-          individuos: dataToSave.individuos.map(ind => ({
-             ...ind,
-             id: ind.id.startsWith('new-') ? `ind-${now.getTime()}-${Math.random().toString(36).substring(2, 9)}` : ind.id
-          })),
+        if (individuosToSave.length === 0) {
+            setIsSaving(false);
+            return;
         }
-        await addItem(entry)
-      }
-      setIsFormOpen(false)
+
+        const dataToSave = { ...formState, individuos: individuosToSave };
+
+        if (selectedConsumo) {
+            await updateItem(selectedConsumo.id, dataToSave);
+        } else {
+            const entry: Omit<ConsumoBordo, "id"> = {
+                ...dataToSave,
+                individuos: dataToSave.individuos.map(ind => ({
+                    ...ind,
+                    id: ind.id.startsWith('new-') ? `ind-${new Date().getTime()}-${Math.random().toString(36).substring(2, 9)}` : ind.id
+                })),
+            };
+            await addItem(entry);
+        }
+        setIsFormOpen(false);
     } catch (error) {
-      console.error("Erro ao salvar consumo:", error)
+        console.error("Erro ao salvar consumo:", error);
     } finally {
-      setIsSaving(false)
+        setIsSaving(false);
     }
   }
 
@@ -232,7 +255,7 @@ export function ConsumoSection() {
     const now = new Date()
     const updatedIndividuos = consumo.individuos.map(ind =>
       ind.id === individuoId
-        ? { ...ind, status: "saiu", horaSaida: now.toTimeString().slice(0, 5) }
+        ? { ...ind, status: "saiu", dataSaida: now.toISOString().split('T')[0], horaSaida: now.toTimeString().slice(0, 5) }
         : ind
     )
 
@@ -243,10 +266,16 @@ export function ConsumoSection() {
     }
   }
 
+  const formatDate = (dateString: string | undefined) => {
+    if (!dateString) return "";
+    const [year, month, day] = dateString.split('-');
+    if(!year || !month || !day) return "";
+    return `${day}/${month}/${year}`;
+  }
+
   const formatDateTime = (data: string, hora: string) => {
     if(!data || !hora) return "-";
-    const [year, month, day] = data.split("-")
-    return `${day}/${month}/${year} ${hora}`
+    return `${formatDate(data)} ${hora}`;
   }
 
   if (loading) {
@@ -255,36 +284,88 @@ export function ConsumoSection() {
 
   return (
     <div className="space-y-4 md:space-y-6">
-      {/* Stats Cards */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
-        <Card><CardContent className="flex items-center gap-4 p-4"><div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10"><Truck className="h-6 w-6 text-primary" /></div><div><p className="text-2xl font-bold">{totalRegistros}</p><p className="text-sm text-muted-foreground">Total Registros</p></div></CardContent></Card>
+        <Card><CardContent className="flex items-center gap-4 p-4"><div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10"><Truck className="h-6 w-6 text-primary" /></div><div><p className="text-2xl font-bold">{totalRegistros}</p><p className="text-sm text-muted-foreground">Registros no Período</p></div></CardContent></Card>
         <Card><CardContent className="flex items-center gap-4 p-4"><div className="flex h-12 w-12 items-center justify-center rounded-lg bg-blue-400/10"><Ship className="h-6 w-6 text-blue-400" /></div><div><p className="text-2xl font-bold">{presentes}</p><p className="text-sm text-muted-foreground">A Bordo</p></div></CardContent></Card>
         <Card><CardContent className="flex items-center gap-4 p-4"><div className="flex h-12 w-12 items-center justify-center rounded-lg bg-purple-400/10"><Users className="h-6 w-6 text-purple-400" /></div><div><p className="text-2xl font-bold">{totalIndividuos}</p><p className="text-sm text-muted-foreground">Total Indivíduos</p></div></CardContent></Card>
         <Card><CardContent className="flex items-center gap-4 p-4"><div className="flex h-11 w-11 items-center justify-center rounded-lg bg-secondary"><span className="text-xs font-bold text-muted-foreground">TEG</span></div><div><p className="text-2xl font-bold">{totalTeg}</p><p className="text-sm text-muted-foreground">Pier TEG</p></div></CardContent></Card>
         <Card><CardContent className="flex items-center gap-4 p-4"><div className="flex h-11 w-11 items-center justify-center rounded-lg bg-secondary"><span className="text-xs font-bold text-muted-foreground">TEAG</span></div><div><p className="text-2xl font-bold">{totalTeag}</p><p className="text-sm text-muted-foreground">Pier TEAG</p></div></CardContent></Card>
       </div>
 
-      {/* Search and Actions */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-         <div className="relative flex-1 md:grow-0">
-            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input placeholder="Buscar registro..." value={search} onChange={e => setSearch(e.target.value)} className="w-full rounded-lg bg-background pl-8 md:w-[200px] lg:w-[336px]" />
-        </div>
-        <Button onClick={handleAddNew} className="w-full sm:w-auto"><Plus className="mr-2 h-4 w-4" />Novo Registro</Button>
-      </div>
+        <Card>
+            <CardContent className="pt-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 items-end">
+                    <div className="lg:col-span-1 grid gap-2">
+                        <Label htmlFor="search">Busca</Label>
+                        <div className="relative">
+                            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                            <Input id="search" placeholder="Buscar por placa, navio, pessoa..." value={search} onChange={e => setSearch(e.target.value)} className="w-full pl-8" />
+                        </div>
+                    </div>
+                    <div className="grid gap-2">
+                        <Label htmlFor="dataInicio">Data Início</Label>
+                        <Input id="dataInicio" type="date" value={dataInicio} onChange={e => setDataInicio(e.target.value)} />
+                    </div>
+                    <div className="grid gap-2">
+                        <Label htmlFor="dataFim">Data Fim</Label>
+                        <Input id="dataFim" type="date" value={dataFim} onChange={e => setDataFim(e.target.value)} />
+                    </div>
+                    <div className="flex gap-2 md:col-span-3 lg:col-span-2">
+                         <Button variant="outline" onClick={() => { setDataInicio(""); setDataFim(""); }} className="w-1/2"><XCircle className="mr-2 h-4 w-4"/>Limpar</Button>
+                        <Button onClick={handleAddNew} className="w-1/2"><Plus className="mr-2 h-4 w-4" />Novo Registro</Button>
+                    </div>
+                </div>
+            </CardContent>
+        </Card>
 
       {/* Add/Edit Dialog */}
-      <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
+      <Dialog open={isFormOpen} onOpenChange={(isOpen) => { if(!isOpen) setFormState(initialFormState); setIsFormOpen(isOpen); }}>
         <DialogContent className="max-w-2xl w-full mx-4 sm:mx-auto">
           <DialogHeader><DialogTitle>{selectedConsumo ? "Editar Registro" : "Registrar Consumo de Bordo"}</DialogTitle></DialogHeader>
           <div className="max-h-[80vh] overflow-y-auto p-1">
             <div className="grid gap-4 py-4">
-              <div className="rounded-lg border bg-secondary/30 p-4 space-y-3"><div className="flex items-center justify-between"><Label>Indivíduos</Label><Button type="button" variant="outline" size="sm" onClick={addIndividuo}><Plus className="mr-1 h-3 w-3" />Adicionar</Button></div><div className="space-y-3">{formState.individuos.map((ind, index) => (<div key={ind.id || index} className="grid grid-cols-[1fr_auto] items-end gap-2"><Input placeholder={`Nome do indivíduo ${index + 1}`} value={ind.nome} onChange={e => handleIndividuoChange(index, "nome", e.target.value)} />{formState.individuos.length > 1 && !selectedConsumo && <Button type="button" variant="ghost" size="icon" onClick={() => removeIndividuo(index)} className="shrink-0 text-destructive hover:text-destructive"><X className="h-4 w-4" /></Button>}</div>))}</div></div>
+              <div className="rounded-lg border bg-secondary/30 p-4 space-y-3">
+                <div className="flex items-center justify-between"><Label>Indivíduos</Label><Button type="button" variant="outline" size="sm" onClick={addIndividuo}><Plus className="mr-1 h-3 w-3" />Adicionar</Button></div>
+                <div className="space-y-3">
+                  {formState.individuos.map((ind, index) => (
+                    <div key={ind.id || index} className="grid grid-cols-[1fr_auto] items-end gap-2">
+                      <Input placeholder={`Nome do indivíduo ${index + 1}`} value={ind.nome} onChange={e => handleIndividuoChange(index, "nome", e.target.value)} />
+                      {formState.individuos.length > 1 && 
+                        <Button type="button" variant="ghost" size="icon" onClick={() => removeIndividuo(index)} className="shrink-0 text-destructive hover:text-destructive"><X className="h-4 w-4" /></Button>}
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4"><div className="grid gap-2"><Label htmlFor="data">Data de Entrada</Label><Input id="data" type="date" value={formState.data} onChange={handleInputChange}/></div><div className="grid gap-2"><Label htmlFor="hora">Hora de Entrada</Label><Input id="hora" type="time" value={formState.hora} onChange={handleInputChange} /></div></div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4"><div className="grid gap-2"><Label htmlFor="veiculo">Veículo</Label><Input id="veiculo" placeholder="Ex: Caminhão Baú" value={formState.veiculo} onChange={handleInputChange} /></div><div className="grid gap-2"><Label htmlFor="placa">Placa</Label><Input id="placa" placeholder="Ex: ABC-1234" value={formState.placa} onChange={handleInputChange} /></div></div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4"><div className="grid gap-2"><Label htmlFor="produto">Produto</Label><Input id="produto" placeholder="Ex: Água Mineral" value={formState.produto} onChange={handleInputChange} /></div><div className="grid gap-2"><Label htmlFor="tipoServico">Tipo de Serviço</Label><Input id="tipoServico" placeholder="Ex: Manutenção" value={formState.tipoServico} onChange={handleInputChange} /></div></div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4"><div className="grid gap-2"><Label htmlFor="notaFiscal">Nota Fiscal</Label><Input id="notaFiscal" placeholder="Ex: NF-001234" value={formState.notaFiscal} onChange={handleInputChange} /></div><div className="grid gap-2"><Label htmlFor="navio">Navio</Label><Input id="navio" placeholder="Nome do navio" value={formState.navio} onChange={handleInputChange} /></div></div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4"><div className="grid gap-2"><Label htmlFor="terminal">Terminal</Label><Select value={formState.terminal} onValueChange={v => handleSelectChange("terminal", v)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="teg">TEG</SelectItem><SelectItem value="teag">TEAG</SelectItem></SelectContent></Select></div><div className="grid gap-2"><Label htmlFor="empresa">Empresa</Label><Input id="empresa" placeholder="Nome da empresa" value={formState.empresa} onChange={handleInputChange} /></div></div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4"><div className="grid gap-2"><Label htmlFor="vigilante">Vigilante</Label><Input id="vigilante" placeholder="Nome do vigilante" value={formState.vigilante} onChange={handleInputChange} /></div><div className="grid gap-2"><Label htmlFor="hora">Hora de Entrada</Label><Input id="hora" type="time" value={formState.hora} onChange={handleInputChange} /></div></div>
+              <div className="grid gap-2"><Label htmlFor="vigilante">Vigilante</Label><Input id="vigilante" placeholder="Nome do vigilante" value={formState.vigilante} onChange={handleInputChange} /></div>
+              
+              {selectedConsumo && (
+                <div className="rounded-lg border bg-secondary/30 p-4 mt-4">
+                  <Label className="mb-3 block">Controle de Saída dos Indivíduos</Label>
+                  <div className="space-y-4">
+                  {formState.individuos.map((ind, index) => (
+                    <div key={ind.id} className="grid grid-cols-1 sm:grid-cols-3 gap-2 items-end">
+                      <div className="sm:col-span-1">
+                        <Label htmlFor={`nome-saida-${index}`} className="text-xs text-muted-foreground">Nome</Label>
+                        <Input id={`nome-saida-${index}`} value={ind.nome} disabled />
+                      </div>
+                      <div className="grid gap-2">
+                        <Label htmlFor={`data-saida-${index}`} className="text-xs text-muted-foreground">Data Saída</Label>
+                        <Input id={`data-saida-${index}`} type="date" value={ind.dataSaida || ""} onChange={e => handleIndividuoChange(index, 'dataSaida', e.target.value)} />
+                      </div>
+                      <div className="grid gap-2">
+                        <Label htmlFor={`hora-saida-${index}`} className="text-xs text-muted-foreground">Hora Saída</Label>
+                        <Input id={`hora-saida-${index}`} type="time" value={ind.horaSaida || ""} onChange={e => handleIndividuoChange(index, 'horaSaida', e.target.value)} />
+                      </div>
+                    </div>
+                  ))}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
            <DialogFooter>
@@ -309,11 +390,11 @@ export function ConsumoSection() {
       </Dialog>
 
       <Card>
-        <CardHeader><CardTitle>Registro de Consumo de Bordo</CardTitle></CardHeader>
+        <CardHeader><CardTitle>Histórico de Consumo de Bordo</CardTitle></CardHeader>
         <CardContent>
              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 lg:hidden">
                 {filteredConsumos.length === 0 ? (
-                    <p className="py-8 text-center text-muted-foreground col-span-full">Nenhum registro encontrado.</p>
+                    <p className="py-8 text-center text-muted-foreground col-span-full">Nenhum registro encontrado para os filtros aplicados.</p>
                 ) : (
                     filteredConsumos.map(consumo => (
                         <div key={consumo.id} className="rounded-lg border bg-card p-4 space-y-4 flex flex-col">
@@ -334,7 +415,7 @@ export function ConsumoSection() {
                                         </div>
                                         <div className="grid grid-cols-2 gap-x-4 text-sm">
                                             <div className="flex flex-col"><span className="text-muted-foreground">Entrada</span><span>{formatDateTime(consumo.data, consumo.hora)}</span></div>
-                                            <div className="flex flex-col"><span className="text-muted-foreground">Saída</span><span>{individuo.horaSaida || '-'}</span></div>
+                                            <div className="flex flex-col"><span className="text-muted-foreground">Saída</span><span>{individuo.horaSaida ? formatDateTime(individuo.dataSaida || consumo.data, individuo.horaSaida) : '-'}</span></div>
                                         </div>
                                          <div className="flex items-center justify-end gap-2 pt-2">
                                             {individuo.status === 'presente' ? (
@@ -389,7 +470,7 @@ export function ConsumoSection() {
                     </thead>
                     <tbody className="divide-y divide-border/50">
                         {filteredConsumos.length === 0 ? (
-                            <tr><td colSpan={14} className="py-8 text-center text-muted-foreground">Nenhum registro encontrado.</td></tr>
+                            <tr><td colSpan={14} className="py-8 text-center text-muted-foreground">Nenhum registro encontrado para os filtros aplicados.</td></tr>
                         ) : (
                             filteredConsumos.map(consumo => (
                                 consumo.individuos.map((individuo, individuoIndex) => (
@@ -406,7 +487,7 @@ export function ConsumoSection() {
                                             <Button size="xs" variant="outline" onClick={() => handleSaida(consumo.id, individuo.id)}><LogOut className="mr-1 h-3 w-3" /> Sair</Button>
                                         ) : individuo.horaSaida ? (
                                             <div className="flex items-center gap-2">
-                                                <span>{individuo.horaSaida}</span>
+                                                <span>{formatDateTime(individuo.dataSaida || consumo.data, individuo.horaSaida)}</span>
                                                 <Button size="xs" variant="outline" onClick={() => handleReEntry(consumo, individuo)}><LogIn className="mr-1 h-3 w-3" /> Nova Entrada</Button>
                                             </div>
                                         ) : (

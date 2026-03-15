@@ -3,12 +3,12 @@
 import { useState, useMemo } from "react"
 import { Header } from "@/components/dashboard/header"
 import { Navigation } from "@/components/dashboard/navigation"
+import { PainelSection } from "@/components/dashboard/painel-section"
 import { VisitantesSection } from "@/components/dashboard/visitantes-section"
 import { RefeicoesSection } from "@/components/dashboard/refeicoes-section"
 import { TPAsSection } from "@/components/dashboard/tpas-section"
 import { ConsumoSection } from "@/components/dashboard/consumo-section"
 import { ReportsSection } from "@/components/dashboard/reports-section"
-import { DashboardSection } from "@/components/dashboard/dashboard-section"
 
 export default function Dashboard() {
   const [activeSection, setActiveSection] = useState("dashboard")
@@ -18,7 +18,7 @@ export default function Dashboard() {
   }
 
   const sectionComponents: { [key: string]: React.ComponentType } = useMemo(() => ({
-    dashboard: DashboardSection,
+    dashboard: PainelSection,
     visitantes: VisitantesSection,
     refeicoes: RefeicoesSection,
     tpas: TPAsSection,
@@ -26,7 +26,7 @@ export default function Dashboard() {
     reports: ReportsSection,
   }), []);
 
-  const ActiveComponent = sectionComponents[activeSection] || DashboardSection;
+  const ActiveComponent = sectionComponents[activeSection] || PainelSection;
 
   return (
     <div className="flex min-h-screen w-full flex-col bg-muted/40">

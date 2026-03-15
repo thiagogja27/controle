@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from "react"
-import { LogIn, LogOut, Plus, Search, Ship, Users, Loader2, FilePenLine, Trash2, MoreVertical } from "lucide-react"
+import { LogIn, LogOut, Plus, Search, Ship, Users, Loader2, FilePenLine, Trash2, MoreVertical, XCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -33,7 +33,7 @@ import { type TPA } from "@/lib/store"
 import { useTPAs } from "@/hooks/use-firebase"
 import { cn } from "@/lib/utils"
 
-const initialFormState: Omit<TPA, "id" | "data" | "status"> = {
+const initialFormState: Omit<TPA, "id" | "status"> = {
   nome: "",
   funcao: "",
   documento: "",
@@ -42,13 +42,18 @@ const initialFormState: Omit<TPA, "id" | "data" | "status"> = {
   pier: "teg",
   observacao: "",
   vigilante: "",
+  data: "",
   hora: "",
+  dataSaida: "",
   horaSaida: "",
 }
 
 export function TPAsSection() {
   const { data: registros, loading, addItem, updateItem, deleteItem } = useTPAs()
   const [search, setSearch] = useState("")
+  const [dataInicio, setDataInicio] = useState("");
+  const [dataFim, setDataFim] = useState("");
+
   const [isFormOpen, setIsFormOpen] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false)
@@ -56,59 +61,60 @@ export function TPAsSection() {
   const [formState, setFormState] = useState(initialFormState)
 
   const handleReEntry = (tpa: TPA) => {
-    setSelectedTPA(null); // Ensure we are creating a new entry
+    setSelectedTPA(null);
     const now = new Date();
+
+    const { id, status, ...restOfTPA } = tpa;
+
     setFormState({
-        ...initialFormState,
-        nome: tpa.nome,
-        funcao: tpa.funcao,
-        documento: tpa.documento,
-        destino: tpa.destino,
-        navio: tpa.navio,
-        pier: tpa.pier,
-        observacao: tpa.observacao,
-        vigilante: tpa.vigilante,
+        ...restOfTPA,
+        data: now.toISOString().split("T")[0],
         hora: now.toTimeString().slice(0, 5),
+        dataSaida: "",
         horaSaida: "",
     });
     setIsFormOpen(true);
   };
 
   useEffect(() => {
-    if (isFormOpen) {
-      if (selectedTPA) {
+    if (isFormOpen && selectedTPA) {
         setFormState({
-          nome: selectedTPA.nome,
-          funcao: selectedTPA.funcao,
-          documento: selectedTPA.documento,
-          destino: selectedTPA.destino,
-          navio: selectedTPA.navio,
-          pier: selectedTPA.pier,
-          observacao: selectedTPA.observacao,
-          vigilante: selectedTPA.vigilante,
-          hora: selectedTPA.hora,
+          ...selectedTPA,
+          dataSaida: selectedTPA.dataSaida || "",
           horaSaida: selectedTPA.horaSaida || "",
         })
-      } else if (!formState.nome) {
-        const now = new Date()
-        setFormState({ ...initialFormState, hora: now.toTimeString().slice(0, 5) })
-      }
     }
-  }, [selectedTPA, isFormOpen, formState.nome])
-
-  const totalPresentes = registros.filter(r => r.status === "presente").length
-  const totalTeg = registros.filter(r => r.pier === "teg").length
-  const totalTeag = registros.filter(r => r.pier === "teag").length
+  }, [selectedTPA, isFormOpen])
 
   const filtered = registros.filter(r => {
     const searchLower = search.toLowerCase().trim()
-    if (!searchLower) return true
-    return (
+    const textMatch = !searchLower || (
       r.nome?.toLowerCase().includes(searchLower) ||
       r.documento?.toLowerCase().includes(searchLower) ||
       r.navio?.toLowerCase().includes(searchLower)
-    )
+    );
+
+     const dateMatch = (() => {
+        if (!dataInicio && !dataFim) {
+            if (searchLower) {
+                return true;
+            }
+            const today = new Date().toISOString().split('T')[0];
+            return r.data === today;
+        }
+        const entrada = r.data;
+        const afterStart = dataInicio ? entrada >= dataInicio : true;
+        const beforeEnd = dataFim ? entrada <= dataFim : true;
+        return afterStart && beforeEnd;
+    })();
+
+    return textMatch && dateMatch;
   })
+
+  const totalPresentes = filtered.filter(r => r.status === "presente").length
+  const totalTeg = filtered.filter(r => r.pier === "teg").length
+  const totalTeag = filtered.filter(r => r.pier === "teag").length
+  const totalRegistros = filtered.length;
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { id, value } = e.target
@@ -121,7 +127,12 @@ export function TPAsSection() {
 
   const handleAddNew = () => {
     setSelectedTPA(null)
-    setFormState(initialFormState)
+    const now = new Date();
+    setFormState({ 
+        ...initialFormState,
+        data: now.toISOString().split("T")[0],
+        hora: now.toTimeString().slice(0, 5) 
+    });
     setIsFormOpen(true)
   }
 
@@ -152,18 +163,18 @@ export function TPAsSection() {
   const handleSave = async () => {
     setIsSaving(true)
     try {
-      const status = formState.horaSaida ? "saiu" : "presente"
+      const status = (formState.horaSaida && formState.dataSaida) ? "saiu" : "presente"
+      let dataToSave: Omit<TPA, "id"> = { ...formState, status };
+
+      if (status === "presente") {
+        dataToSave.horaSaida = "";
+        dataToSave.dataSaida = "";
+      }
+
       if (selectedTPA) {
-        await updateItem(selectedTPA.id, { ...formState, status })
+        await updateItem(selectedTPA.id, dataToSave)
       } else {
-        const now = new Date()
-        const entry: Omit<TPA, "id"> = {
-          ...formState,
-          data: now.toISOString().split("T")[0],
-          status: "presente",
-          horaSaida: "",
-        }
-        await addItem(entry)
+        await addItem(dataToSave)
       }
       setIsFormOpen(false)
     } catch (error) {
@@ -175,19 +186,27 @@ export function TPAsSection() {
 
   const handleSaida = async (id: string) => {
     try {
+      const now = new Date();
       await updateItem(id, {
         status: "saiu",
-        horaSaida: new Date().toTimeString().slice(0, 5),
+        dataSaida: now.toISOString().split("T")[0],
+        horaSaida: now.toTimeString().slice(0, 5),
       })
     } catch (error) {
       console.error("Erro ao registrar saída:", error)
     }
   }
 
-  const formatDate = (data: string, hora: string) => {
+  const formatDate = (dateString: string | undefined) => {
+    if (!dateString) return "";
+    const [year, month, day] = dateString.split('-');
+    if(!year || !month || !day) return "";
+    return `${day}/${month}/${year}`;
+  }
+
+  const formatDateTime = (data: string | undefined, hora: string) => {
     if (!data || !hora) return ""
-    const [y, m, d] = data.split("-")
-    return `${d}/${m}/${y} ${hora}`
+    return `${formatDate(data)} ${hora}`
   }
 
   const isFormValid =
@@ -196,7 +215,9 @@ export function TPAsSection() {
     formState.documento.trim() &&
     formState.destino.trim() &&
     formState.navio.trim() &&
-    formState.vigilante.trim()
+    formState.vigilante.trim() &&
+    formState.data.trim() &&
+    formState.hora.trim()
 
   if (loading) {
     return <div className="flex items-center justify-center py-12"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
@@ -206,23 +227,41 @@ export function TPAsSection() {
     <div className="space-y-4 md:space-y-6">
       {/* Stats */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Card><CardContent className="flex items-center gap-4 p-4"><div className="flex h-11 w-11 items-center justify-center rounded-lg bg-primary/10"><Users className="h-5 w-5 text-primary" /></div><div><p className="text-2xl font-bold">{registros.length}</p><p className="text-sm text-muted-foreground">Total do Dia</p></div></CardContent></Card>
+        <Card><CardContent className="flex items-center gap-4 p-4"><div className="flex h-11 w-11 items-center justify-center rounded-lg bg-primary/10"><Users className="h-5 w-5 text-primary" /></div><div><p className="text-2xl font-bold">{totalRegistros}</p><p className="text-sm text-muted-foreground">Total no Período</p></div></CardContent></Card>
         <Card><CardContent className="flex items-center gap-4 p-4"><div className="flex h-11 w-11 items-center justify-center rounded-lg bg-primary/10"><Ship className="h-5 w-5 text-primary" /></div><div><p className="text-2xl font-bold text-primary">{totalPresentes}</p><p className="text-sm text-muted-foreground">A Bordo</p></div></CardContent></Card>
         <Card><CardContent className="flex items-center gap-4 p-4"><div className="flex h-11 w-11 items-center justify-center rounded-lg bg-secondary"><span className="text-xs font-bold text-muted-foreground">TEG</span></div><div><p className="text-2xl font-bold">{totalTeg}</p><p className="text-sm text-muted-foreground">Pier TEG</p></div></CardContent></Card>
         <Card><CardContent className="flex items-center gap-4 p-4"><div className="flex h-11 w-11 items-center justify-center rounded-lg bg-secondary"><span className="text-xs font-bold text-muted-foreground">TEAG</span></div><div><p className="text-2xl font-bold">{totalTeag}</p><p className="text-sm text-muted-foreground">Pier TEAG</p></div></CardContent></Card>
       </div>
 
-      {/* Search & Add */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="relative flex-1 md:grow-0">
-            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input placeholder="Buscar registro..." value={search} onChange={e => setSearch(e.target.value)} className="w-full rounded-lg bg-background pl-8 md:w-[200px] lg:w-[336px]" />
-        </div>
-        <Button onClick={handleAddNew} className="w-full sm:w-auto"><Plus className="mr-2 h-4 w-4" />Registrar Entrada</Button>
-      </div>
+        <Card>
+            <CardContent className="pt-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 items-end">
+                    <div className="lg:col-span-1 grid gap-2">
+                        <Label htmlFor="search">Busca</Label>
+                        <div className="relative">
+                            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                            <Input id="search" placeholder="Buscar por nome, documento, navio..." value={search} onChange={e => setSearch(e.target.value)} className="w-full pl-8" />
+                        </div>
+                    </div>
+                    <div className="grid gap-2">
+                        <Label htmlFor="dataInicio">Data Início</Label>
+                        <Input id="dataInicio" type="date" value={dataInicio} onChange={e => setDataInicio(e.target.value)} />
+                    </div>
+                    <div className="grid gap-2">
+                        <Label htmlFor="dataFim">Data Fim</Label>
+                        <Input id="dataFim" type="date" value={dataFim} onChange={e => setDataFim(e.target.value)} />
+                    </div>
+                    <div className="flex gap-2 md:col-span-3 lg:col-span-1">
+                         <Button variant="outline" onClick={() => { setDataInicio(""); setDataFim(""); }} className="w-full"><XCircle className="mr-2 h-4 w-4"/>Limpar</Button>
+                        <Button onClick={handleAddNew} className="w-full"><Plus className="mr-2 h-4 w-4" />Registrar TPA</Button>
+                    </div>
+                </div>
+            </CardContent>
+        </Card>
+
 
       {/* Add/Edit Dialog */}
-      <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
+      <Dialog open={isFormOpen} onOpenChange={(isOpen) => { if(!isOpen) setFormState(initialFormState); setIsFormOpen(isOpen); }}>
         <DialogContent className="max-w-lg w-full mx-4 sm:mx-auto">
           <DialogHeader><DialogTitle>{selectedTPA ? "Editar Registro TPA" : "Registrar Entrada TPA"}</DialogTitle></DialogHeader>
           <div className="max-h-[80vh] overflow-y-auto p-1">
@@ -233,8 +272,10 @@ export function TPAsSection() {
               <div className="grid gap-2"><Label htmlFor="destino">Destino</Label><Input id="destino" placeholder="Ex: Convés Principal" value={formState.destino} onChange={handleInputChange} /></div>
               <div className="grid gap-2"><Label htmlFor="navio">Navio</Label><Input id="navio" placeholder="Nome do navio" value={formState.navio} onChange={handleInputChange} /></div>
               <div className="grid gap-2"><Label htmlFor="pier">Pier</Label><Select value={formState.pier} onValueChange={v => handleSelectChange("pier", v as "teg" | "teag")}><SelectTrigger id="pier"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="teg">TEG</SelectItem><SelectItem value="teag">TEAG</SelectItem></SelectContent></Select></div>
+              <div className="grid gap-2"><Label htmlFor="data">Data Entrada</Label><Input id="data" type="date" value={formState.data} onChange={handleInputChange} /></div>
               <div className="grid gap-2"><Label htmlFor="hora">Hora Entrada</Label><Input id="hora" type="time" value={formState.hora} onChange={handleInputChange} /></div>
-              {selectedTPA && <div className="grid gap-2"><Label htmlFor="horaSaida">Hora Saída</Label><Input id="horaSaida" type="time" value={formState.horaSaida || ""} onChange={handleInputChange} /></div>}
+              <div className="grid gap-2"><Label htmlFor="dataSaida">Data Saída</Label><Input id="dataSaida" type="date" value={formState.dataSaida || ""} onChange={handleInputChange} /></div>
+              <div className="grid gap-2"><Label htmlFor="horaSaida">Hora Saída</Label><Input id="horaSaida" type="time" value={formState.horaSaida || ""} onChange={handleInputChange} /></div>
               <div className="grid gap-2 sm:col-span-2"><Label htmlFor="vigilante">Vigilante</Label><Input id="vigilante" placeholder="Nome do vigilante responsável" value={formState.vigilante} onChange={handleInputChange} /></div>
               <div className="grid gap-2 sm:col-span-2"><Label htmlFor="observacao">Observação</Label><Textarea id="observacao" placeholder="Observações adicionais (opcional)" value={formState.observacao} onChange={handleInputChange} rows={3} /></div>
             </div>
@@ -262,11 +303,11 @@ export function TPAsSection() {
 
       {/* List */}
       <Card>
-        <CardHeader><CardTitle>Registros TPA</CardTitle></CardHeader>
+        <CardHeader><CardTitle>Histórico de TPAs</CardTitle></CardHeader>
         <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 lg:hidden">
                 {filtered.length === 0 ? (
-                    <p className="py-8 text-center text-muted-foreground col-span-full">Nenhum registro encontrado.</p>
+                    <p className="py-8 text-center text-muted-foreground col-span-full">Nenhum registro encontrado para os filtros aplicados.</p>
                 ) : (
                     filtered.map(r => (
                         <div key={r.id} className="rounded-lg border bg-card p-4 space-y-3 flex flex-col">
@@ -280,8 +321,8 @@ export function TPAsSection() {
                             <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm flex-grow">
                                 <div className="flex flex-col"><span className="text-muted-foreground">Documento</span><span>{r.documento}</span></div>
                                 <div className="flex flex-col"><span className="text-muted-foreground">Navio</span><span>{r.navio}</span></div>
-                                <div className="flex flex-col"><span className="text-muted-foreground">Entrada</span><span>{formatDate(r.data, r.hora)}</span></div>
-                                <div className="flex flex-col"><span className="text-muted-foreground">Saída</span><span>{r.horaSaida || '-'}</span></div>
+                                <div className="flex flex-col"><span className="text-muted-foreground">Entrada</span><span>{formatDateTime(r.data, r.hora)}</span></div>
+                                <div className="flex flex-col"><span className="text-muted-foreground">Saída</span><span>{r.horaSaida ? formatDateTime(r.dataSaida || r.data, r.horaSaida) : '-'}</span></div>
                             </div>
                              <div className="border-t pt-3 flex items-center justify-end gap-2">
                                 {r.status === "presente" ? (
@@ -305,7 +346,8 @@ export function TPAsSection() {
                  <table className="w-full text-sm">
                     <thead>
                         <tr className="border-b border-border text-left text-xs text-muted-foreground uppercase">
-                            <th className="px-4 py-3 font-medium">Data / Hora</th>
+                            <th className="px-4 py-3 font-medium">Entrada</th>
+                            <th className="px-4 py-3 font-medium">Saída</th>
                             <th className="px-4 py-3 font-medium">Nome</th>
                             <th className="px-4 py-3 font-medium">Função</th>
                             <th className="px-4 py-3 font-medium">Documento</th>
@@ -314,17 +356,17 @@ export function TPAsSection() {
                             <th className="px-4 py-3 font-medium">Pier</th>
                             <th className="px-4 py-3 font-medium">Vigilante</th>
                             <th className="px-4 py-3 font-medium">Observações</th>
-                            <th className="px-4 py-3 font-medium">Hora Saída</th>
                             <th className="px-4 py-3 font-medium text-right">Ações</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-border/50">
                         {filtered.length === 0 ? (
-                            <tr><td colSpan={11} className="py-8 text-center text-muted-foreground">Nenhum registro encontrado.</td></tr>
+                            <tr><td colSpan={11} className="py-8 text-center text-muted-foreground">Nenhum registro encontrado para os filtros aplicados.</td></tr>
                         ) : (
                             filtered.map(r => (
                                 <tr key={r.id} className="hover:bg-muted/50">
-                                    <td className="px-4 py-3 whitespace-nowrap tabular-nums text-muted-foreground">{formatDate(r.data, r.hora)}</td>
+                                    <td className="px-4 py-3 whitespace-nowrap tabular-nums text-muted-foreground">{formatDateTime(r.data, r.hora)}</td>
+                                    <td className="px-4 py-3 whitespace-nowrap tabular-nums text-muted-foreground">{r.horaSaida ? formatDateTime(r.dataSaida || r.data, r.horaSaida) : "-"}</td>
                                     <td className="px-4 py-3 font-medium whitespace-nowrap text-foreground">{r.nome}</td>
                                     <td className="px-4 py-3 text-muted-foreground">{r.funcao}</td>
                                     <td className="px-4 py-3 tabular-nums text-muted-foreground">{r.documento}</td>
@@ -333,7 +375,6 @@ export function TPAsSection() {
                                     <td className="px-4 py-3"><span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ${r.pier === "teg" ? "bg-primary/10 text-primary" : "bg-info/10 text-info"}`}>{r.pier.toUpperCase()}</span></td>
                                     <td className="px-4 py-3 whitespace-nowrap text-foreground">{r.vigilante}</td>
                                     <td className="px-4 py-3 text-muted-foreground max-w-xs truncate">{r.observacao}</td>
-                                    <td className="px-4 py-3 whitespace-nowrap tabular-nums text-muted-foreground">{r.horaSaida || "-"}</td>
                                     <td className="px-4 py-3">
                                         <div className="flex items-center justify-end gap-2">
                                             {r.status === "presente" ? (
