@@ -32,6 +32,8 @@ import { Textarea } from "@/components/ui/textarea"
 import { type TPA } from "@/lib/store"
 import { useTPAs } from "@/hooks/use-firebase"
 import { cn } from "@/lib/utils"
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
+
 
 const initialFormState: Omit<TPA, "id" | "status"> = {
   nome: "",
@@ -48,11 +50,15 @@ const initialFormState: Omit<TPA, "id" | "status"> = {
   horaSaida: "",
 }
 
+type Shift = "todos" | "07-13" | "13-19" | "19-01" | "01-07";
+
 export function TPAsSection() {
   const { data: registros, loading, addItem, updateItem, deleteItem } = useTPAs()
   const [search, setSearch] = useState("")
   const [dataInicio, setDataInicio] = useState("");
   const [dataFim, setDataFim] = useState("");
+  const [activeShift, setActiveShift] = useState<Shift>("todos");
+
 
   const [isFormOpen, setIsFormOpen] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
@@ -108,7 +114,30 @@ export function TPAsSection() {
         return afterStart && beforeEnd;
     })();
 
-    return textMatch && dateMatch;
+    const shiftMatch = (() => {
+      if (activeShift === "todos") {
+        return true;
+      }
+      if (!r.horaSaida) {
+        return false;
+      }
+      const hora = r.horaSaida;
+      switch (activeShift) {
+        case "07-13":
+          return hora >= "07:00" && hora < "13:00";
+        case "13-19":
+          return hora >= "13:00" && hora < "19:00";
+        case "19-01":
+          return hora >= "19:00" || hora < "01:00";
+        case "01-07":
+            return hora >= "01:00" && hora < "07:00";
+        default:
+          return true;
+      }
+    })();
+
+
+    return textMatch && dateMatch && shiftMatch;
   })
 
   const totalPresentes = filtered.filter(r => r.status === "presente").length
@@ -234,9 +263,9 @@ export function TPAsSection() {
       </div>
 
         <Card>
-            <CardContent className="pt-6">
+            <CardContent className="pt-6 space-y-4">
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 items-end">
-                    <div className="lg:col-span-1 grid gap-2">
+                    <div className="grid gap-2">
                         <Label htmlFor="search">Busca</Label>
                         <div className="relative">
                             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -251,10 +280,23 @@ export function TPAsSection() {
                         <Label htmlFor="dataFim">Data Fim</Label>
                         <Input id="dataFim" type="date" value={dataFim} onChange={e => setDataFim(e.target.value)} />
                     </div>
-                    <div className="flex gap-2 md:col-span-3 lg:col-span-1">
-                         <Button variant="outline" onClick={() => { setDataInicio(""); setDataFim(""); }} className="w-full"><XCircle className="mr-2 h-4 w-4"/>Limpar</Button>
-                        <Button onClick={handleAddNew} className="w-full"><Plus className="mr-2 h-4 w-4" />Registrar TPA</Button>
-                    </div>
+                    <Button variant="outline" onClick={() => { setDataInicio(""); setDataFim(""); }} className="w-full"><XCircle className="mr-2 h-4 w-4"/>Limpar</Button>
+                    <Button onClick={handleAddNew} className="w-full"><Plus className="mr-2 h-4 w-4" />Registrar TPA</Button>
+                </div>
+                 <div className="flex flex-col gap-2">
+                    <Label>Filtrar por Turno de Saída</Label>
+                    <ToggleGroup
+                        type="single"
+                        value={activeShift}
+                        onValueChange={(value) => setActiveShift(value as Shift || "todos")}
+                        className="justify-start"
+                    >
+                        <ToggleGroupItem value="todos">Todos</ToggleGroupItem>
+                        <ToggleGroupItem value="07-13">07-13</ToggleGroupItem>
+                        <ToggleGroupItem value="13-19">13-19</ToggleGroupItem>
+                        <ToggleGroupItem value="19-01">19-01</ToggleGroupItem>
+                        <ToggleGroupItem value="01-07">01-07</ToggleGroupItem>
+                    </ToggleGroup>
                 </div>
             </CardContent>
         </Card>
