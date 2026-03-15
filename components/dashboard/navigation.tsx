@@ -1,7 +1,7 @@
 'use client'
 
 import { cn } from "@/lib/utils"
-import { LayoutDashboard, Users, Utensils, CreditCard, Package, BarChart } from "lucide-react"
+import { LayoutDashboard, Users, Utensils, CreditCard, Package, BarChart, Settings } from "lucide-react"
 
 interface NavigationProps {
   activeSection: string
@@ -44,6 +44,12 @@ const sections = [
     label: "Relatórios",
     description: "Geração e exportação de relatórios",
     icon: BarChart,
+  },
+    {
+    id: "settings",
+    label: "Configurações",
+    description: "Ajustes e personalizações do sistema",
+    icon: Settings,
   }
 ]
 

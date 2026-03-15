@@ -45,6 +45,17 @@ const config: Config = {
         md: "calc(var(--radius) - 2px)",
         sm: "calc(var(--radius) - 4px)",
       },
+      keyframes: {
+        "blink-warning": {
+          "50%": {
+            backgroundColor: "hsl(var(--destructive) / 0.25)",
+            borderColor: "hsl(var(--destructive) / 0.5)",
+          },
+        },
+      },
+      animation: {
+        "blink-warning": "blink-warning 1.5s infinite",
+      },
     },
   },
   plugins: [],

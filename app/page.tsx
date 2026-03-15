@@ -9,6 +9,7 @@ import { RefeicoesSection } from "@/components/dashboard/refeicoes-section"
 import { TPAsSection } from "@/components/dashboard/tpas-section"
 import { ConsumoSection } from "@/components/dashboard/consumo-section"
 import { ReportsSection } from "@/components/dashboard/reports-section"
+import { SettingsSection } from "@/components/dashboard/settings-section"
 
 export default function Dashboard() {
   const [activeSection, setActiveSection] = useState("dashboard")
@@ -24,6 +25,7 @@ export default function Dashboard() {
     tpas: TPAsSection,
     consumo: ConsumoSection,
     reports: ReportsSection,
+    settings: SettingsSection,
   }), []);
 
   const ActiveComponent = sectionComponents[activeSection] || PainelSection;

@@ -1,7 +1,7 @@
 'use client'
 
-import { useMemo, useState } from 'react'
-import { Users, Utensils, Ship, FileText, ArrowRight, Clock, Shield, AlertTriangle, BarChart2, List, Building2 } from 'lucide-react'
+import { useMemo, useState, useEffect, useRef } from 'react'
+import { Users, Utensils, Ship, FileText, AlertTriangle, BarChart2, List, Building2, Clock, Shield } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { 
     Dialog, DialogContent, DialogHeader, DialogTitle, 
@@ -16,6 +16,8 @@ import {
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart"
 import { type RefeicaoPolicial, type OldRefeicaoPolicial } from './refeicoes-section'
 import { cn } from "@/lib/utils"
+import { useToast } from "@/components/ui/use-toast"
+import { useSettingsStore } from "@/lib/settings-store"
 
 // --- Helper Functions ---
 const COLORS = ['#3b82f6', '#10b981', '#f97316', '#8b5cf6', '#ec4899'];
@@ -77,6 +79,36 @@ export function PainelSection() {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isExceededStayModalOpen, setIsExceededStayModalOpen] = useState(false);
     const [modalData, setModalData] = useState({ title: '', data: [] as any[] });
+    const { toast } = useToast();
+    const prevVisitantesRef = useRef(visitantes);
+    const { maxPermanenceHours, voiceAlerts } = useSettingsStore()
+
+    // --- Voice Alert Effect ---
+    useEffect(() => {
+        const prevVisitantes = prevVisitantesRef.current;
+
+        if (voiceAlerts && prevVisitantes.length < visitantes.length) {
+            const newVisitors = visitantes.filter(
+                v => !prevVisitantes.some(pv => pv.id === v.id)
+            );
+
+            if (newVisitors.length > 0) {
+                const newVisitor = newVisitors[0];
+                const utterance = new SpeechSynthesisUtterance(
+                    `Novo visitante: ${newVisitor.nome} da empresa ${newVisitor.empresa}`
+                );
+                utterance.lang = 'pt-BR';
+                speechSynthesis.speak(utterance);
+
+                toast({
+                    title: "Novo Visitante",
+                    description: `${newVisitor.nome} (${newVisitor.empresa}) acabou de entrar.`
+                });
+            }
+        }
+
+        prevVisitantesRef.current = visitantes;
+    }, [visitantes, voiceAlerts, toast]);
 
     // --- Memoized Data Processing ---
     const refeicoes = useMemo(() => {
@@ -100,9 +132,9 @@ export function PainelSection() {
     const permanenciaExcedida = useMemo(() => 
         visitantesPresentes
             .map(v => ({ ...v, duration: calculateDurationInHours(v.dataEntrada, v.horaEntrada) }))
-            .filter(v => v.duration > 8)
+            .filter(v => v.duration > maxPermanenceHours)
             .sort((a, b) => b.duration - a.duration)
-    , [visitantesPresentes]);
+    , [visitantesPresentes, maxPermanenceHours]);
 
     const credenciaisPresentes = useMemo(() => {
         return visitantesPresentes.reduce((acc, v) => {
@@ -190,9 +222,15 @@ export function PainelSection() {
             </div>
 
              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                 <Card className="border-destructive bg-destructive/10 cursor-pointer hover:bg-destructive/20" onClick={() => setIsExceededStayModalOpen(true)}>
+                 <Card 
+                    className={cn(
+                        "border-destructive bg-destructive/10 cursor-pointer hover:bg-destructive/20",
+                        permanenciaExcedida.length > 0 && "animate-blink-warning"
+                    )}
+                    onClick={() => setIsExceededStayModalOpen(true)}
+                >
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium text-destructive">Permanência Excedida</CardTitle><AlertTriangle className="h-4 w-4 text-destructive" /></CardHeader>
-                    <CardContent><div className="text-2xl font-bold text-destructive">{permanenciaExcedida.length}</div><p className="text-xs text-destructive/80">Visitantes há mais de 8h.</p></CardContent>
+                    <CardContent><div className="text-2xl font-bold text-destructive">{permanenciaExcedida.length}</div><p className="text-xs text-destructive/80">Visitantes há mais de {maxPermanenceHours}h.</p></CardContent>
                 </Card>
                  <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">Credenciais (Presentes)</CardTitle><Shield className="h-4 w-4 text-muted-foreground" /></CardHeader>
@@ -277,7 +315,9 @@ export function PainelSection() {
             </div>
 
             <Card>
-                <CardHeader><CardTitle className="flex items-center gap-2 text-base"><List className="h-4 w-4" /> Feed de Atividades Recentes</CardTitle></CardHeader>
+                 <CardHeader>
+                    <CardTitle className="flex items-center gap-2 text-base"><List className="h-4 w-4" /> Feed de Atividades Recentes</CardTitle>
+                </CardHeader>
                 <CardContent>
                     <div className="space-y-4">
                         {unifiedFeed.map((item, index) => (
@@ -332,7 +372,7 @@ export function PainelSection() {
                 <DialogContent className="max-w-md mx-auto sm:max-w-lg">
                     <DialogHeader>
                         <DialogTitle>Visitantes com Permanência Excedida</DialogTitle>
-                        <DialogDescription>Visitantes que estão no local há mais de 8 horas.</DialogDescription>
+                        <DialogDescription>Visitantes que estão no local há mais de {maxPermanenceHours} horas.</DialogDescription>
                     </DialogHeader>
                     <div className="max-h-[60vh] overflow-auto py-4">
                         <ul className="space-y-3">
