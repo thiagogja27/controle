@@ -28,6 +28,13 @@ const calculateDurationInHours = (dataEntrada: string, horaEntrada: string): num
     return diff / (1000 * 60 * 60);
 };
 
+const formatDuration = (hours: number) => {
+    const h = Math.floor(hours);
+    const m = Math.round((hours - h) * 60);
+    return `${h}h ${m}m`;
+};
+
+
 const CustomTooltip = ({ active, payload, label }: TooltipProps<number, string>) => {
   if (active && payload && payload.length) {
     return (
@@ -68,6 +75,7 @@ export function PainelSection() {
     const { data: rawRefeicoes = [], loading: loadingRefeicoes } = useRefeicoes()
     const { data: tpas = [], loading: loadingTpas } = useTPAs()
     const [isModalOpen, setIsModalOpen] = useState(false);
+    const [isExceededStayModalOpen, setIsExceededStayModalOpen] = useState(false);
     const [modalData, setModalData] = useState({ title: '', data: [] as any[] });
 
     // --- Memoized Data Processing ---
@@ -88,9 +96,14 @@ export function PainelSection() {
         });
     }, [rawRefeicoes]);
 
-    // --- New Dashboard Metrics ---
     const visitantesPresentes = useMemo(() => visitantes.filter(v => v.status === "presente"), [visitantes]);
-    const permanenciaExcedida = useMemo(() => visitantesPresentes.filter(v => calculateDurationInHours(v.dataEntrada, v.horaEntrada) > 8), [visitantesPresentes]);
+    const permanenciaExcedida = useMemo(() => 
+        visitantesPresentes
+            .map(v => ({ ...v, duration: calculateDurationInHours(v.dataEntrada, v.horaEntrada) }))
+            .filter(v => v.duration > 8)
+            .sort((a, b) => b.duration - a.duration)
+    , [visitantesPresentes]);
+
     const credenciaisPresentes = useMemo(() => {
         return visitantesPresentes.reduce((acc, v) => {
             if (v.credencial === 'verde') acc.verde++;
@@ -120,7 +133,6 @@ export function PainelSection() {
         return Object.entries(counts).map(([name, value]) => ({ name, value })).sort((a, b) => a.name.localeCompare(b.name));
     }, [visitantes]);
     
-    // --- Old Dashboard Metrics ---
     const allPresentIndividuals = useMemo(() => {
         const presentVisitantes = visitantes.filter(v => v.status === 'presente').map(v => ({ id: v.id, nome: v.nome, type: 'Visitante', destino: v.destino.toUpperCase(), details: [{ label: 'Empresa', value: v.empresa }, { label: 'Documento', value: v.documento }, { label: 'Motivo', value: v.motivo }] }));
         const presentTPAs = tpas.filter(t => t.status === 'presente').map(t => ({ id: t.id, nome: t.nome, type: 'TPA', destino: t.pier.toUpperCase(), details: [{ label: 'Função', value: t.funcao }, { label: 'Documento', value: t.documento }, { label: 'Navio', value: t.navio }] }));
@@ -146,7 +158,6 @@ export function PainelSection() {
         return Object.entries(counts).map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value);
     }, [visitantes]);
 
-    // Combined Feed
      const unifiedFeed = useMemo(() => {
         const visitantesFeed = visitantes.map(v => ({ type: 'Visitante', icon: Users, description: `${v.nome} (${v.empresa}) entrou.`, time: new Date(`${v.dataEntrada}T${v.horaEntrada}`), color: "text-blue-500" }));
         const refeicoesFeed = refeicoes.flatMap((r: any) => (r.individuos || []).map((i: any) => ({ type: 'Refeição', icon: Shield, description: `${i.nome} (Policial) registrou refeição.`, time: new Date(`${r.data}T${r.hora}`), color: "text-green-500" })));
@@ -170,7 +181,6 @@ export function PainelSection() {
 
     return (
         <div className="space-y-6">
-             {/* --- Cards Row 1: High-Level & Alerts --- */}
             <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
                 <Card className="cursor-pointer hover:bg-muted/50" onClick={() => openModal('Presentes no TEG', presentesTEG)}><CardHeader className="flex flex-row items-center justify-between pb-2"><CardTitle className="text-sm font-medium">Presentes no TEG</CardTitle><Users className="h-4 w-4 text-muted-foreground" /></CardHeader><CardContent><div className="text-2xl font-bold">{totalTEG}</div></CardContent></Card>
                 <Card className="cursor-pointer hover:bg-muted/50" onClick={() => openModal('Presentes no TEAG', presentesTEAG)}><CardHeader className="flex flex-row items-center justify-between pb-2"><CardTitle className="text-sm font-medium">Presentes no TEAG</CardTitle><Users className="h-4 w-4 text-muted-foreground" /></CardHeader><CardContent><div className="text-2xl font-bold">{totalTEAG}</div></CardContent></Card>
@@ -179,9 +189,8 @@ export function PainelSection() {
                 <Card><CardHeader className="flex flex-row items-center justify-between pb-2"><CardTitle className="text-sm font-medium">TPAs Presentes</CardTitle><FileText className="h-4 w-4 text-muted-foreground" /></CardHeader><CardContent><div className="text-2xl font-bold">{totalTPAsPresentes}</div></CardContent></Card>
             </div>
 
-            {/* --- Cards Row 2: Alerts & Today's Stats --- */}
              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                 <Card className="border-destructive bg-destructive/10">
+                 <Card className="border-destructive bg-destructive/10 cursor-pointer hover:bg-destructive/20" onClick={() => setIsExceededStayModalOpen(true)}>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium text-destructive">Permanência Excedida</CardTitle><AlertTriangle className="h-4 w-4 text-destructive" /></CardHeader>
                     <CardContent><div className="text-2xl font-bold text-destructive">{permanenciaExcedida.length}</div><p className="text-xs text-destructive/80">Visitantes há mais de 8h.</p></CardContent>
                 </Card>
@@ -202,7 +211,6 @@ export function PainelSection() {
                 </Card>
             </div>
 
-            {/* --- Charts Section --- */}
             <div className="grid grid-cols-1 gap-4 lg:grid-cols-5">
                 <Card className="lg:col-span-3">
                     <CardHeader><CardTitle>Consumo de Bordo por Empresa</CardTitle></CardHeader>
@@ -268,7 +276,6 @@ export function PainelSection() {
                 </Card>
             </div>
 
-            {/* --- Activity Feed --- */}
             <Card>
                 <CardHeader><CardTitle className="flex items-center gap-2 text-base"><List className="h-4 w-4" /> Feed de Atividades Recentes</CardTitle></CardHeader>
                 <CardContent>
@@ -288,7 +295,7 @@ export function PainelSection() {
                 </CardContent>
             </Card>
 
-            {/* --- Modal for Present People --- */}
+            {/* --- Modals --- */}
             <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
                 <DialogContent className="max-w-md mx-auto sm:max-w-lg md:max-w-2xl lg:max-w-4xl">
                     <DialogHeader>
@@ -320,6 +327,35 @@ export function PainelSection() {
                     <DialogFooter><DialogClose asChild><Button type="button" variant="secondary">Fechar</Button></DialogClose></DialogFooter>
                 </DialogContent>
             </Dialog>
+            
+            <Dialog open={isExceededStayModalOpen} onOpenChange={setIsExceededStayModalOpen}>
+                <DialogContent className="max-w-md mx-auto sm:max-w-lg">
+                    <DialogHeader>
+                        <DialogTitle>Visitantes com Permanência Excedida</DialogTitle>
+                        <DialogDescription>Visitantes que estão no local há mais de 8 horas.</DialogDescription>
+                    </DialogHeader>
+                    <div className="max-h-[60vh] overflow-auto py-4">
+                        <ul className="space-y-3">
+                            {permanenciaExcedida.map(visitor => (
+                                <li key={visitor.id} className="rounded-lg border bg-card p-3">
+                                    <div className="flex items-center justify-between">
+                                        <div>
+                                            <p className="font-semibold">{visitor.nome}</p>
+                                            <p className="text-sm text-muted-foreground">{visitor.empresa}</p>
+                                        </div>
+                                        <div className="text-right">
+                                            <p className="font-bold text-destructive">{formatDuration(visitor.duration)}</p>
+                                            <p className="text-xs text-muted-foreground">Entrada: {visitor.horaEntrada}</p>
+                                        </div>
+                                    </div>
+                                </li>
+                            ))}
+                        </ul>
+                    </div>
+                     <DialogFooter><DialogClose asChild><Button type="button" variant="secondary">Fechar</Button></DialogClose></DialogFooter>
+                </DialogContent>
+            </Dialog>
+
         </div>
     )
 }

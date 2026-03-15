@@ -47,7 +47,7 @@ export function RefeicoesSection() {
   const { data: rawRefeicoes, loading, addItem, updateItem, deleteItem } = useRefeicoes()
   
   const refeicoes = useMemo(() => {
-    return (rawRefeicoes as Array<OldRefeicaoPolicial | RefeicaoPolicial>).map(r => {
+    const transformed = (rawRefeicoes as Array<OldRefeicaoPolicial | RefeicaoPolicial>).map(r => {
       let dataString = r.data;
       if (typeof r.data === 'object' && r.data !== null && 'toDate' in r.data) {
         dataString = r.data.toDate().toISOString().split('T')[0];
@@ -73,6 +73,16 @@ export function RefeicoesSection() {
           horaSaida: horaSaida || "",
         }]
       } as RefeicaoPolicial;
+    });
+
+    const seen = new Set();
+    return transformed.filter(refeicao => {
+      if (seen.has(refeicao.id)) {
+        console.warn("Duplicate refeicao.id found:", refeicao.id);
+        return false;
+      }
+      seen.add(refeicao.id);
+      return true;
     });
   }, [rawRefeicoes]);
 
@@ -260,8 +270,7 @@ export function RefeicoesSection() {
     setSelectedRefeicao(null);
     const now = new Date();
     
-    // Get the group data, excluding individuals
-    const { individuos, ...restOfRefeicao } = refeicao;
+    const { individuos, id, ...restOfRefeicao } = refeicao;
 
     setFormState({
       ...restOfRefeicao,
@@ -269,7 +278,7 @@ export function RefeicoesSection() {
       hora: now.toTimeString().slice(0, 5),
       individuos: [{
           id: `new-${Date.now()}`,
-          nome: individuo.nome, // Keep the specific individual's name
+          nome: individuo.nome, 
           status: "presente",
           dataSaida: "",
           horaSaida: "",
@@ -415,8 +424,8 @@ export function RefeicoesSection() {
                  {filteredRefeicoes.length === 0 ? (
                     <p className="py-8 text-center text-muted-foreground col-span-full">Nenhum registro encontrado para os filtros aplicados.</p>
                 ) : (
-                    filteredRefeicoes.map(refeicao => (
-                         <div key={refeicao.id} className="rounded-lg border bg-card p-4 space-y-3 flex flex-col">
+                    filteredRefeicoes.map((refeicao, index) => (
+                         <div key={`${refeicao.id}-${index}`} className="rounded-lg border bg-card p-4 space-y-3 flex flex-col">
                            <div className="flex justify-between items-start">
                                 <div>
                                     <p className="font-semibold">{refeicao.prefixo} <span className={cn("font-normal", refeicao.categoria === 'pm' ? categoriaConfig.pm.color : categoriaConfig.civil.color)}>({refeicao.categoria.toUpperCase()})</span></p>
@@ -426,8 +435,8 @@ export function RefeicoesSection() {
                             </div>
 
                              <div className="border-t pt-3 space-y-3 flex-grow">
-                                {refeicao.individuos?.map((individuo) => (
-                                    <div key={individuo.id} className="border-b pb-3 last:border-b-0 last:pb-0">
+                                {refeicao.individuos?.map((individuo, i) => (
+                                    <div key={`${individuo.id}-${i}`} className="border-b pb-3 last:border-b-0 last:pb-0">
                                         <div className="flex justify-between items-center">
                                             <p>{individuo.nome}</p>
                                             <span className={cn("inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold", individuo.status === "presente" ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-800")}>{individuo.status === "presente" ? "Presente" : "Saiu"}</span>
@@ -477,9 +486,9 @@ export function RefeicoesSection() {
                         {filteredRefeicoes.length === 0 ? (
                         <tr><td colSpan={8} className="py-8 text-center text-muted-foreground">Nenhum registro encontrado para os filtros aplicados.</td></tr>
                         ) : (
-                        filteredRefeicoes.flatMap(refeicao =>
-                            refeicao.individuos?.map(individuo => (
-                            <tr key={individuo.id} className="hover:bg-muted/50">
+                        filteredRefeicoes.flatMap((refeicao, refeicaoIndex) =>
+                            refeicao.individuos?.map((individuo, individuoIndex) => (
+                            <tr key={`${refeicao.id}-${individuo.id}-${refeicaoIndex}-${individuoIndex}`} className="hover:bg-muted/50">
                                 <td className="px-4 py-3 font-medium">{individuo.nome}</td>
                                 <td className="px-4 py-3"><span className={cn("inline-flex items-center rounded-full px-2 py-1 text-xs font-semibold", individuo.status === "presente" ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300" : "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300")}>{individuo.status === "presente" ? "Presente" : "Saiu"}</span></td>
                                 <td className="px-4 py-3 tabular-nums text-muted-foreground">{formatDateTime(refeicao.data, refeicao.hora)}</td>
