@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, forwardRef } from "react"
 import { Plus, Search, UserCheck, UserX, Clock, Building2, Loader2, FilePenLine, Trash2, LogIn, MoreVertical, ShieldCheck, ShieldAlert, XCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -33,6 +33,14 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { type Visitante } from "@/lib/store"
 import { useVisitantes } from "@/hooks/use-firebase"
 import { cn } from "@/lib/utils"
+import { IMaskInput } from 'react-imask';
+
+
+const ForwardedInput = forwardRef<HTMLInputElement, any>((props, ref) => {
+    const { as, ...rest } = props;
+    return <Input ref={ref} {...rest} />;
+});
+ForwardedInput.displayName = 'ForwardedInput';
 
 const initialFormState: Omit<Visitante, "id" | "status"> = {
   nome: "",
@@ -70,6 +78,8 @@ const destinos = [
   "RH",
   "Outros",
 ];
+
+const cnhCategorias = ["A", "B", "C", "D", "E", "AB", "AC", "AD", "AE"];
 
 const credencialConfig = {
     verde: { text: "Permissão de acesso ao navio", icon: ShieldCheck, className: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200" },
@@ -173,6 +183,10 @@ export function VisitantesSection() {
     const { id, value } = e.target
     setFormState(prev => ({ ...prev, [id]: value }))
   }
+
+  const handleMaskedInputChange = (id: string, value: string) => {
+    setFormState(prev => ({ ...prev, [id]: value }));
+  };
   
   const handleSelectChange = (id: string, value: string) => {
     setFormState(prev => ({ ...prev, [id]: value }));
@@ -340,7 +354,16 @@ export function VisitantesSection() {
           <div className="max-h-[80vh] overflow-y-auto p-1">
             <div className="grid grid-cols-1 gap-4 py-4 sm:grid-cols-2">
               <div className="grid gap-2 sm:col-span-2"><Label htmlFor="nome">Nome Completo</Label><Input id="nome" value={formState.nome} onChange={handleInputChange} /></div>
-              <div className="grid gap-2"><Label htmlFor="documento">Documento (CPF)</Label><Input id="documento" value={formState.documento} onChange={handleInputChange} /></div>
+              <div className="grid gap-2">
+                <Label htmlFor="documento">Documento (CPF)</Label>
+                <IMaskInput
+                  mask="000.000.000-00"
+                  id="documento"
+                  value={formState.documento}
+                  onAccept={(value) => handleMaskedInputChange('documento', value as string)}
+                  as={ForwardedInput}
+                />
+              </div>
               <div className="grid gap-2"><Label htmlFor="empresa">Empresa</Label><Input id="empresa" value={formState.empresa} onChange={handleInputChange} /></div>
               <div className="grid gap-2 sm:col-span-2"><Label htmlFor="motivo">Motivo da Visita</Label><Input id="motivo" value={formState.motivo} onChange={handleInputChange} /></div>
               
@@ -386,13 +409,50 @@ export function VisitantesSection() {
               
               {formState.diversos && (
                 <>
-                  <div className="grid gap-2"><Label htmlFor="rg">RG</Label><Input id="rg" value={formState.rg || ""} onChange={handleInputChange} /></div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="rg">RG</Label>
+                    <IMaskInput
+                      mask="00.000.000-0"
+                      id="rg"
+                      value={formState.rg || ""}
+                      onAccept={(value) => handleMaskedInputChange('rg', value as string)}
+                      as={ForwardedInput}
+                    />
+                  </div>
                   <div className="grid gap-2"><Label htmlFor="validadeRg">Validade RG</Label><Input id="validadeRg" type="date" value={formState.validadeRg || ""} onChange={handleInputChange} /></div>
-                  <div className="grid gap-2"><Label htmlFor="cnh">CNH</Label><Input id="cnh" value={formState.cnh || ""} onChange={handleInputChange} /></div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="cnh">CNH</Label>
+                    <IMaskInput
+                      mask="00000000000"
+                      id="cnh"
+                      value={formState.cnh || ""}
+                      onAccept={(value) => handleMaskedInputChange('cnh', value as string)}
+                      as={ForwardedInput}
+                    />
+                  </div>
                   <div className="grid gap-2"><Label htmlFor="validadeCnh">Validade CNH</Label><Input id="validadeCnh" type="date" value={formState.validadeCnh || ""} onChange={handleInputChange} /></div>
-                  <div className="grid gap-2"><Label htmlFor="categoriaCnh">Categoria CNH</Label><Input id="categoriaCnh" value={formState.categoriaCnh || ""} onChange={handleInputChange} /></div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="categoriaCnh">Categoria CNH</Label>
+                    <Select value={formState.categoriaCnh || ""} onValueChange={(value) => handleSelectChange("categoriaCnh", value)}>
+                      <SelectTrigger id="categoriaCnh">
+                        <SelectValue placeholder="Selecione..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {cnhCategorias.map(cat => <SelectItem key={cat} value={cat}>{cat}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
                   <div className="grid gap-2"><Label htmlFor="dataNascimento">Data de Nascimento</Label><Input id="dataNascimento" type="date" value={formState.dataNascimento || ""} onChange={handleInputChange} /></div>
-                  <div className="grid gap-2"><Label htmlFor="telefone">Telefone</Label><Input id="telefone" value={formState.telefone || ""} onChange={handleInputChange} /></div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="telefone">Telefone</Label>
+                    <IMaskInput
+                      mask="(00) 00000-0000"
+                      id="telefone"
+                      value={formState.telefone || ""}
+                      onAccept={(value) => handleMaskedInputChange('telefone', value as string)}
+                      as={ForwardedInput}
+                    />
+                  </div>
                 </>
               )}
             </div>

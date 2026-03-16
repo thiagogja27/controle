@@ -14,12 +14,11 @@ import {
     PieChart, Pie, Cell, Legend, TooltipProps, CartesianGrid
 } from 'recharts'
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart"
-import { type RefeicaoPolicial, type OldRefeicaoPolicial } from './refeicoes-section'
 import { cn } from "@/lib/utils"
 import { useToast } from "@/components/ui/use-toast"
 import { useSettingsStore } from "@/lib/settings-store"
 
-// --- Helper Functions ---
+// --- Helper Functions & Hooks ---
 const COLORS = ['#3b82f6', '#10b981', '#f97316', '#8b5cf6', '#ec4899'];
 
 const calculateDurationInHours = (dataEntrada: string, horaEntrada: string): number => {
@@ -36,7 +35,23 @@ const formatDuration = (hours: number) => {
     return `${h}h ${m}m`;
 };
 
+const usePrevious = <T extends unknown>(value: T): T | undefined => {
+    const ref = useRef<T>();
+    useEffect(() => {
+        ref.current = value;
+    });
+    return ref.current;
+};
 
+const speak = (text: string) => {
+    if (typeof window === 'undefined' || !window.speechSynthesis) return;
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = 'pt-BR';
+    window.speechSynthesis.speak(utterance);
+};
+
+
+// --- Tooltip Components ---
 const CustomTooltip = ({ active, payload, label }: TooltipProps<number, string>) => {
   if (active && payload && payload.length) {
     return (
@@ -71,7 +86,7 @@ const CustomPieTooltip = ({ active, payload }: TooltipProps<number, string>) => 
 
 // --- Main Component ---
 export function PainelSection() {
-    // --- Hooks ---
+    // --- Data & State Hooks ---
     const { data: visitantes = [], loading: loadingVisitantes } = useVisitantes()
     const { data: rawConsumos = [], loading: loadingConsumos } = useConsumos()
     const { data: rawRefeicoes = [], loading: loadingRefeicoes } = useRefeicoes()
@@ -80,35 +95,63 @@ export function PainelSection() {
     const [isExceededStayModalOpen, setIsExceededStayModalOpen] = useState(false);
     const [modalData, setModalData] = useState({ title: '', data: [] as any[] });
     const { toast } = useToast();
-    const prevVisitantesRef = useRef(visitantes);
-    const { maxPermanenceHours, voiceAlerts } = useSettingsStore()
+    
+    // --- Settings Store ---
+    const { 
+        maxPermanenceHours, voiceAlerts, voiceAlertsRefeicoes, 
+        voiceAlertsTPAs, voiceAlertsConsumo 
+    } = useSettingsStore()
 
-    // --- Voice Alert Effect ---
+    // --- Previous State Refs ---
+    const prevVisitantes = usePrevious(visitantes) ?? [];
+    const prevRefeicoes = usePrevious(rawRefeicoes) ?? [];
+    const prevTpas = usePrevious(tpas) ?? [];
+    const prevConsumos = usePrevious(rawConsumos) ?? [];
+
+    // --- Voice Alert Effects ---
     useEffect(() => {
-        const prevVisitantes = prevVisitantesRef.current;
-
-        if (voiceAlerts && prevVisitantes.length < visitantes.length) {
-            const newVisitors = visitantes.filter(
-                v => !prevVisitantes.some(pv => pv.id === v.id)
-            );
-
-            if (newVisitors.length > 0) {
-                const newVisitor = newVisitors[0];
-                const utterance = new SpeechSynthesisUtterance(
-                    `Novo visitante: ${newVisitor.nome} da empresa ${newVisitor.empresa}`
-                );
-                utterance.lang = 'pt-BR';
-                speechSynthesis.speak(utterance);
-
-                toast({
-                    title: "Novo Visitante",
-                    description: `${newVisitor.nome} (${newVisitor.empresa}) acabou de entrar.`
-                });
+        if (!loadingVisitantes && voiceAlerts && visitantes.length > prevVisitantes.length) {
+            const newVisitor = visitantes.find(v => !prevVisitantes.some(pv => pv.id === v.id));
+            if (newVisitor) {
+                speak(`Novo visitante: ${newVisitor.nome} da empresa ${newVisitor.empresa}`);
+                toast({ title: "Novo Visitante", description: `${newVisitor.nome} (${newVisitor.empresa}) entrou.` });
             }
         }
+    }, [visitantes, prevVisitantes, voiceAlerts, toast, loadingVisitantes]);
 
-        prevVisitantesRef.current = visitantes;
-    }, [visitantes, voiceAlerts, toast]);
+    useEffect(() => {
+        if (!loadingRefeicoes && voiceAlertsRefeicoes && rawRefeicoes.length > prevRefeicoes.length) {
+            const newRefeicao = rawRefeicoes.find(r => !prevRefeicoes.some(pr => pr.id === r.id));
+            if (newRefeicao) {
+                // @ts-ignore
+                const individual = (newRefeicao.individuos && newRefeicao.individuos[0]) ? newRefeicao.individuos[0].nome : 'Policial';
+                speak(`Nova refeição registrada para ${individual}`);
+                toast({ title: "Nova Refeição", description: `${individual} registrou uma refeição.` });
+            }
+        }
+    }, [rawRefeicoes, prevRefeicoes, voiceAlertsRefeicoes, toast, loadingRefeicoes]);
+
+    useEffect(() => {
+        if (!loadingTpas && voiceAlertsTPAs && tpas.length > prevTpas.length) {
+            const newTpa = tpas.find(t => !prevTpas.some(pt => pt.id === t.id));
+            if (newTpa) {
+                speak(`Novo TPA: ${newTpa.nome}`);
+                toast({ title: "Novo TPA", description: `${newTpa.nome} (TPA) registrou entrada.` });
+            }
+        }
+    }, [tpas, prevTpas, voiceAlertsTPAs, toast, loadingTpas]);
+
+    useEffect(() => {
+        if (!loadingConsumos && voiceAlertsConsumo && rawConsumos.length > prevConsumos.length) {
+            const newConsumo = rawConsumos.find(c => !prevConsumos.some(pc => pc.id === c.id));
+            if (newConsumo) {
+                // @ts-ignore
+                speak(`Novo consumo de bordo da empresa ${newConsumo.empresa}`);
+                // @ts-ignore
+                toast({ title: "Novo Consumo de Bordo", description: `Registro da empresa ${newConsumo.empresa} para o navio ${newConsumo.navio}.` });
+            }
+        }
+    }, [rawConsumos, prevConsumos, voiceAlertsConsumo, toast, loadingConsumos]);
 
     // --- Memoized Data Processing ---
     const refeicoes = useMemo(() => {
@@ -121,10 +164,7 @@ export function PainelSection() {
             }
             if ('individuos' in r && Array.isArray(r.individuos)) return { ...r, data: dataString };
             const oldRecord = r as any;
-            return {
-                ...oldRecord, data: dataString,
-                individuos: [{ id: oldRecord.id, nome: oldRecord.nome || 'N/A', status: oldRecord.status || "presente", horaSaida: oldRecord.horaSaida || "" }]
-            };
+            return { ...oldRecord, data: dataString, individuos: [{ id: oldRecord.id, nome: oldRecord.nome || 'N/A', status: oldRecord.status || "presente", horaSaida: oldRecord.horaSaida || "" }] };
         });
     }, [rawRefeicoes]);
 
@@ -168,6 +208,7 @@ export function PainelSection() {
     const allPresentIndividuals = useMemo(() => {
         const presentVisitantes = visitantes.filter(v => v.status === 'presente').map(v => ({ id: v.id, nome: v.nome, type: 'Visitante', destino: v.destino.toUpperCase(), details: [{ label: 'Empresa', value: v.empresa }, { label: 'Documento', value: v.documento }, { label: 'Motivo', value: v.motivo }] }));
         const presentTPAs = tpas.filter(t => t.status === 'presente').map(t => ({ id: t.id, nome: t.nome, type: 'TPA', destino: t.pier.toUpperCase(), details: [{ label: 'Função', value: t.funcao }, { label: 'Documento', value: t.documento }, { label: 'Navio', value: t.navio }] }));
+        // @ts-ignore
         const presentConsumos = rawConsumos.flatMap(c => (c.individuos || []).filter(i => i.status === 'presente').map(i => ({ id: i.id, nome: i.nome, type: 'Consumo de Bordo', destino: c.terminal.toUpperCase(), details: [{ label: 'Empresa', value: c.empresa }, { label: 'Veículo', value: `${c.veiculo} (${c.placa})` }, { label: 'Produto', value: c.produto }] })));
         return [...presentVisitantes, ...presentTPAs, ...presentConsumos];
     }, [visitantes, tpas, rawConsumos]);
@@ -181,6 +222,7 @@ export function PainelSection() {
     const totalTPAsPresentes = tpas.filter(t => t.status === 'presente').length;
 
     const consumoPorEmpresa = useMemo(() => {
+         // @ts-ignore
         const counts = rawConsumos.reduce((acc, curr) => { acc[curr.empresa] = (acc[curr.empresa] || 0) + 1; return acc; }, {} as { [key: string]: number });
         return Object.entries(counts).map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value);
     }, [rawConsumos]);
@@ -193,6 +235,7 @@ export function PainelSection() {
      const unifiedFeed = useMemo(() => {
         const visitantesFeed = visitantes.map(v => ({ type: 'Visitante', icon: Users, description: `${v.nome} (${v.empresa}) entrou.`, time: new Date(`${v.dataEntrada}T${v.horaEntrada}`), color: "text-blue-500" }));
         const refeicoesFeed = refeicoes.flatMap((r: any) => (r.individuos || []).map((i: any) => ({ type: 'Refeição', icon: Shield, description: `${i.nome} (Policial) registrou refeição.`, time: new Date(`${r.data}T${r.hora}`), color: "text-green-500" })));
+        // @ts-ignore
         const consumosFeed = rawConsumos.flatMap((c: any) => (c.individuos || []).map((i: any) => ({ type: 'Consumo', icon: Ship, description: `${i.nome} acessou o navio ${c.navio}.`, time: new Date(`${c.data}T${c.hora}`), color: "text-purple-500" })));
         const tpasFeed = tpas.map(t => ({ type: 'TPA', icon: FileText, description: `${t.nome} (TPA) registrou entrada.`, time: new Date(`${t.data}T${t.hora}`), color: "text-orange-500" }));
         return [...visitantesFeed, ...refeicoesFeed, ...consumosFeed, ...tpasFeed]

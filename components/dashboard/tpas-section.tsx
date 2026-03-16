@@ -50,6 +50,17 @@ const initialFormState: Omit<TPA, "id" | "status"> = {
   horaSaida: "",
 }
 
+const funcoes = [
+  "Rechego",
+  "Contramestre geral",
+  "Contramestre de porão",
+  "Contramestre do rechego",
+  "Operador de grabe",
+  "Tripper",
+  "Operador de shiploader",
+  "Vigia"
+];
+
 type Shift = "todos" | "07-13" | "13-19" | "19-01" | "01-07";
 
 export function TPAsSection() {
@@ -150,7 +161,7 @@ export function TPAsSection() {
     setFormState(prev => ({ ...prev, [id]: value }))
   }
 
-  const handleSelectChange = (id: string, value: "teg" | "teag") => {
+  const handleSelectChange = (id: string, value: string) => {
     setFormState(prev => ({ ...prev, [id]: value }))
   }
 
@@ -309,11 +320,21 @@ export function TPAsSection() {
           <div className="max-h-[80vh] overflow-y-auto p-1">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 py-4">
               <div className="grid gap-2"><Label htmlFor="nome">Nome</Label><Input id="nome" placeholder="Nome completo" value={formState.nome} onChange={handleInputChange} /></div>
-              <div className="grid gap-2"><Label htmlFor="funcao">Função</Label><Input id="funcao" placeholder="Ex: Operador, Técnico" value={formState.funcao} onChange={handleInputChange} /></div>
+              <div className="grid gap-2">
+                <Label htmlFor="funcao">Função</Label>
+                <Select value={formState.funcao} onValueChange={v => handleSelectChange("funcao", v)}>
+                  <SelectTrigger id="funcao">
+                    <SelectValue placeholder="Selecione a função..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {funcoes.map(f => <SelectItem key={f} value={f}>{f}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
               <div className="grid gap-2"><Label htmlFor="documento">Documento</Label><Input id="documento" placeholder="CPF / RG" value={formState.documento} onChange={handleInputChange} /></div>
               <div className="grid gap-2"><Label htmlFor="destino">Destino</Label><Input id="destino" placeholder="Ex: Convés Principal" value={formState.destino} onChange={handleInputChange} /></div>
               <div className="grid gap-2"><Label htmlFor="navio">Navio</Label><Input id="navio" placeholder="Nome do navio" value={formState.navio} onChange={handleInputChange} /></div>
-              <div className="grid gap-2"><Label htmlFor="pier">Pier</Label><Select value={formState.pier} onValueChange={v => handleSelectChange("pier", v as "teg" | "teag")}><SelectTrigger id="pier"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="teg">TEG</SelectItem><SelectItem value="teag">TEAG</SelectItem></SelectContent></Select></div>
+              <div className="grid gap-2"><Label htmlFor="pier">Pier</Label><Select value={formState.pier} onValueChange={v => handleSelectChange("pier", v)}><SelectTrigger id="pier"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="teg">TEG</SelectItem><SelectItem value="teag">TEAG</SelectItem></SelectContent></Select></div>
               <div className="grid gap-2"><Label htmlFor="data">Data Entrada</Label><Input id="data" type="date" value={formState.data} onChange={handleInputChange} /></div>
               <div className="grid gap-2"><Label htmlFor="hora">Hora Entrada</Label><Input id="hora" type="time" value={formState.hora} onChange={handleInputChange} /></div>
               <div className="grid gap-2"><Label htmlFor="dataSaida">Data Saída</Label><Input id="dataSaida" type="date" value={formState.dataSaida || ""} onChange={handleInputChange} /></div>
