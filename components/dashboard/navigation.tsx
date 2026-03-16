@@ -1,7 +1,7 @@
 'use client'
 
 import { cn } from "@/lib/utils"
-import { LayoutDashboard, Users, Utensils, CreditCard, Package, BarChart, Settings } from "lucide-react"
+import { LayoutDashboard, Users, Utensils, CreditCard, Package, BarChart, Settings, Map } from "lucide-react"
 
 interface NavigationProps {
   activeSection: string
@@ -21,17 +21,23 @@ const sections = [
     description: "Gerenciar entrada e saída",
     icon: Users,
   },
+    {
+    id: "tpas",
+    label: "Controle TPAs",
+    description: "Terminais de pagamento",
+    icon: CreditCard,
+  },
+  {
+    id: "mapa",
+    label: "Mapa do Terminal",
+    description: "Visualização em tempo real",
+    icon: Map,
+  },
   {
     id: "refeicoes",
     label: "Refeições Policiais",
     description: "Controle de refeições",
     icon: Utensils,
-  },
-  {
-    id: "tpas",
-    label: "Controle TPAs",
-    description: "Terminais de pagamento",
-    icon: CreditCard,
   },
   {
     id: "consumo",

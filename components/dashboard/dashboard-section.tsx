@@ -124,8 +124,24 @@ export function DashboardSection() {
                 }))
         );
 
-    return [...presentVisitantes, ...presentTPAs, ...presentConsumos];
-  }, [visitantes, tpas, consumos]);
+    const presentRefeicoes = refeicoes
+        .flatMap(r => 
+            (r.individuos || [])
+                .filter(i => i.status === 'presente')
+                .map(i => ({ 
+                    id: i.id, 
+                    nome: i.nome, 
+                    type: 'Refeição Policial', 
+                    destino: 'Refeitório', 
+                    details: [
+                        { label: 'Categoria', value: r.categoria },
+                        { label: 'Prefixo', value: r.prefixo },
+                    ]
+                }))
+        );
+
+    return [...presentVisitantes, ...presentTPAs, ...presentConsumos, ...presentRefeicoes];
+  }, [visitantes, tpas, consumos, refeicoes]);
 
   const presentesTEG = useMemo(() => allPresentIndividuals.filter(p => p.destino === 'TEG'), [allPresentIndividuals]);
   const presentesTEAG = useMemo(() => allPresentIndividuals.filter(p => p.destino === 'TEAG'), [allPresentIndividuals]);
@@ -133,9 +149,9 @@ export function DashboardSection() {
   const totalTEG = presentesTEG.length;
   const totalTEAG = presentesTEAG.length;
 
-  const totalVisitantesPresentes = visitantes.filter(v => v.status === 'presente').length;
-  const totalPoliciaisPresentes = refeicoes.flatMap(r => r.individuos).filter(i => i.status === 'presente').length;
-  const totalTPAsPresentes = tpas.filter(t => t.status === 'presente').length;
+  const totalVisitantesPresentes = allPresentIndividuals.filter(p => p.type === 'Visitante').length;
+  const totalPoliciaisPresentes = allPresentIndividuals.filter(p => p.type === 'Refeição Policial').length;
+  const totalTPAsPresentes = allPresentIndividuals.filter(p => p.type === 'TPA').length;
 
   const consumoPorEmpresa = useMemo(() => {
     const counts = consumos.reduce((acc, curr) => {
