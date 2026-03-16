@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from "react"
-import { LogIn, LogOut, Plus, Search, Ship, Users, Loader2, FilePenLine, Trash2, MoreVertical, XCircle } from "lucide-react"
+import { LogIn, LogOut, Plus, Search, Ship, Users, Loader2, FilePenLine, Trash2, MoreVertical, XCircle, ShieldCheck, ShieldAlert } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -48,6 +48,7 @@ const initialFormState: Omit<TPA, "id" | "status"> = {
   hora: "",
   dataSaida: "",
   horaSaida: "",
+  credencial: "azul",
 }
 
 const funcoes = [
@@ -60,6 +61,12 @@ const funcoes = [
   "Operador de shiploader",
   "Vigia"
 ];
+
+const credencialConfig = {
+    verde: { text: "Permissão de acesso ao navio", icon: ShieldCheck, className: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200" },
+    vermelho: { text: "Permissão de acesso ao pier", icon: ShieldAlert, className: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200" },
+    azul: { text: "Acesso restrito à área administrativa", icon: null, className: "" },
+};
 
 type Shift = "todos" | "07-13" | "13-19" | "19-01" | "01-07";
 
@@ -89,6 +96,7 @@ export function TPAsSection() {
         hora: now.toTimeString().slice(0, 5),
         dataSaida: "",
         horaSaida: "",
+        credencial: tpa.credencial || "azul",
     });
     setIsFormOpen(true);
   };
@@ -97,6 +105,7 @@ export function TPAsSection() {
     if (isFormOpen && selectedTPA) {
         setFormState({
           ...selectedTPA,
+          credencial: selectedTPA.credencial || "azul",
           dataSaida: selectedTPA.dataSaida || "",
           horaSaida: selectedTPA.horaSaida || "",
         })
@@ -263,6 +272,20 @@ export function TPAsSection() {
     return <div className="flex items-center justify-center py-12"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
   }
 
+  const CredencialBadge = ({ credencial }: { credencial?: "azul" | "vermelho" | "verde" }) => {
+    if (!credencial || !["verde", "vermelho"].includes(credencial)) return null;
+
+    const config = credencialConfig[credencial];
+    const Icon = config.icon
+
+    return (
+      <div className={cn("mt-2 flex items-center gap-2 rounded-md p-2 text-xs font-semibold", config.className)}>
+        {Icon && <Icon className="h-4 w-4 flex-shrink-0" />}
+        <span>{config.text}</span>
+      </div>
+    );
+  };
+
   return (
     <div className="space-y-4 md:space-y-6">
       {/* Stats */}
@@ -332,6 +355,19 @@ export function TPAsSection() {
                 </Select>
               </div>
               <div className="grid gap-2"><Label htmlFor="documento">Documento</Label><Input id="documento" placeholder="CPF / RG" value={formState.documento} onChange={handleInputChange} /></div>
+              
+              <div className="grid gap-2 sm:col-span-2">
+                <Label htmlFor="credencial">Credencial de Acesso</Label>
+                <Select value={formState.credencial || 'azul'} onValueChange={(value) => handleSelectChange("credencial", value)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="azul">Azul (Administrativo)</SelectItem>
+                    <SelectItem value="vermelho">Vermelho (Pier)</SelectItem>
+                    <SelectItem value="verde">Verde (Navio)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
               <div className="grid gap-2"><Label htmlFor="destino">Destino</Label><Input id="destino" placeholder="Ex: Convés Principal" value={formState.destino} onChange={handleInputChange} /></div>
               <div className="grid gap-2"><Label htmlFor="navio">Navio</Label><Input id="navio" placeholder="Nome do navio" value={formState.navio} onChange={handleInputChange} /></div>
               <div className="grid gap-2"><Label htmlFor="pier">Pier</Label><Select value={formState.pier} onValueChange={v => handleSelectChange("pier", v)}><SelectTrigger id="pier"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="teg">TEG</SelectItem><SelectItem value="teag">TEAG</SelectItem></SelectContent></Select></div>
@@ -381,6 +417,7 @@ export function TPAsSection() {
                                 </div>
                                  <span className={cn("inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold", r.status === "presente" ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-800")}>{r.status}</span>
                             </div>
+                            <CredencialBadge credencial={r.credencial} />
                             <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm flex-grow">
                                 <div className="flex flex-col"><span className="text-muted-foreground">Documento</span><span>{r.documento}</span></div>
                                 <div className="flex flex-col"><span className="text-muted-foreground">Navio</span><span>{r.navio}</span></div>
@@ -427,10 +464,13 @@ export function TPAsSection() {
                             <tr><td colSpan={11} className="py-8 text-center text-muted-foreground">Nenhum registro encontrado para os filtros aplicados.</td></tr>
                         ) : (
                             filtered.map(r => (
-                                <tr key={r.id} className="hover:bg-muted/50">
+                                <tr key={r.id} className={cn("hover:bg-muted/50", r.credencial && credencialConfig[r.credencial]?.className.replace(/text-\S+/, '').replace(/dark:text-\S+/, ''))}>
                                     <td className="px-4 py-3 whitespace-nowrap tabular-nums text-muted-foreground">{formatDateTime(r.data, r.hora)}</td>
                                     <td className="px-4 py-3 whitespace-nowrap tabular-nums text-muted-foreground">{r.horaSaida ? formatDateTime(r.dataSaida || r.data, r.horaSaida) : "-"}</td>
-                                    <td className="px-4 py-3 font-medium whitespace-nowrap text-foreground">{r.nome}</td>
+                                    <td className="px-4 py-3 font-medium whitespace-nowrap text-foreground">
+                                        <div>{r.nome}</div>
+                                        <CredencialBadge credencial={r.credencial} />
+                                    </td>
                                     <td className="px-4 py-3 text-muted-foreground">{r.funcao}</td>
                                     <td className="px-4 py-3 tabular-nums text-muted-foreground">{r.documento}</td>
                                     <td className="px-4 py-3 whitespace-nowrap text-foreground">{r.navio}</td>

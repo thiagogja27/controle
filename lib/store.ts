@@ -59,6 +59,7 @@ export interface TPA {
   dataSaida?: string // Added
   horaSaida?: string
   status: "presente" | "saiu"
+  credencial?: "azul" | "vermelho" | "verde"
 }
 
 export interface Individuo {
@@ -67,6 +68,7 @@ export interface Individuo {
   status: "presente" | "saiu"
   dataSaida?: string // Added
   horaSaida?: string
+  credencial?: "azul" | "vermelho" | "verde"
 }
 
 export interface ConsumoBordo {

@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from "react"
-import { LogIn, LogOut, Plus, Search, Ship, Truck, Users, X, Loader2, FilePenLine, Trash2, MoreVertical, XCircle } from "lucide-react"
+import { LogIn, LogOut, Plus, Search, Ship, Truck, Users, X, Loader2, FilePenLine, Trash2, MoreVertical, XCircle, ShieldCheck, ShieldAlert } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -33,7 +33,7 @@ import { useConsumos } from "@/hooks/use-firebase"
 import { cn } from "@/lib/utils"
 
 const initialFormState: Omit<ConsumoBordo, "id"> = {
-  individuos: [{ id: `new-${Date.now()}`, nome: "", status: "presente", dataSaida: "", horaSaida: "" }],
+  individuos: [{ id: `new-${Date.now()}`, nome: "", status: "presente", dataSaida: "", horaSaida: "", credencial: "azul" }],
   veiculo: "",
   placa: "",
   produto: "",
@@ -46,6 +46,12 @@ const initialFormState: Omit<ConsumoBordo, "id"> = {
   data: "",
   hora: "",
 }
+
+const credencialConfig = {
+    verde: { text: "Permissão de acesso ao navio", icon: ShieldCheck, className: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200" },
+    vermelho: { text: "Permissão de acesso ao pier", icon: ShieldAlert, className: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200" },
+    azul: { text: "Acesso restrito à área administrativa", icon: null, className: "" },
+};
 
 export function ConsumoSection() {
   const { data: consumos, loading, addItem, updateItem, deleteItem } = useConsumos()
@@ -75,6 +81,7 @@ export function ConsumoSection() {
             status: "presente",
             dataSaida: "",
             horaSaida: "",
+            credencial: individuo.credencial || "azul",
         }],
     });
     setIsFormOpen(true);
@@ -85,7 +92,7 @@ export function ConsumoSection() {
         setFormState({
           ...selectedConsumo,
           tipoServico: selectedConsumo.tipoServico || "",
-          individuos: selectedConsumo.individuos.map(ind => ({ ...ind, dataSaida: ind.dataSaida || "", horaSaida: ind.horaSaida || "" })),
+          individuos: selectedConsumo.individuos.map(ind => ({ ...ind, credencial: ind.credencial || "azul", dataSaida: ind.dataSaida || "", horaSaida: ind.horaSaida || "" })),
         })
     }
   }, [isFormOpen, selectedConsumo])
@@ -143,11 +150,17 @@ export function ConsumoSection() {
     (newIndividuos[index] as any)[field] = value;
     setFormState(prev => ({ ...prev, individuos: newIndividuos }));
   }
+  
+  const handleIndividuoSelectChange = (index: number, field: keyof Omit<Individuo, 'id'>, value: string) => {
+    const newIndividuos = [...formState.individuos];
+    (newIndividuos[index] as any)[field] = value;
+    setFormState(prev => ({ ...prev, individuos: newIndividuos }));
+  }
 
   const addIndividuo = () => {
     setFormState(prev => ({
       ...prev,
-      individuos: [...prev.individuos, { id: `new-${Date.now()}`, nome: "", status: "presente", dataSaida: "", horaSaida: "" }],
+      individuos: [...prev.individuos, { id: `new-${Date.now()}`, nome: "", status: "presente", dataSaida: "", horaSaida: "", credencial: "azul" }],
     }))
   }
 
@@ -164,7 +177,7 @@ export function ConsumoSection() {
         ...initialFormState,
         data: now.toISOString().split("T")[0],
         hora: now.toTimeString().slice(0, 5),
-        individuos: [{ id: `new-${Date.now()}`, nome: "", status: "presente", dataSaida: "", horaSaida: "" }],
+        individuos: [{ id: `new-${Date.now()}`, nome: "", status: "presente", dataSaida: "", horaSaida: "", credencial: "azul" }],
     }); 
     setIsFormOpen(true)
   }
@@ -282,6 +295,20 @@ export function ConsumoSection() {
     return <div className="flex items-center justify-center py-12"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
   }
 
+  const CredencialBadge = ({ credencial }: { credencial?: "azul" | "vermelho" | "verde" }) => {
+    if (!credencial || !["verde", "vermelho"].includes(credencial)) return null;
+
+    const config = credencialConfig[credencial];
+    const Icon = config.icon
+
+    return (
+      <div className={cn("mt-1 flex items-center gap-2 rounded-md p-1.5 text-xs font-semibold", config.className)}>
+        {Icon && <Icon className="h-3 w-3 flex-shrink-0" />}
+        <span className="text-xs">{config.text}</span>
+      </div>
+    );
+  };
+
   return (
     <div className="space-y-4 md:space-y-6">
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
@@ -326,12 +353,22 @@ export function ConsumoSection() {
             <div className="grid gap-4 py-4">
               <div className="rounded-lg border bg-secondary/30 p-4 space-y-3">
                 <div className="flex items-center justify-between"><Label>Indivíduos</Label><Button type="button" variant="outline" size="sm" onClick={addIndividuo}><Plus className="mr-1 h-3 w-3" />Adicionar</Button></div>
-                <div className="space-y-3">
+                <div className="space-y-4">
                   {formState.individuos.map((ind, index) => (
-                    <div key={ind.id || index} className="grid grid-cols-[1fr_auto] items-end gap-2">
-                      <Input placeholder={`Nome do indivíduo ${index + 1}`} value={ind.nome} onChange={e => handleIndividuoChange(index, "nome", e.target.value)} />
+                    <div key={ind.id || index} className="grid grid-cols-[1fr_auto] gap-3 items-start border-t pt-4 first:border-t-0 first:pt-0">
+                      <div className="space-y-3">
+                        <Input placeholder={`Nome do indivíduo ${index + 1}`} value={ind.nome} onChange={e => handleIndividuoChange(index, "nome", e.target.value)} />
+                         <Select value={ind.credencial || 'azul'} onValueChange={(value) => handleIndividuoSelectChange(index, "credencial", value)}>
+                          <SelectTrigger><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="azul">Azul (Administrativo)</SelectItem>
+                            <SelectItem value="vermelho">Vermelho (Pier)</SelectItem>
+                            <SelectItem value="verde">Verde (Navio)</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
                       {formState.individuos.length > 1 && 
-                        <Button type="button" variant="ghost" size="icon" onClick={() => removeIndividuo(index)} className="shrink-0 text-destructive hover:text-destructive"><X className="h-4 w-4" /></Button>}
+                        <Button type="button" variant="ghost" size="icon" onClick={() => removeIndividuo(index)} className="shrink-0 text-destructive hover:text-destructive mt-2"><X className="h-4 w-4" /></Button>}
                     </div>
                   ))}
                 </div>
@@ -410,7 +447,10 @@ export function ConsumoSection() {
                                 {consumo.individuos.map(individuo => (
                                     <div key={individuo.id} className="border-t pt-3 space-y-2">
                                         <div className="flex justify-between items-center">
-                                            <p>{individuo.nome}</p>
+                                            <div>
+                                                <p>{individuo.nome}</p>
+                                                <CredencialBadge credencial={individuo.credencial} />
+                                            </div>
                                             <span className={cn("inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold", individuo.status === "presente" ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-800")}>{individuo.status === "presente" ? "A Bordo" : "Saiu"}</span>
                                         </div>
                                         <div className="grid grid-cols-2 gap-x-4 text-sm">
@@ -432,7 +472,7 @@ export function ConsumoSection() {
                                 <div className="flex justify-between"><span className="text-muted-foreground">Produto:</span><span>{consumo.produto}</span></div>
                                 {consumo.tipoServico && <div className="flex justify-between"><span className="text-muted-foreground">Serviço:</span><span>{consumo.tipoServico}</span></div>}
                                 <div className="flex justify-between"><span className="text-muted-foreground">Nota Fiscal:</span><span>{consumo.notaFiscal}</span></div>
-                                <div className="flex justify-between"><span className="text-muted-foreground">Vigilante:</span><span>{consumo.vigilante}</span></div>
+                                <div className="flex justify-between"><span className="text-muted-foreground">Vigilante:</span><span>{ consumo.vigilante}</span></div>
                             </div>
 
                             <div className="border-t pt-3 flex items-center justify-end">
@@ -474,8 +514,11 @@ export function ConsumoSection() {
                         ) : (
                             filteredConsumos.map(consumo => (
                                 consumo.individuos.map((individuo, individuoIndex) => (
-                                <tr key={individuo.id} className="hover:bg-muted/50">
-                                    <td className="px-4 py-3 font-medium">{individuo.nome}</td>
+                                <tr key={individuo.id} className={cn("hover:bg-muted/50", individuo.credencial && credencialConfig[individuo.credencial]?.className.replace(/text-\S+/, '').replace(/dark:text-\S+/, ''))}>
+                                    <td className="px-4 py-3 font-medium">
+                                        <div>{individuo.nome}</div>
+                                        <CredencialBadge credencial={individuo.credencial} />
+                                    </td>
                                     <td className="px-4 py-3">
                                         <span className={cn("inline-flex items-center rounded-full px-2 py-1 text-xs font-semibold", individuo.status === "presente" ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300" : "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300")}>
                                             {individuo.status === "presente" ? "A Bordo" : "Saiu"}

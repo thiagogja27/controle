@@ -29,45 +29,66 @@ export function MapaTerminalSection() {
   const { data: consumos, loading: loadingConsumos } = useConsumos()
 
   const pessoasPresentes = useMemo(() => {
-    const visitantesPresentes = visitantes.filter(v => v.status === "presente");
+    const visitantesPresentes = visitantes
+      .filter(v => v.status === "presente")
+      .map(v => ({
+        nome: v.nome,
+        empresa: v.empresa,
+        credencial: v.credencial,
+        dataEntrada: v.dataEntrada,
+        horaEntrada: v.horaEntrada,
+        type: 'Visitante',
+        local: v.destino,
+      }));
 
     const tpasPresentes = tpas
       .filter(t => t.status === "presente")
       .map(t => {
         let local;
-        if (t.funcao === "Vigia") {
-          local = "Portaria";
-        } else if (t.funcao === "Tripper") {
-          local = "Classificação";
-        } 
-        else if (t.pier === 'teg') {
-          local = "Pier TEG";
-        } else if (t.pier === 'teag') {
-          local = "Pier TEAG";
-        } 
-        else if (["Operador de grabe", "Operador de shiploader"].includes(t.funcao)) {
-          local = "Pier TEG";
-        } else if (["Rechego", "Contramestre geral", "Contramestre de porão", "Contramestre do rechego"].includes(t.funcao)) {
-          local = "Pier TEAG";
-        } 
-        else {
-          local = "Outros";
-        }
-        return { ...t, local };
+        if (t.funcao === "Vigia") { local = "Portaria"; }
+        else if (t.funcao === "Tripper") { local = "Classificação"; }
+        else if (t.pier === 'teg') { local = "Pier TEG"; }
+        else if (t.pier === 'teag') { local = "Pier TEAG"; }
+        else if (["Operador de grabe", "Operador de shiploader"].includes(t.funcao)) { local = "Pier TEG"; }
+        else if (["Rechego", "Contramestre geral", "Contramestre de porão", "Contramestre do rechego"].includes(t.funcao)) { local = "Pier TEAG"; }
+        else { local = "Outros"; }
+
+        return {
+          nome: t.nome,
+          empresa: t.funcao,
+          credencial: t.credencial,
+          dataEntrada: t.data,
+          horaEntrada: t.hora,
+          type: 'TPA',
+          local: local,
+        };
       });
 
-    const refeicoesPresentes = refeicoes.flatMap(refeicao => 
+    const refeicoesPresentes = refeicoes.flatMap(refeicao =>
       (refeicao.individuos || [])
         .filter(individuo => individuo.status === "presente")
-        .map(individuo => ({ ...individuo, local: "Refeitório" }))
+        .map(individuo => ({
+          nome: individuo.nome,
+          empresa: refeicao.categoria === 'pm' ? 'Polícia Militar' : 'Polícia Civil',
+          credencial: 'N/A',
+          dataEntrada: refeicao.data,
+          horaEntrada: refeicao.hora,
+          type: 'Refeição',
+          local: "Refeitório",
+        }))
     );
 
     const consumosPresentes = consumos.flatMap(consumo =>
       (consumo.individuos || [])
         .filter(individuo => individuo.status === "presente")
-        .map(individuo => ({ 
-          ...individuo, 
-          local: consumo.terminal === 'teg' ? 'Pier TEG' : 'Pier TEAG' 
+        .map(individuo => ({
+          nome: individuo.nome,
+          empresa: consumo.empresa,
+          credencial: individuo.credencial,
+          dataEntrada: consumo.data,
+          horaEntrada: consumo.hora,
+          type: 'Consumo de Bordo',
+          local: consumo.terminal === 'teg' ? 'Pier TEG' : 'Pier TEAG',
         }))
     );
 
@@ -75,20 +96,17 @@ export function MapaTerminalSection() {
   }, [visitantes, tpas, refeicoes, consumos]);
 
   const locais = useMemo(() => {
-    const agrupado: Record<string, { count: number; names: string[] }> = {};
+    const agrupado: Record<string, { count: number; pessoas: any[] }> = {};
 
     pessoasPresentes.forEach(pessoa => {
-      const key = ('local' in pessoa && pessoa.local) 
-        ? pessoa.local 
-        : ('destino' in pessoa && pessoa.destino ? pessoa.destino : "Outros");
-
+      const key = pessoa.local || "Outros";
       const localValido = Object.keys(destinoCoordenadas).includes(key) ? key : "Outros";
 
       if (!agrupado[localValido]) {
-        agrupado[localValido] = { count: 0, names: [] };
+        agrupado[localValido] = { count: 0, pessoas: [] };
       }
       agrupado[localValido].count++;
-      agrupado[localValido].names.push(pessoa.nome);
+      agrupado[localValido].pessoas.push(pessoa);
     });
 
     return agrupado;
@@ -141,18 +159,58 @@ export function MapaTerminalSection() {
                     </div>
                   </TooltipTrigger>
                   <TooltipContent className="bg-background border shadow-lg rounded-xl p-3 max-w-xs">
-                    <p className="font-bold text-lg mb-2 flex items-center">
+                    <p className="font-bold text-lg mb-2 flex items-center text-foreground">
                         <span className="h-3 w-3 rounded-full mr-2" style={{ backgroundColor: config.color }}/>
                         {local}
                     </p>
-                    <ul className="space-y-1 list-disc list-inside ml-2">
-                      {data.names.map((name, i) => (
-                        <li key={i} className="text-sm text-muted-foreground flex items-center">
-                          <User className="h-3 w-3 mr-2 text-primary"/> {name}
-                        </li>
-                      ))}
+                    <ul className="space-y-2 max-h-60 overflow-y-auto pr-2">
+                      {data.pessoas.map((pessoa: any, i: number) => {
+                        let tempoPermanencia = 'N/A';
+                        let entrada: Date | null = null;
+
+                        if (pessoa.dataEntrada) {
+                            if (typeof pessoa.dataEntrada === 'string' && pessoa.horaEntrada) {
+                                entrada = new Date(`${pessoa.dataEntrada}T${pessoa.horaEntrada}`);
+                            } else if (pessoa.dataEntrada.seconds) {
+                                entrada = new Date(pessoa.dataEntrada.seconds * 1000);
+                            }
+                        }
+
+                        if (entrada && !isNaN(entrada.getTime())) {
+                          const agora = new Date();
+                          const diffMs = agora.getTime() - entrada.getTime();
+                          const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+                          const diffMins = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+                          tempoPermanencia = `${diffHours}h ${diffMins}m`;
+                        }
+
+                        const credencialClassName = {
+                          azul: 'text-blue-500 dark:text-blue-400',
+                          vermelho: 'text-red-500 dark:text-red-400',
+                          verde: 'text-green-500 dark:text-green-400',
+                        }[pessoa.credencial] || 'text-muted-foreground';
+
+                        return (
+                          <li key={i} className="text-sm border-b border-dashed pb-2 last:border-b-0 last:pb-0">
+                            <div className="font-semibold flex items-center text-foreground">
+                              <User className="h-3 w-3 mr-2 text-primary"/> {pessoa.nome}
+                            </div>
+                            <div className="pl-5 text-muted-foreground space-y-0.5 mt-1">
+                              <p><strong>Tipo:</strong> {pessoa.type || 'N/A'}</p>
+                              <p><strong>{pessoa.type === 'TPA' ? 'Função' : 'Empresa'}:</strong> {pessoa.empresa || 'N/A'}</p>
+                              <p>
+                                <strong>Credencial:</strong>
+                                <span className={`${credencialClassName} font-semibold`}>
+                                  {' '}{pessoa.credencial ? pessoa.credencial.charAt(0).toUpperCase() + pessoa.credencial.slice(1) : 'N/A'}
+                                </span>
+                              </p>
+                              <p><strong>Permanência:</strong> {tempoPermanencia}</p>
+                            </div>
+                          </li>
+                        );
+                      })}
                     </ul>
-                    <p className="font-bold text-right mt-2">Total: {data.count}</p>
+                    <p className="font-bold text-right mt-2 text-foreground">Total: {data.count}</p>
                   </TooltipContent>
                 </Tooltip>
               );
