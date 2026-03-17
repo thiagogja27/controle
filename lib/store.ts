@@ -1,4 +1,4 @@
-// Types for the control system
+'''// Types for the control system
 export interface Visitante {
   id: string
   nome: string
@@ -26,6 +26,16 @@ export interface Visitante {
   categoriaCnh?: string
 }
 
+export interface OcorrenciaCompliance {
+  id: string;
+  nomeIndividuo: string;
+  documentoIndividuo: string; // CPF
+  dataOcorrencia: string;
+  motivo: string;
+  descricao: string;
+  autor: string; // Quem registrou
+}
+
 export interface IndividuoRefeicao {
   id: string
   nome: string
@@ -36,12 +46,12 @@ export interface IndividuoRefeicao {
 
 export interface RefeicaoPolicial {
   id: string
-  individuos: IndividuoRefeicao[]
-  prefixo: string
-  categoria: "pm" | "civil"
-  vigilante: string
   data: string
   hora: string
+  setor: "Tático" | "Viaturas" | "Equipe" // Setor da polícia
+  individuos: IndividuoRefeicao[]
+  observacao?: string
+  total: number // Total de refeições
 }
 
 export interface TPA {
@@ -52,21 +62,23 @@ export interface TPA {
   destino: string
   navio: string
   pier: "teg" | "teag"
-  observacao: string
+  observacao?: string
   vigilante: string
   data: string
   hora: string
-  dataSaida?: string // Added
+  dataSaida?: string
   horaSaida?: string
   status: "presente" | "saiu"
   credencial?: "azul" | "vermelho" | "verde"
 }
 
+// Used by ConsumoBordo
 export interface Individuo {
   id: string
   nome: string
+  documento: string // This is the new field
   status: "presente" | "saiu"
-  dataSaida?: string // Added
+  dataSaida?: string
   horaSaida?: string
   credencial?: "azul" | "vermelho" | "verde"
 }
@@ -78,7 +90,7 @@ export interface ConsumoBordo {
   placa: string
   produto: string
   notaFiscal: string
-  tipoServico: string // Added service type
+  tipoServico?: string
   navio: string
   terminal: "teg" | "teag"
   empresa: string
@@ -86,3 +98,4 @@ export interface ConsumoBordo {
   data: string
   hora: string
 }
+'''

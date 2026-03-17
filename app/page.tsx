@@ -5,6 +5,7 @@ import { Header } from "@/components/dashboard/header"
 import { Navigation } from "@/components/dashboard/navigation"
 import { PainelSection } from "@/components/dashboard/painel-section"
 import { VisitantesSection } from "@/components/dashboard/visitantes-section"
+import { ComplianceSection } from "@/components/dashboard/compliance-section"
 import { RefeicoesSection } from "@/components/dashboard/refeicoes-section"
 import { TPAsSection } from "@/components/dashboard/tpas-section"
 import { ConsumoSection } from "@/components/dashboard/consumo-section"
@@ -22,6 +23,7 @@ export default function Dashboard() {
   const sectionComponents: { [key: string]: React.ComponentType } = useMemo(() => ({
     dashboard: PainelSection,
     visitantes: VisitantesSection,
+    compliance: ComplianceSection,
     refeicoes: RefeicoesSection,
     tpas: TPAsSection,
     mapa: MapaTerminalSection, // Adiciona a nova seção

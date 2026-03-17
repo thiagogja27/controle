@@ -1,10 +1,11 @@
 'use client'
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo, forwardRef } from "react"
 import { LogIn, LogOut, Plus, Search, Ship, Users, Loader2, FilePenLine, Trash2, MoreVertical, XCircle, ShieldCheck, ShieldAlert } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import {
   Dialog,
   DialogContent,
@@ -29,11 +30,18 @@ import {
 } from "@/components/ui/select"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { type TPA } from "@/lib/store"
+import { type TPA, type OcorrenciaCompliance } from "@/lib/store"
 import { useTPAs } from "@/hooks/use-firebase"
+import { useOcorrenciasCompliance } from "@/hooks/use-compliance"
 import { cn } from "@/lib/utils"
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
+import { IMaskInput } from 'react-imask';
 
+const ForwardedInput = forwardRef<HTMLInputElement, any>((props, ref) => {
+    const { as, ...rest } = props;
+    return <Input ref={ref} {...rest} />;
+});
+ForwardedInput.displayName = 'ForwardedInput';
 
 const initialFormState: Omit<TPA, "id" | "status"> = {
   nome: "",
@@ -70,8 +78,16 @@ const credencialConfig = {
 
 type Shift = "todos" | "07-13" | "13-19" | "19-01" | "01-07";
 
+const formatDate = (dateString: string | undefined) => {
+  if (!dateString) return "";
+  const [year, month, day] = dateString.split('-');
+  if(!year || !month || !day) return "";
+  return `${day}/${month}/${year}`;
+}
+
 export function TPAsSection() {
   const { data: registros, loading, addItem, updateItem, deleteItem } = useTPAs()
+  const { data: ocorrencias } = useOcorrenciasCompliance();
   const [search, setSearch] = useState("")
   const [dataInicio, setDataInicio] = useState("");
   const [dataFim, setDataFim] = useState("");
@@ -83,6 +99,17 @@ export function TPAsSection() {
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false)
   const [selectedTPA, setSelectedTPA] = useState<TPA | null>(null)
   const [formState, setFormState] = useState(initialFormState)
+  const [complianceAlert, setComplianceAlert] = useState<OcorrenciaCompliance | null>(null);
+
+  const checkCompliance = (documento: string) => {
+    const unmaskedDoc = documento.replace(/\D/g, '');
+    if (unmaskedDoc.length > 0) {
+        const foundOcorrencia = ocorrencias.find(o => o.documentoIndividuo.replace(/\D/g, '') === unmaskedDoc);
+        setComplianceAlert(foundOcorrencia || null);
+    } else {
+        setComplianceAlert(null);
+    }
+  }
 
   const handleReEntry = (tpa: TPA) => {
     setSelectedTPA(null);
@@ -98,6 +125,7 @@ export function TPAsSection() {
         horaSaida: "",
         credencial: tpa.credencial || "azul",
     });
+    checkCompliance(tpa.documento);
     setIsFormOpen(true);
   };
 
@@ -112,7 +140,7 @@ export function TPAsSection() {
     }
   }, [selectedTPA, isFormOpen])
 
-  const filtered = registros.filter(r => {
+  const filtered = useMemo(() => registros.filter(r => {
     const searchLower = search.toLowerCase().trim()
     const textMatch = !searchLower || (
       r.nome?.toLowerCase().includes(searchLower) ||
@@ -158,17 +186,24 @@ export function TPAsSection() {
 
 
     return textMatch && dateMatch && shiftMatch;
-  })
+  }), [registros, search, dataInicio, dataFim, activeShift]);
 
-  const totalPresentes = filtered.filter(r => r.status === "presente").length
-  const totalTeg = filtered.filter(r => r.pier === "teg").length
-  const totalTeag = filtered.filter(r => r.pier === "teag").length
-  const totalRegistros = filtered.length;
+  const totalPresentes = registros.filter(r => r.status === "presente").length
+  const totalTeg = registros.filter(r => r.pier === "teg").length
+  const totalTeag = registros.filter(r => r.pier === "teag").length
+  const totalRegistros = registros.length;
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { id, value } = e.target
     setFormState(prev => ({ ...prev, [id]: value }))
   }
+
+  const handleMaskedInputChange = (id: string, value: string) => {
+    setFormState(prev => ({ ...prev, [id]: value }));
+    if (id === 'documento') {
+      checkCompliance(value);
+    }
+  };
 
   const handleSelectChange = (id: string, value: string) => {
     setFormState(prev => ({ ...prev, [id]: value }))
@@ -176,6 +211,7 @@ export function TPAsSection() {
 
   const handleAddNew = () => {
     setSelectedTPA(null)
+    setComplianceAlert(null);
     const now = new Date();
     setFormState({ 
         ...initialFormState,
@@ -187,6 +223,7 @@ export function TPAsSection() {
 
   const handleEdit = (tpa: TPA) => {
     setSelectedTPA(tpa)
+    checkCompliance(tpa.documento);
     setIsFormOpen(true)
   }
 
@@ -210,6 +247,8 @@ export function TPAsSection() {
   }
 
   const handleSave = async () => {
+    if (!isFormValid) return;
+
     setIsSaving(true)
     try {
       const status = (formState.horaSaida && formState.dataSaida) ? "saiu" : "presente"
@@ -246,13 +285,6 @@ export function TPAsSection() {
     }
   }
 
-  const formatDate = (dateString: string | undefined) => {
-    if (!dateString) return "";
-    const [year, month, day] = dateString.split('-');
-    if(!year || !month || !day) return "";
-    return `${day}/${month}/${year}`;
-  }
-
   const formatDateTime = (data: string | undefined, hora: string) => {
     if (!data || !hora) return ""
     return `${formatDate(data)} ${hora}`
@@ -261,7 +293,7 @@ export function TPAsSection() {
   const isFormValid =
     formState.nome.trim() &&
     formState.funcao.trim() &&
-    formState.documento.trim() &&
+    (formState.documento.trim() && formState.documento.length >= 14) &&
     formState.destino.trim() &&
     formState.navio.trim() &&
     formState.vigilante.trim() &&
@@ -290,7 +322,7 @@ export function TPAsSection() {
     <div className="space-y-4 md:space-y-6">
       {/* Stats */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Card><CardContent className="flex items-center gap-4 p-4"><div className="flex h-11 w-11 items-center justify-center rounded-lg bg-primary/10"><Users className="h-5 w-5 text-primary" /></div><div><p className="text-2xl font-bold">{totalRegistros}</p><p className="text-sm text-muted-foreground">Total no Período</p></div></CardContent></Card>
+        <Card><CardContent className="flex items-center gap-4 p-4"><div className="flex h-11 w-11 items-center justify-center rounded-lg bg-primary/10"><Users className="h-5 w-5 text-primary" /></div><div><p className="text-2xl font-bold">{totalRegistros}</p><p className="text-sm text-muted-foreground">Total de Registros</p></div></CardContent></Card>
         <Card><CardContent className="flex items-center gap-4 p-4"><div className="flex h-11 w-11 items-center justify-center rounded-lg bg-primary/10"><Ship className="h-5 w-5 text-primary" /></div><div><p className="text-2xl font-bold text-primary">{totalPresentes}</p><p className="text-sm text-muted-foreground">A Bordo</p></div></CardContent></Card>
         <Card><CardContent className="flex items-center gap-4 p-4"><div className="flex h-11 w-11 items-center justify-center rounded-lg bg-secondary"><span className="text-xs font-bold text-muted-foreground">TEG</span></div><div><p className="text-2xl font-bold">{totalTeg}</p><p className="text-sm text-muted-foreground">Pier TEG</p></div></CardContent></Card>
         <Card><CardContent className="flex items-center gap-4 p-4"><div className="flex h-11 w-11 items-center justify-center rounded-lg bg-secondary"><span className="text-xs font-bold text-muted-foreground">TEAG</span></div><div><p className="text-2xl font-bold">{totalTeag}</p><p className="text-sm text-muted-foreground">Pier TEAG</p></div></CardContent></Card>
@@ -337,10 +369,21 @@ export function TPAsSection() {
 
 
       {/* Add/Edit Dialog */}
-      <Dialog open={isFormOpen} onOpenChange={(isOpen) => { if(!isOpen) setFormState(initialFormState); setIsFormOpen(isOpen); }}>
+      <Dialog open={isFormOpen} onOpenChange={(isOpen) => { if(!isOpen) { setFormState(initialFormState); setComplianceAlert(null); } setIsFormOpen(isOpen); }}>
         <DialogContent className="max-w-lg w-full mx-4 sm:mx-auto">
           <DialogHeader><DialogTitle>{selectedTPA ? "Editar Registro TPA" : "Registrar Entrada TPA"}</DialogTitle></DialogHeader>
-          <div className="max-h-[80vh] overflow-y-auto p-1">
+          
+          {complianceAlert && (
+            <Alert variant="destructive" className="mt-4">
+              <ShieldAlert className="h-4 w-4" />
+              <AlertTitle>Alerta de Compliance</AlertTitle>
+              <AlertDescription>
+                <p>Indivíduo com ocorrência registrada. Por favor, consulte a seção de Compliance para mais detalhes antes de prosseguir com o registro.</p>
+              </AlertDescription>
+            </Alert>
+          )}
+
+          <div className="max-h-[70vh] overflow-y-auto p-1 mt-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 py-4">
               <div className="grid gap-2"><Label htmlFor="nome">Nome</Label><Input id="nome" placeholder="Nome completo" value={formState.nome} onChange={handleInputChange} /></div>
               <div className="grid gap-2">
@@ -354,7 +397,16 @@ export function TPAsSection() {
                   </SelectContent>
                 </Select>
               </div>
-              <div className="grid gap-2"><Label htmlFor="documento">Documento</Label><Input id="documento" placeholder="CPF / RG" value={formState.documento} onChange={handleInputChange} /></div>
+              <div className="grid gap-2">
+                <Label htmlFor="documento">Documento (CPF)</Label>
+                <IMaskInput
+                  mask="000.000.000-00"
+                  id="documento"
+                  value={formState.documento}
+                  onAccept={(value) => handleMaskedInputChange('documento', value as string)}
+                  as={ForwardedInput}
+                />
+              </div>
               
               <div className="grid gap-2 sm:col-span-2">
                 <Label htmlFor="credencial">Credencial de Acesso</Label>

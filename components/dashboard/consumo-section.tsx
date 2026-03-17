@@ -1,10 +1,11 @@
 'use client'
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, forwardRef, useMemo } from "react"
 import { LogIn, LogOut, Plus, Search, Ship, Truck, Users, X, Loader2, FilePenLine, Trash2, MoreVertical, XCircle, ShieldCheck, ShieldAlert } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import {
   Dialog,
   DialogContent,
@@ -28,12 +29,20 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Label } from "@/components/ui/label"
-import { type ConsumoBordo, type Individuo } from "@/lib/store"
+import { type ConsumoBordo, type Individuo, type OcorrenciaCompliance } from "@/lib/store"
 import { useConsumos } from "@/hooks/use-firebase"
+import { useOcorrenciasCompliance } from "@/hooks/use-compliance"
 import { cn } from "@/lib/utils"
+import { IMaskInput } from 'react-imask';
+
+const ForwardedInput = forwardRef<HTMLInputElement, any>((props, ref) => {
+    const { as, ...rest } = props;
+    return <Input ref={ref} {...rest} />;
+});
+ForwardedInput.displayName = 'ForwardedInput';
 
 const initialFormState: Omit<ConsumoBordo, "id"> = {
-  individuos: [{ id: `new-${Date.now()}`, nome: "", status: "presente", dataSaida: "", horaSaida: "", credencial: "azul" }],
+  individuos: [{ id: `new-${Date.now()}`, nome: "", documento: "", status: "presente", dataSaida: "", horaSaida: "", credencial: "azul" }],
   veiculo: "",
   placa: "",
   produto: "",
@@ -53,8 +62,11 @@ const credencialConfig = {
     azul: { text: "Acesso restrito à área administrativa", icon: null, className: "" },
 };
 
+type FormErrors = Record<string, string>;
+
 export function ConsumoSection() {
   const { data: consumos, loading, addItem, updateItem, deleteItem } = useConsumos()
+  const { data: ocorrencias } = useOcorrenciasCompliance();
   const [search, setSearch] = useState("")
   const [dataInicio, setDataInicio] = useState("");
   const [dataFim, setDataFim] = useState("");
@@ -64,9 +76,32 @@ export function ConsumoSection() {
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false)
   const [selectedConsumo, setSelectedConsumo] = useState<ConsumoBordo | null>(null)
   const [formState, setFormState] = useState(initialFormState)
+  const [formErrors, setFormErrors] = useState<FormErrors>({});
+  const [complianceAlerts, setComplianceAlerts] = useState<Record<number, OcorrenciaCompliance | null>>({});
+
+    const clearError = (field: string) => {
+        if (formErrors[field]) {
+            setFormErrors(prev => {
+                const newErrors = { ...prev };
+                delete newErrors[field];
+                return newErrors;
+            });
+        }
+    };
+
+  const checkCompliance = (documento: string, index: number) => {
+    const unmaskedDoc = documento.replace(/\D/g, '');
+    if (unmaskedDoc.length > 0) {
+        const foundOcorrencia = ocorrencias.find(o => o.documentoIndividuo.replace(/\D/g, '') === unmaskedDoc);
+        setComplianceAlerts(prev => ({ ...prev, [index]: foundOcorrencia || null }));
+    } else {
+        setComplianceAlerts(prev => ({ ...prev, [index]: null }));
+    }
+  }
 
   const handleReEntry = (consumo: ConsumoBordo, individuo: Individuo) => {
     setSelectedConsumo(null);
+    setFormErrors({});
     const now = new Date();
     
     const { id, individuos, ...restOfConsumo } = consumo;
@@ -78,12 +113,14 @@ export function ConsumoSection() {
         individuos: [{
             id: `new-${Date.now()}`,
             nome: individuo.nome, 
+            documento: individuo.documento,
             status: "presente",
             dataSaida: "",
             horaSaida: "",
             credencial: individuo.credencial || "azul",
         }],
     });
+    checkCompliance(individuo.documento, 0);
     setIsFormOpen(true);
   };
 
@@ -92,12 +129,15 @@ export function ConsumoSection() {
         setFormState({
           ...selectedConsumo,
           tipoServico: selectedConsumo.tipoServico || "",
-          individuos: selectedConsumo.individuos.map(ind => ({ ...ind, credencial: ind.credencial || "azul", dataSaida: ind.dataSaida || "", horaSaida: ind.horaSaida || "" })),
+          individuos: selectedConsumo.individuos.map(ind => ({ ...ind, documento: ind.documento || "", credencial: ind.credencial || "azul", dataSaida: ind.dataSaida || "", horaSaida: ind.horaSaida || "" })),
         })
+        selectedConsumo.individuos.forEach((ind, index) => checkCompliance(ind.documento || "", index));
+    } else if (!isFormOpen) {
+        setFormErrors({});
     }
   }, [isFormOpen, selectedConsumo])
 
-  const filteredConsumos = consumos.filter(consumo => {
+  const filteredConsumos = useMemo(() => consumos.filter(consumo => {
     const searchLower = search.toLowerCase().trim();
     const textMatch = !searchLower || (
       consumo.veiculo.toLowerCase().includes(searchLower) ||
@@ -108,7 +148,7 @@ export function ConsumoSection() {
       consumo.navio.toLowerCase().includes(searchLower) ||
       consumo.empresa.toLowerCase().includes(searchLower) ||
       consumo.individuos.some(individuo =>
-        individuo.nome.toLowerCase().includes(searchLower)
+        individuo.nome.toLowerCase().includes(searchLower) || (individuo.documento && individuo.documento.includes(searchLower))
       )
     );
 
@@ -127,57 +167,72 @@ export function ConsumoSection() {
     })();
 
     return textMatch && dateMatch;
-  })
+  }), [consumos, search, dataInicio, dataFim]);
 
-  const allIndividuos = filteredConsumos.flatMap(c => c.individuos || [])
-  const totalRegistros = filteredConsumos.length
-  const presentes = allIndividuos.filter(i => i.status === "presente").length
-  const totalIndividuos = allIndividuos.length
-  const totalTeg = filteredConsumos.filter(c => c.terminal === "teg").length
-  const totalTeag = filteredConsumos.filter(c => c.terminal === "teag").length
+  const { totalRegistros, presentes, totalIndividuos, totalTeg, totalTeag } = useMemo(() => {
+    const allIndividuos = consumos.flatMap(c => c.individuos || []);
+    return {
+        totalRegistros: consumos.length,
+        presentes: allIndividuos.filter(i => i.status === "presente").length,
+        totalIndividuos: allIndividuos.length,
+        totalTeg: consumos.filter(c => c.terminal === "teg").length,
+        totalTeag: consumos.filter(c => c.terminal === "teag").length
+    };
+  }, [consumos]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { id, value } = e.target
     setFormState(prev => ({ ...prev, [id]: value }))
+    clearError(id);
   }
+
+  const handleMaskedInputChange = (id: string, value: string) => {
+    setFormState(prev => ({ ...prev, [id]: value }));
+    clearError(id);
+  };
 
   const handleSelectChange = (id: string, value: string) => {
     setFormState(prev => ({ ...prev, [id]: value }))
+    clearError(id);
   }
 
   const handleIndividuoChange = (index: number, field: keyof Omit<Individuo, 'id'>, value: string) => {
     const newIndividuos = [...formState.individuos];
     (newIndividuos[index] as any)[field] = value;
     setFormState(prev => ({ ...prev, individuos: newIndividuos }));
-  }
-  
-  const handleIndividuoSelectChange = (index: number, field: keyof Omit<Individuo, 'id'>, value: string) => {
-    const newIndividuos = [...formState.individuos];
-    (newIndividuos[index] as any)[field] = value;
-    setFormState(prev => ({ ...prev, individuos: newIndividuos }));
+    clearError(`individuo-${index}-${field}`);
+     if (field === 'documento') {
+      checkCompliance(value, index);
+    }
   }
 
   const addIndividuo = () => {
     setFormState(prev => ({
       ...prev,
-      individuos: [...prev.individuos, { id: `new-${Date.now()}`, nome: "", status: "presente", dataSaida: "", horaSaida: "", credencial: "azul" }],
+      individuos: [...prev.individuos, { id: `new-${Date.now()}`, nome: "", documento: "", status: "presente", dataSaida: "", horaSaida: "", credencial: "azul" }],
     }))
   }
 
   const removeIndividuo = (index: number) => {
     if (formState.individuos.length > 1) {
       setFormState(prev => ({ ...prev, individuos: prev.individuos.filter((_, i) => i !== index) }))
+      setComplianceAlerts(prev => {
+        const newAlerts = {...prev};
+        delete newAlerts[index];
+        return newAlerts;
+      });
     }
   }
 
   const handleAddNew = () => {
-    setSelectedConsumo(null)
+    setSelectedConsumo(null);
+    setComplianceAlerts({});
     const now = new Date();
     setFormState({ 
         ...initialFormState,
         data: now.toISOString().split("T")[0],
         hora: now.toTimeString().slice(0, 5),
-        individuos: [{ id: `new-${Date.now()}`, nome: "", status: "presente", dataSaida: "", horaSaida: "", credencial: "azul" }],
+        individuos: [{ id: `new-${Date.now()}`, nome: "", documento: "", status: "presente", dataSaida: "", horaSaida: "", credencial: "azul" }],
     }); 
     setIsFormOpen(true)
   }
@@ -212,7 +267,41 @@ export function ConsumoSection() {
     }
   }
 
+  const validateForm = () => {
+    const errors: FormErrors = {};
+
+    if (!formState.data) errors.data = "Data é obrigatória.";
+    if (!formState.hora) errors.hora = "Hora é obrigatória.";
+    if (!formState.veiculo.trim()) errors.veiculo = "Veículo é obrigatório.";
+    if (!formState.placa.trim()) errors.placa = "Placa é obrigatória.";
+    if (!formState.produto.trim()) errors.produto = "Produto é obrigatório.";
+    if (!formState.notaFiscal.trim()) errors.notaFiscal = "Nota Fiscal é obrigatória.";
+    if (!formState.navio.trim()) errors.navio = "Navio é obrigatório.";
+    if (!formState.empresa.trim()) errors.empresa = "Empresa é obrigatória.";
+    if (!formState.vigilante.trim()) errors.vigilante = "Vigilante é obrigatório.";
+
+    formState.individuos.forEach((ind, index) => {
+        if (!ind.nome.trim()) {
+            errors[`individuo-${index}-nome`] = "Nome do indivíduo é obrigatório.";
+        }
+        if (!ind.documento.trim() || ind.documento.length < 14) { // CPF mask
+            errors[`individuo-${index}-documento`] = "Documento (CPF) é obrigatório.";
+        }
+    });
+
+    if (formState.individuos.length === 0 || !formState.individuos[0].nome.trim()) {
+        errors.individuos = "Pelo menos um indivíduo deve ser registrado.";
+    }
+
+    setFormErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
  const handleSave = async () => {
+    if (!validateForm()) {
+      return;
+    }
+
     setIsSaving(true);
     try {
         const individuosToSave: Individuo[] = formState.individuos
@@ -266,7 +355,7 @@ export function ConsumoSection() {
     if (!consumo) return
 
     const now = new Date()
-    const updatedIndividuos = consumo.individuos.map(ind =>
+    const updatedIndividuos = consumo.individuos.map((ind): Individuo =>
       ind.id === individuoId
         ? { ...ind, status: "saiu", dataSaida: now.toISOString().split('T')[0], horaSaida: now.toTimeString().slice(0, 5) }
         : ind
@@ -312,7 +401,7 @@ export function ConsumoSection() {
   return (
     <div className="space-y-4 md:space-y-6">
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
-        <Card><CardContent className="flex items-center gap-4 p-4"><div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10"><Truck className="h-6 w-6 text-primary" /></div><div><p className="text-2xl font-bold">{totalRegistros}</p><p className="text-sm text-muted-foreground">Registros no Período</p></div></CardContent></Card>
+        <Card><CardContent className="flex items-center gap-4 p-4"><div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10"><Truck className="h-6 w-6 text-primary" /></div><div><p className="text-2xl font-bold">{totalRegistros}</p><p className="text-sm text-muted-foreground">Total de Registros</p></div></CardContent></Card>
         <Card><CardContent className="flex items-center gap-4 p-4"><div className="flex h-12 w-12 items-center justify-center rounded-lg bg-blue-400/10"><Ship className="h-6 w-6 text-blue-400" /></div><div><p className="text-2xl font-bold">{presentes}</p><p className="text-sm text-muted-foreground">A Bordo</p></div></CardContent></Card>
         <Card><CardContent className="flex items-center gap-4 p-4"><div className="flex h-12 w-12 items-center justify-center rounded-lg bg-purple-400/10"><Users className="h-6 w-6 text-purple-400" /></div><div><p className="text-2xl font-bold">{totalIndividuos}</p><p className="text-sm text-muted-foreground">Total Indivíduos</p></div></CardContent></Card>
         <Card><CardContent className="flex items-center gap-4 p-4"><div className="flex h-11 w-11 items-center justify-center rounded-lg bg-secondary"><span className="text-xs font-bold text-muted-foreground">TEG</span></div><div><p className="text-2xl font-bold">{totalTeg}</p><p className="text-sm text-muted-foreground">Pier TEG</p></div></CardContent></Card>
@@ -331,11 +420,25 @@ export function ConsumoSection() {
                     </div>
                     <div className="grid gap-2">
                         <Label htmlFor="dataInicio">Data Início</Label>
-                        <Input id="dataInicio" type="date" value={dataInicio} onChange={e => setDataInicio(e.target.value)} />
+                        <IMaskInput
+                            mask="0000-00-00"
+                            id="dataInicio"
+                            placeholder="AAAA-MM-DD"
+                            value={dataInicio}
+                            onAccept={(value) => setDataInicio(value as string)}
+                            as={ForwardedInput}
+                        />
                     </div>
                     <div className="grid gap-2">
                         <Label htmlFor="dataFim">Data Fim</Label>
-                        <Input id="dataFim" type="date" value={dataFim} onChange={e => setDataFim(e.target.value)} />
+                        <IMaskInput
+                            mask="0000-00-00"
+                            id="dataFim"
+                            placeholder="AAAA-MM-DD"
+                            value={dataFim}
+                            onAccept={(value) => setDataFim(value as string)}
+                            as={ForwardedInput}
+                        />
                     </div>
                     <div className="flex gap-2 md:col-span-3 lg:col-span-2">
                          <Button variant="outline" onClick={() => { setDataInicio(""); setDataFim(""); }} className="w-1/2"><XCircle className="mr-2 h-4 w-4"/>Limpar</Button>
@@ -346,19 +449,44 @@ export function ConsumoSection() {
         </Card>
 
       {/* Add/Edit Dialog */}
-      <Dialog open={isFormOpen} onOpenChange={(isOpen) => { if(!isOpen) setFormState(initialFormState); setIsFormOpen(isOpen); }}>
+      <Dialog open={isFormOpen} onOpenChange={(isOpen) => { if(!isOpen) { setFormState(initialFormState); setComplianceAlerts({}) }; setIsFormOpen(isOpen); }}>
         <DialogContent className="max-w-2xl w-full mx-4 sm:mx-auto">
           <DialogHeader><DialogTitle>{selectedConsumo ? "Editar Registro" : "Registrar Consumo de Bordo"}</DialogTitle></DialogHeader>
           <div className="max-h-[80vh] overflow-y-auto p-1">
             <div className="grid gap-4 py-4">
               <div className="rounded-lg border bg-secondary/30 p-4 space-y-3">
-                <div className="flex items-center justify-between"><Label>Indivíduos</Label><Button type="button" variant="outline" size="sm" onClick={addIndividuo}><Plus className="mr-1 h-3 w-3" />Adicionar</Button></div>
+                 <div className="flex items-center justify-between">
+                    <Label className={cn(formErrors.individuos && "text-destructive")}>Indivíduos</Label>
+                    <Button type="button" variant="outline" size="sm" onClick={addIndividuo}><Plus className="mr-1 h-3 w-3" />Adicionar</Button>
+                </div>
+                {formErrors.individuos && <p className="text-red-500 text-xs mt-2">{formErrors.individuos}</p>}
                 <div className="space-y-4">
                   {formState.individuos.map((ind, index) => (
                     <div key={ind.id || index} className="grid grid-cols-[1fr_auto] gap-3 items-start border-t pt-4 first:border-t-0 first:pt-0">
                       <div className="space-y-3">
-                        <Input placeholder={`Nome do indivíduo ${index + 1}`} value={ind.nome} onChange={e => handleIndividuoChange(index, "nome", e.target.value)} />
-                         <Select value={ind.credencial || 'azul'} onValueChange={(value) => handleIndividuoSelectChange(index, "credencial", value)}>
+                        {complianceAlerts[index] && (
+                            <Alert variant="destructive">
+                                <ShieldAlert className="h-4 w-4" />
+                                <AlertTitle>Alerta de Compliance</AlertTitle>
+                                <AlertDescription>
+                                <p>Indivíduo com ocorrência. Consulte a seção de Compliance.</p>
+                                </AlertDescription>
+                            </Alert>
+                        )}
+                         <Input placeholder={`Nome do indivíduo ${index + 1}`} value={ind.nome} onChange={e => handleIndividuoChange(index, "nome", e.target.value)} className={cn(formErrors[`individuo-${index}-nome`] && "border-red-500")} />
+                         {formErrors[`individuo-${index}-nome`] && <p className="text-red-500 text-xs">{formErrors[`individuo-${index}-nome`]}</p>}
+
+                        <IMaskInput
+                            mask="000.000.000-00"
+                            placeholder="Documento (CPF)"
+                            value={ind.documento}
+                            onAccept={(value) => handleIndividuoChange(index, 'documento', value as string)}
+                            as={ForwardedInput}
+                            className={cn(formErrors[`individuo-${index}-documento`] && "border-red-500")}
+                        />
+                        {formErrors[`individuo-${index}-documento`] && <p className="text-red-500 text-xs">{formErrors[`individuo-${index}-documento`]}</p>}
+
+                         <Select value={ind.credencial || 'azul'} onValueChange={(value) => handleIndividuoChange(index, "credencial", value)}>
                           <SelectTrigger><SelectValue /></SelectTrigger>
                           <SelectContent>
                             <SelectItem value="azul">Azul (Administrativo)</SelectItem>
@@ -373,12 +501,77 @@ export function ConsumoSection() {
                   ))}
                 </div>
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4"><div className="grid gap-2"><Label htmlFor="data">Data de Entrada</Label><Input id="data" type="date" value={formState.data} onChange={handleInputChange}/></div><div className="grid gap-2"><Label htmlFor="hora">Hora de Entrada</Label><Input id="hora" type="time" value={formState.hora} onChange={handleInputChange} /></div></div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4"><div className="grid gap-2"><Label htmlFor="veiculo">Veículo</Label><Input id="veiculo" placeholder="Ex: Caminhão Baú" value={formState.veiculo} onChange={handleInputChange} /></div><div className="grid gap-2"><Label htmlFor="placa">Placa</Label><Input id="placa" placeholder="Ex: ABC-1234" value={formState.placa} onChange={handleInputChange} /></div></div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4"><div className="grid gap-2"><Label htmlFor="produto">Produto</Label><Input id="produto" placeholder="Ex: Água Mineral" value={formState.produto} onChange={handleInputChange} /></div><div className="grid gap-2"><Label htmlFor="tipoServico">Tipo de Serviço</Label><Input id="tipoServico" placeholder="Ex: Manutenção" value={formState.tipoServico} onChange={handleInputChange} /></div></div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4"><div className="grid gap-2"><Label htmlFor="notaFiscal">Nota Fiscal</Label><Input id="notaFiscal" placeholder="Ex: NF-001234" value={formState.notaFiscal} onChange={handleInputChange} /></div><div className="grid gap-2"><Label htmlFor="navio">Navio</Label><Input id="navio" placeholder="Nome do navio" value={formState.navio} onChange={handleInputChange} /></div></div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4"><div className="grid gap-2"><Label htmlFor="terminal">Terminal</Label><Select value={formState.terminal} onValueChange={v => handleSelectChange("terminal", v)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="teg">TEG</SelectItem><SelectItem value="teag">TEAG</SelectItem></SelectContent></Select></div><div className="grid gap-2"><Label htmlFor="empresa">Empresa</Label><Input id="empresa" placeholder="Nome da empresa" value={formState.empresa} onChange={handleInputChange} /></div></div>
-              <div className="grid gap-2"><Label htmlFor="vigilante">Vigilante</Label><Input id="vigilante" placeholder="Nome do vigilante" value={formState.vigilante} onChange={handleInputChange} /></div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="grid gap-2">
+                    <Label htmlFor="data">Data de Entrada</Label>
+                    <IMaskInput
+                        mask="0000-00-00"
+                        id="data"
+                        placeholder="AAAA-MM-DD"
+                        value={formState.data}
+                        onAccept={(value) => handleMaskedInputChange('data', value as string)}
+                        as={ForwardedInput}
+                        className={cn(formErrors.data && "border-red-500")}
+                    />
+                    {formErrors.data && <p className="text-red-500 text-xs">{formErrors.data}</p>}
+                </div>
+                <div className="grid gap-2">
+                    <Label htmlFor="hora">Hora de Entrada</Label>
+                    <Input id="hora" type="time" value={formState.hora} onChange={handleInputChange} className={cn(formErrors.hora && "border-red-500")} />
+                    {formErrors.hora && <p className="text-red-500 text-xs">{formErrors.hora}</p>}
+                </div>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="grid gap-2">
+                    <Label htmlFor="veiculo">Veículo</Label>
+                    <Input id="veiculo" placeholder="Ex: Caminhão Baú" value={formState.veiculo} onChange={handleInputChange} className={cn(formErrors.veiculo && "border-red-500")} />
+                    {formErrors.veiculo && <p className="text-red-500 text-xs">{formErrors.veiculo}</p>}
+                </div>
+                <div className="grid gap-2">
+                    <Label htmlFor="placa">Placa</Label>
+                    <Input id="placa" placeholder="Ex: ABC-1234" value={formState.placa} onChange={handleInputChange} className={cn(formErrors.placa && "border-red-500")} />
+                    {formErrors.placa && <p className="text-red-500 text-xs">{formErrors.placa}</p>}
+                </div>
+               </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="grid gap-2">
+                    <Label htmlFor="produto">Produto</Label>
+                    <Input id="produto" placeholder="Ex: Água Mineral" value={formState.produto} onChange={handleInputChange} className={cn(formErrors.produto && "border-red-500")} />
+                    {formErrors.produto && <p className="text-red-500 text-xs">{formErrors.produto}</p>}
+                </div>
+                <div className="grid gap-2">
+                    <Label htmlFor="tipoServico">Tipo de Serviço</Label>
+                    <Input id="tipoServico" placeholder="Ex: Manutenção" value={formState.tipoServico || ''} onChange={handleInputChange} />
+                </div>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="grid gap-2">
+                    <Label htmlFor="notaFiscal">Nota Fiscal</Label>
+                    <Input id="notaFiscal" placeholder="Ex: NF-001234" value={formState.notaFiscal} onChange={handleInputChange} className={cn(formErrors.notaFiscal && "border-red-500")} />
+                    {formErrors.notaFiscal && <p className="text-red-500 text-xs">{formErrors.notaFiscal}</p>}
+                </div>
+                <div className="grid gap-2">
+                    <Label htmlFor="navio">Navio</Label>
+                    <Input id="navio" placeholder="Nome do navio" value={formState.navio} onChange={handleInputChange} className={cn(formErrors.navio && "border-red-500")} />
+                    {formErrors.navio && <p className="text-red-500 text-xs">{formErrors.navio}</p>}
+                </div>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="grid gap-2">
+                    <Label htmlFor="terminal">Terminal</Label>
+                    <Select value={formState.terminal} onValueChange={v => handleSelectChange("terminal", v)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="teg">TEG</SelectItem><SelectItem value="teag">TEAG</SelectItem></SelectContent></Select>
+                </div>
+                <div className="grid gap-2">
+                    <Label htmlFor="empresa">Empresa</Label>
+                    <Input id="empresa" placeholder="Nome da empresa" value={formState.empresa} onChange={handleInputChange} className={cn(formErrors.empresa && "border-red-500")} />
+                    {formErrors.empresa && <p className="text-red-500 text-xs">{formErrors.empresa}</p>}
+                </div>
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="vigilante">Vigilante</Label>
+                <Input id="vigilante" placeholder="Nome do vigilante" value={formState.vigilante} onChange={handleInputChange} className={cn(formErrors.vigilante && "border-red-500")} />
+                {formErrors.vigilante && <p className="text-red-500 text-xs">{formErrors.vigilante}</p>}
+              </div>
               
               {selectedConsumo && (
                 <div className="rounded-lg border bg-secondary/30 p-4 mt-4">
@@ -392,7 +585,14 @@ export function ConsumoSection() {
                       </div>
                       <div className="grid gap-2">
                         <Label htmlFor={`data-saida-${index}`} className="text-xs text-muted-foreground">Data Saída</Label>
-                        <Input id={`data-saida-${index}`} type="date" value={ind.dataSaida || ""} onChange={e => handleIndividuoChange(index, 'dataSaida', e.target.value)} />
+                        <IMaskInput
+                            mask="0000-00-00"
+                            id={`data-saida-${index}`}
+                            placeholder="AAAA-MM-DD"
+                            value={ind.dataSaida || ""}
+                            onAccept={(value) => handleIndividuoChange(index, 'dataSaida', value as string)}
+                            as={ForwardedInput}
+                        />
                       </div>
                       <div className="grid gap-2">
                         <Label htmlFor={`hora-saida-${index}`} className="text-xs text-muted-foreground">Hora Saída</Label>
@@ -449,6 +649,7 @@ export function ConsumoSection() {
                                         <div className="flex justify-between items-center">
                                             <div>
                                                 <p>{individuo.nome}</p>
+                                                <p className="text-sm text-muted-foreground">{individuo.documento}</p>
                                                 <CredencialBadge credencial={individuo.credencial} />
                                             </div>
                                             <span className={cn("inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold", individuo.status === "presente" ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-800")}>{individuo.status === "presente" ? "A Bordo" : "Saiu"}</span>
@@ -493,6 +694,7 @@ export function ConsumoSection() {
                     <thead>
                         <tr className="border-b border-border text-left text-xs text-muted-foreground uppercase">
                             <th className="px-4 py-3 font-medium">Nome</th>
+                            <th className="px-4 py-3 font-medium">Documento</th>
                             <th className="px-4 py-3 font-medium">Status</th>
                             <th className="px-4 py-3 font-medium">Entrada</th>
                             <th className="px-4 py-3 font-medium">Saída</th>
@@ -510,7 +712,7 @@ export function ConsumoSection() {
                     </thead>
                     <tbody className="divide-y divide-border/50">
                         {filteredConsumos.length === 0 ? (
-                            <tr><td colSpan={14} className="py-8 text-center text-muted-foreground">Nenhum registro encontrado para os filtros aplicados.</td></tr>
+                            <tr><td colSpan={15} className="py-8 text-center text-muted-foreground">Nenhum registro encontrado para os filtros aplicados.</td></tr>
                         ) : (
                             filteredConsumos.map(consumo => (
                                 consumo.individuos.map((individuo, individuoIndex) => (
@@ -519,6 +721,7 @@ export function ConsumoSection() {
                                         <div>{individuo.nome}</div>
                                         <CredencialBadge credencial={individuo.credencial} />
                                     </td>
+                                    <td className="px-4 py-3 text-muted-foreground">{individuo.documento}</td>
                                     <td className="px-4 py-3">
                                         <span className={cn("inline-flex items-center rounded-full px-2 py-1 text-xs font-semibold", individuo.status === "presente" ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300" : "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300")}>
                                             {individuo.status === "presente" ? "A Bordo" : "Saiu"}

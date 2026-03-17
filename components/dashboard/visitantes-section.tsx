@@ -1,11 +1,12 @@
 'use client'
 
-import { useState, useEffect, forwardRef } from "react"
+import { useState, useEffect, forwardRef, useMemo } from "react"
 import { Plus, Search, UserCheck, UserX, Clock, Building2, Loader2, FilePenLine, Trash2, LogIn, MoreVertical, ShieldCheck, ShieldAlert, XCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import {
   Dialog,
   DialogContent,
@@ -30,15 +31,16 @@ import {
 } from "@/components/ui/select"
 import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
-import { type Visitante } from "@/lib/store"
+import { type Visitante, type OcorrenciaCompliance } from "@/lib/store"
 import { useVisitantes } from "@/hooks/use-firebase"
+import { useOcorrenciasCompliance } from "@/hooks/use-compliance"
 import { cn } from "@/lib/utils"
 import { IMaskInput } from 'react-imask';
 
 
 const ForwardedInput = forwardRef<HTMLInputElement, any>((props, ref) => {
     const { as, ...rest } = props;
-    return <Input ref={ref} {...rest} />;
+    return <Input ref={ref} {...rest} />
 });
 ForwardedInput.displayName = 'ForwardedInput';
 
@@ -87,8 +89,30 @@ const credencialConfig = {
     azul: { text: "Acesso restrito à área administrativa", icon: null, className: "" },
 };
 
+type FormErrors = Partial<Record<keyof Omit<Visitante, 'id' | 'status'> | 'outroDestino', string>>;
+
+const formatDate = (dateString: string) => {
+  if (!dateString) return "N/A";
+  const [year, month, day] = dateString.split('-');
+  return `${day}/${month}/${year}`;
+}
+
+// Helper functions to convert date formats
+const toBrDate = (isoDate: string = ''): string => {
+    if (!isoDate || !/^\d{4}-\d{2}-\d{2}$/.test(isoDate)) return '';
+    const [year, month, day] = isoDate.split('-');
+    return `${day}/${month}/${year}`;
+};
+
+const toIsoDate = (brDate: string = ''): string => {
+    if (!brDate || !/^\d{2}\/\d{2}\/\d{4}$/.test(brDate)) return '';
+    const [day, month, year] = brDate.split('/');
+    return `${year}-${month}-${day}`;
+};
+
 export function VisitantesSection() {
   const { data: visitantes, loading, addItem, updateItem, deleteItem } = useVisitantes()
+  const { data: ocorrencias } = useOcorrenciasCompliance();
   const [search, setSearch] = useState("")
   const [dataInicio, setDataInicio] = useState("");
   const [dataFim, setDataFim] = useState("");
@@ -97,22 +121,39 @@ export function VisitantesSection() {
   const [isSaving, setIsSaving] = useState(false)
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false)
   const [selectedVisitante, setSelectedVisitante] = useState<Visitante | null>(null)
-  const [formState, setFormState] = useState(initialFormState)
+  const [formState, setFormState] = useState<Omit<Visitante, "id" | "status">>(initialFormState)
   const [outroDestino, setOutroDestino] = useState("");
+  const [formErrors, setFormErrors] = useState<FormErrors>({});
+  const [complianceAlert, setComplianceAlert] = useState<OcorrenciaCompliance | null>(null);
+
+  const checkCompliance = (documento: string) => {
+    const unmaskedDoc = documento.replace(/\D/g, '');
+    if (unmaskedDoc.length > 0) {
+        const foundOcorrencia = ocorrencias.find(o => o.documentoIndividuo.replace(/\D/g, '') === unmaskedDoc);
+        setComplianceAlert(foundOcorrencia || null);
+    } else {
+        setComplianceAlert(null);
+    }
+  }
 
   const handleReEntry = (visitante: Visitante) => {
     setSelectedVisitante(null);
+    setFormErrors({});
+    setComplianceAlert(null);
     const now = new Date();
 
     const { id, status, ...restOfVisitante } = visitante;
     
-    const newFormState = {
+    const newFormState: Omit<Visitante, "id" | "status"> = {
       ...restOfVisitante,
-      dataEntrada: now.toISOString().split("T")[0],
+      dataEntrada: toBrDate(now.toISOString().split("T")[0]),
       horaEntrada: now.toTimeString().slice(0, 5),
       dataSaida: "",
       horaSaida: "",
       credencial: visitante.credencial || "azul",
+      dataNascimento: toBrDate(visitante.dataNascimento),
+      validadeRg: toBrDate(visitante.validadeRg),
+      validadeCnh: toBrDate(visitante.validadeCnh),
     };
 
     if (!destinos.includes(visitante.destino)) {
@@ -121,6 +162,8 @@ export function VisitantesSection() {
     } else {
       setOutroDestino("");
     }
+    
+    checkCompliance(visitante.documento);
     
     setFormState(newFormState);
     setIsFormOpen(true);
@@ -139,22 +182,26 @@ export function VisitantesSection() {
         diversos: selectedVisitante.diversos || false,
         rg: selectedVisitante.rg || "",
         cnh: selectedVisitante.cnh || "",
-        dataNascimento: selectedVisitante.dataNascimento || "",
-        validadeRg: selectedVisitante.validadeRg || "",
-        validadeCnh: selectedVisitante.validadeCnh || "",
+        dataNascimento: toBrDate(selectedVisitante.dataNascimento),
+        validadeRg: toBrDate(selectedVisitante.validadeRg),
+        validadeCnh: toBrDate(selectedVisitante.validadeCnh),
         telefone: selectedVisitante.telefone || "",
         categoriaCnh: selectedVisitante.categoriaCnh || "",
+        dataEntrada: toBrDate(selectedVisitante.dataEntrada),
+        horaEntrada: selectedVisitante.horaEntrada || "",
+        dataSaida: toBrDate(selectedVisitante.dataSaida),
         horaSaida: selectedVisitante.horaSaida || "",
-        dataSaida: selectedVisitante.dataSaida || "",
       });
       setOutroDestino(isOutro ? selectedVisitante.destino : "");
+    } else if (!isFormOpen) {
+      setFormErrors({});
     }
   }, [isFormOpen, selectedVisitante]);
 
   const presentes = visitantes.filter(v => v.status === "presente").length
   const sairam = visitantes.filter(v => v.status === "saiu").length
 
-  const filteredVisitantes = visitantes.filter(v => {
+  const filteredVisitantes = useMemo(() => visitantes.filter(v => {
       const searchLower = search.toLowerCase().trim();
       const textMatch = !searchLower || (
           v.nome.toLowerCase().includes(searchLower) ||
@@ -162,49 +209,69 @@ export function VisitantesSection() {
           v.documento.includes(search)
       );
 
-      const dateMatch = (() => {
-          if (!dataInicio && !dataFim) {
-              if (searchLower) {
-                  return true;
-              }
-              const today = new Date().toISOString().split('T')[0];
-              return v.dataEntrada === today;
-          }
-          const entrada = v.dataEntrada;
-          const afterStart = dataInicio ? entrada >= dataInicio : true;
-          const beforeEnd = dataFim ? entrada <= dataFim : true;
-          return afterStart && beforeEnd;
-      })();
+      if (!dataInicio && !dataFim) {
+          const today = new Date().toISOString().split('T')[0];
+          return v.dataEntrada === today && textMatch;
+      }
 
-      return textMatch && dateMatch;
-  });
+      const entrada = v.dataEntrada;
+      const afterStart = dataInicio ? entrada >= dataInicio : true;
+      const beforeEnd = dataFim ? entrada <= dataFim : true;
+      return afterStart && beforeEnd && textMatch;
+  }), [visitantes, search, dataInicio, dataFim]);
+
+  const clearError = (field: string) => {
+    if (formErrors[field as keyof FormErrors]) {
+        setFormErrors(prev => {
+            const newErrors = { ...prev };
+            delete newErrors[field as keyof FormErrors];
+            return newErrors;
+        });
+    }
+  };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { id, value } = e.target
     setFormState(prev => ({ ...prev, [id]: value }))
+    clearError(id);
   }
-
+  
   const handleMaskedInputChange = (id: string, value: string) => {
     setFormState(prev => ({ ...prev, [id]: value }));
+    clearError(id);
+    if (id === 'documento') {
+      checkCompliance(value);
+    }
   };
   
   const handleSelectChange = (id: string, value: string) => {
     setFormState(prev => ({ ...prev, [id]: value }));
     if (id === 'destino' && value !== 'Outros') {
       setOutroDestino("");
+      clearError('outroDestino');
     }
+    clearError(id);
   };
 
   const handleCheckboxChange = (id: string, checked: boolean) => {
     setFormState(prev => ({ ...prev, [id]: checked }))
+    if (id === 'diversos' && !checked) {
+      // Clear errors for all fields inside 'diversos' when it's unchecked
+      const diverseFields = ['rg', 'validadeRg', 'cnh', 'validadeCnh', 'categoriaCnh', 'dataNascimento', 'telefone'];
+      const newErrors = { ...formErrors };
+      diverseFields.forEach(field => delete newErrors[field as keyof FormErrors]);
+      setFormErrors(newErrors);
+    }
   }
 
   const handleAddNew = () => {
     setSelectedVisitante(null);
+    setFormErrors({});
+    setComplianceAlert(null);
     const now = new Date();
     setFormState({
       ...initialFormState,
-      dataEntrada: now.toISOString().split("T")[0],
+      dataEntrada: toBrDate(now.toISOString().split("T")[0]),
       horaEntrada: now.toTimeString().slice(0, 5),
     });
     setOutroDestino("");
@@ -213,6 +280,8 @@ export function VisitantesSection() {
 
   const handleEdit = (visitante: Visitante) => {
     setSelectedVisitante(visitante)
+    setFormErrors({});
+    checkCompliance(visitante.documento);
     setIsFormOpen(true)
   }
 
@@ -235,17 +304,86 @@ export function VisitantesSection() {
     }
   }
 
+  const validateForm = () => {
+    const errors: FormErrors = {};
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    if (!formState.nome.trim()) errors.nome = "Nome completo é obrigatório.";
+    if (!formState.documento.trim() || formState.documento.length < 14) errors.documento = "Documento (CPF) é obrigatório.";
+    if (!formState.empresa.trim()) errors.empresa = "Empresa é obrigatória.";
+    if (!formState.motivo.trim()) errors.motivo = "Motivo da visita é obrigatório.";
+    if (!formState.destino.trim()) errors.destino = "Destino é obrigatório.";
+
+    if (formState.destino === "Outros" && !outroDestino.trim()) {
+        errors.outroDestino = "Especifique o destino se 'Outros'.";
+    }
+
+    const dateFields: Array<keyof Omit<Visitante, "id" | "status">> = ['dataEntrada', 'dataSaida', 'validadeRg', 'validadeCnh', 'dataNascimento'];
+    dateFields.forEach(field => {
+        const brDateValue = formState[field] as string;
+        if (brDateValue) {
+            if (!/^\d{2}\/\d{2}\/\d{4}$/.test(brDateValue)) {
+                errors[field as keyof FormErrors] = "Formato de data inválido (DD/MM/AAAA).";
+            } else {
+                const isoDate = toIsoDate(brDateValue);
+                const date = new Date(isoDate + "T00:00:00"); // Avoid timezone issues
+                if (isNaN(date.getTime())) {
+                    errors[field as keyof FormErrors] = "Data inválida.";
+                    return;
+                }
+
+                if (field === 'validadeRg' || field === 'validadeCnh') {
+                    if (date < today) {
+                        errors[field as keyof FormErrors] = "Documento vencido.";
+                    }
+                }
+                if (field === 'dataNascimento') {
+                    if (date >= today) {
+                        errors[field as keyof FormErrors] = "Data de nascimento deve ser no passado.";
+                    }
+                }
+            }
+        }
+    });
+
+    if (formState.diversos) {
+        const requiredFields: Partial<Record<keyof Visitante, string>> = {
+            rg: "RG é obrigatório.",
+            validadeRg: "Validade do RG é obrigatória.",
+            cnh: "CNH é obrigatória.",
+            validadeCnh: "Validade da CNH é obrigatória.",
+            categoriaCnh: "Categoria da CNH é obrigatória.",
+            dataNascimento: "Data de nascimento é obrigatória.",
+            telefone: "Telefone é obrigatório."
+        };
+        for (const [field, message] of Object.entries(requiredFields)) {
+            if (!formState[field as keyof typeof formState]) {
+                errors[field as keyof FormErrors] = message;
+            }
+        }
+    }
+
+    setFormErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
   const handleSave = async () => {
+    if (!validateForm()) {
+        return;
+    }
+
     setIsSaving(true);
     try {
         const finalDestino = formState.destino === "Outros" ? outroDestino : formState.destino;
-        if (!finalDestino.trim()) {
-            setIsSaving(false);
-            return;
-        }
-
+        
         const dataToSave: Omit<Visitante, "id"> = { 
-            ...formState, 
+            ...formState,
+            dataEntrada: toIsoDate(formState.dataEntrada),
+            dataSaida: toIsoDate(formState.dataSaida),
+            validadeRg: toIsoDate(formState.validadeRg),
+            validadeCnh: toIsoDate(formState.validadeCnh),
+            dataNascimento: toIsoDate(formState.dataNascimento),
             destino: finalDestino, 
             status: (formState.horaSaida && formState.dataSaida) ? "saiu" : "presente" 
         };
@@ -286,13 +424,6 @@ export function VisitantesSection() {
 
   if (loading) {
     return <div className="flex items-center justify-center py-12"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
-  }
-  
-  const formatDate = (dateString: string) => {
-    if (!dateString) return "";
-    const [year, month, day] = dateString.split('-');
-    if(!year || !month || !day) return "";
-    return `${day}/${month}/${year}`;
   }
 
   const CredencialBadge = ({ credencial }: { credencial?: "azul" | "vermelho" | "verde" }) => {
@@ -348,12 +479,23 @@ export function VisitantesSection() {
 
 
       {/* Add/Edit Dialog */}
-      <Dialog open={isFormOpen} onOpenChange={(isOpen) => { if(!isOpen) { setFormState(initialFormState); setOutroDestino(""); } setIsFormOpen(isOpen); }}>
+      <Dialog open={isFormOpen} onOpenChange={(isOpen) => { setIsFormOpen(isOpen); if (!isOpen) setComplianceAlert(null); }}>
         <DialogContent className="max-w-lg w-full mx-4 sm:mx-auto">
           <DialogHeader><DialogTitle>{selectedVisitante ? "Editar Visitante" : "Registrar Novo Visitante"}</DialogTitle></DialogHeader>
-          <div className="max-h-[80vh] overflow-y-auto p-1">
+          
+          {complianceAlert && (
+            <Alert variant="destructive" className="mt-4">
+              <ShieldAlert className="h-4 w-4" />
+              <AlertTitle>Alerta de Compliance</AlertTitle>
+              <AlertDescription>
+                <p>Indivíduo com ocorrência registrada. Por favor, consulte a seção de Compliance para mais detalhes antes de prosseguir com o registro.</p>
+              </AlertDescription>
+            </Alert>
+          )}
+
+          <div className="max-h-[70vh] overflow-y-auto p-1 mt-4">
             <div className="grid grid-cols-1 gap-4 py-4 sm:grid-cols-2">
-              <div className="grid gap-2 sm:col-span-2"><Label htmlFor="nome">Nome Completo</Label><Input id="nome" value={formState.nome} onChange={handleInputChange} /></div>
+              <div className="grid gap-2 sm:col-span-2"><Label htmlFor="nome">Nome Completo</Label><Input id="nome" value={formState.nome} onChange={handleInputChange} className={cn(formErrors.nome && "border-red-500")} />{formErrors.nome && <p className="text-red-500 text-xs">{formErrors.nome}</p>}</div>
               <div className="grid gap-2">
                 <Label htmlFor="documento">Documento (CPF)</Label>
                 <IMaskInput
@@ -362,43 +504,72 @@ export function VisitantesSection() {
                   value={formState.documento}
                   onAccept={(value) => handleMaskedInputChange('documento', value as string)}
                   as={ForwardedInput}
+                  className={cn(formErrors.documento && "border-red-500")}
                 />
+                {formErrors.documento && <p className="text-red-500 text-xs">{formErrors.documento}</p>}
               </div>
-              <div className="grid gap-2"><Label htmlFor="empresa">Empresa</Label><Input id="empresa" value={formState.empresa} onChange={handleInputChange} /></div>
-              <div className="grid gap-2 sm:col-span-2"><Label htmlFor="motivo">Motivo da Visita</Label><Input id="motivo" value={formState.motivo} onChange={handleInputChange} /></div>
+              <div className="grid gap-2"><Label htmlFor="empresa">Empresa</Label><Input id="empresa" value={formState.empresa} onChange={handleInputChange} className={cn(formErrors.empresa && "border-red-500")} />{formErrors.empresa && <p className="text-red-500 text-xs">{formErrors.empresa}</p>}</div>
+              <div className="grid gap-2 sm:col-span-2"><Label htmlFor="motivo">Motivo da Visita</Label><Input id="motivo" value={formState.motivo} onChange={handleInputChange} className={cn(formErrors.motivo && "border-red-500")} />{formErrors.motivo && <p className="text-red-500 text-xs">{formErrors.motivo}</p>}</div>
               
                <div className="grid gap-2 sm:col-span-2">
                 <Label htmlFor="credencial">Credencial de Acesso</Label>
                 <Select value={formState.credencial || 'azul'} onValueChange={(value) => handleSelectChange("credencial", value)}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectTrigger className={cn(formErrors.credencial && "border-red-500")}><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="azul">Azul (Administrativo)</SelectItem>
                     <SelectItem value="vermelho">Vermelho (Pier)</SelectItem>
                     <SelectItem value="verde">Verde (Navio)</SelectItem>
                   </SelectContent>
                 </Select>
+                 {formErrors.credencial && <p className="text-red-500 text-xs">{formErrors.credencial}</p>}
               </div>
 
               <div className="grid gap-2 sm:col-span-2">
                 <Label htmlFor="destino">Destino</Label>
                 <Select value={formState.destino} onValueChange={(value) => handleSelectChange("destino", value)}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectTrigger className={cn(formErrors.destino && "border-red-500")}><SelectValue /></SelectTrigger>
                   <SelectContent>
                     {destinos.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}
                   </SelectContent>
                 </Select>
+                {formErrors.destino && <p className="text-red-500 text-xs">{formErrors.destino}</p>}
               </div>
               {formState.destino === "Outros" && (
                 <div className="grid gap-2 sm:col-span-2">
                   <Label htmlFor="outroDestino">Especifique o Destino</Label>
-                  <Input id="outroDestino" value={outroDestino} onChange={(e) => setOutroDestino(e.target.value)} />
+                  <Input id="outroDestino" value={outroDestino} onChange={(e) => { setOutroDestino(e.target.value); clearError('outroDestino'); }} className={cn(formErrors.outroDestino && "border-red-500")} />
+                  {formErrors.outroDestino && <p className="text-red-500 text-xs">{formErrors.outroDestino}</p>}
                 </div>
               )}
 
-              <div className="grid gap-2"><Label htmlFor="dataEntrada">Data Entrada</Label><Input id="dataEntrada" type="date" value={formState.dataEntrada} onChange={handleInputChange} /></div>
+              <div className="grid gap-2">
+                <Label htmlFor="dataEntrada">Data Entrada</Label>
+                <IMaskInput
+                    mask="00/00/0000"
+                    id="dataEntrada"
+                    placeholder="DD/MM/AAAA"
+                    value={formState.dataEntrada}
+                    onAccept={(value) => handleMaskedInputChange('dataEntrada', value as string)}
+                    as={ForwardedInput}
+                    className={cn(formErrors.dataEntrada && "border-red-500")}
+                />
+                {formErrors.dataEntrada && <p className="text-red-500 text-xs">{formErrors.dataEntrada}</p>}
+              </div>
               <div className="grid gap-2"><Label htmlFor="horaEntrada">Hora Entrada</Label><Input id="horaEntrada" type="time" value={formState.horaEntrada} onChange={handleInputChange} /></div>
 
-              <div className="grid gap-2"><Label htmlFor="dataSaida">Data Saída</Label><Input id="dataSaida" type="date" value={formState.dataSaida || ""} onChange={handleInputChange} /></div>
+              <div className="grid gap-2">
+                <Label htmlFor="dataSaida">Data Saída</Label>
+                <IMaskInput
+                    mask="00/00/0000"
+                    id="dataSaida"
+                    placeholder="DD/MM/AAAA"
+                    value={formState.dataSaida || ""}
+                    onAccept={(value) => handleMaskedInputChange('dataSaida', value as string)}
+                    as={ForwardedInput}
+                    className={cn(formErrors.dataSaida && "border-red-500")}
+                />
+                {formErrors.dataSaida && <p className="text-red-500 text-xs">{formErrors.dataSaida}</p>}
+              </div>
               <div className="grid gap-2"><Label htmlFor="horaSaida">Hora Saída</Label><Input id="horaSaida" type="time" value={formState.horaSaida || ""} onChange={handleInputChange} /></div>
 
               <div className="grid gap-2"><Label htmlFor="notaFiscal">Nota Fiscal</Label><Input id="notaFiscal" value={formState.notaFiscal || ""} onChange={handleInputChange} /></div>
@@ -417,9 +588,23 @@ export function VisitantesSection() {
                       value={formState.rg || ""}
                       onAccept={(value) => handleMaskedInputChange('rg', value as string)}
                       as={ForwardedInput}
+                      className={cn(formErrors.rg && "border-red-500")}
                     />
+                    {formErrors.rg && <p className="text-red-500 text-xs">{formErrors.rg}</p>}
                   </div>
-                  <div className="grid gap-2"><Label htmlFor="validadeRg">Validade RG</Label><Input id="validadeRg" type="date" value={formState.validadeRg || ""} onChange={handleInputChange} /></div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="validadeRg">Validade RG</Label>
+                    <IMaskInput
+                        mask="00/00/0000"
+                        id="validadeRg"
+                        placeholder="DD/MM/AAAA"
+                        value={formState.validadeRg || ""}
+                        onAccept={(value) => handleMaskedInputChange('validadeRg', value as string)}
+                        as={ForwardedInput}
+                        className={cn(formErrors.validadeRg && "border-red-500")}
+                    />
+                    {formErrors.validadeRg && <p className="text-red-500 text-xs">{formErrors.validadeRg}</p>}
+                  </div>
                   <div className="grid gap-2">
                     <Label htmlFor="cnh">CNH</Label>
                     <IMaskInput
@@ -428,21 +613,48 @@ export function VisitantesSection() {
                       value={formState.cnh || ""}
                       onAccept={(value) => handleMaskedInputChange('cnh', value as string)}
                       as={ForwardedInput}
+                      className={cn(formErrors.cnh && "border-red-500")}
                     />
+                     {formErrors.cnh && <p className="text-red-500 text-xs">{formErrors.cnh}</p>}
                   </div>
-                  <div className="grid gap-2"><Label htmlFor="validadeCnh">Validade CNH</Label><Input id="validadeCnh" type="date" value={formState.validadeCnh || ""} onChange={handleInputChange} /></div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="validadeCnh">Validade CNH</Label>
+                    <IMaskInput
+                        mask="00/00/0000"
+                        id="validadeCnh"
+                        placeholder="DD/MM/AAAA"
+                        value={formState.validadeCnh || ""}
+                        onAccept={(value) => handleMaskedInputChange('validadeCnh', value as string)}
+                        as={ForwardedInput}
+                        className={cn(formErrors.validadeCnh && "border-red-500")}
+                    />
+                    {formErrors.validadeCnh && <p className="text-red-500 text-xs">{formErrors.validadeCnh}</p>}
+                  </div>
                   <div className="grid gap-2">
                     <Label htmlFor="categoriaCnh">Categoria CNH</Label>
                     <Select value={formState.categoriaCnh || ""} onValueChange={(value) => handleSelectChange("categoriaCnh", value)}>
-                      <SelectTrigger id="categoriaCnh">
+                      <SelectTrigger id="categoriaCnh" className={cn(formErrors.categoriaCnh && "border-red-500")}>
                         <SelectValue placeholder="Selecione..." />
                       </SelectTrigger>
                       <SelectContent>
                         {cnhCategorias.map(cat => <SelectItem key={cat} value={cat}>{cat}</SelectItem>)}
                       </SelectContent>
                     </Select>
+                    {formErrors.categoriaCnh && <p className="text-red-500 text-xs">{formErrors.categoriaCnh}</p>}
                   </div>
-                  <div className="grid gap-2"><Label htmlFor="dataNascimento">Data de Nascimento</Label><Input id="dataNascimento" type="date" value={formState.dataNascimento || ""} onChange={handleInputChange} /></div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="dataNascimento">Data de Nascimento</Label>
+                    <IMaskInput
+                        mask="00/00/0000"
+                        id="dataNascimento"
+                        placeholder="DD/MM/AAAA"
+                        value={formState.dataNascimento || ""}
+                        onAccept={(value) => handleMaskedInputChange('dataNascimento', value as string)}
+                        as={ForwardedInput}
+                        className={cn(formErrors.dataNascimento && "border-red-500")}
+                    />
+                    {formErrors.dataNascimento && <p className="text-red-500 text-xs">{formErrors.dataNascimento}</p>}
+                  </div>
                   <div className="grid gap-2">
                     <Label htmlFor="telefone">Telefone</Label>
                     <IMaskInput
@@ -451,7 +663,9 @@ export function VisitantesSection() {
                       value={formState.telefone || ""}
                       onAccept={(value) => handleMaskedInputChange('telefone', value as string)}
                       as={ForwardedInput}
+                      className={cn(formErrors.telefone && "border-red-500")}
                     />
+                    {formErrors.telefone && <p className="text-red-500 text-xs">{formErrors.telefone}</p>}
                   </div>
                 </>
               )}
@@ -536,6 +750,7 @@ export function VisitantesSection() {
               <thead>
                 <tr className="border-b border-border text-left text-xs text-muted-foreground uppercase">
                   <th className="px-4 py-3 font-medium">Visitante</th>
+                  <th className="px-4 py-3 font-medium">Credencial</th>
                   <th className="px-4 py-3 font-medium">Documento</th>
                   <th className="px-4 py-3 font-medium">Empresa</th>
                   <th className="px-4 py-3 font-medium">Motivo</th>
@@ -551,12 +766,14 @@ export function VisitantesSection() {
               </thead>
               <tbody className="divide-y divide-border/50">
                 {filteredVisitantes.length === 0 ? (
-                  <tr><td colSpan={12} className="py-8 text-center text-muted-foreground">Nenhum visitante encontrado para os filtros aplicados.</td></tr>
+                  <tr><td colSpan={13} className="py-8 text-center text-muted-foreground">Nenhum visitante encontrado para os filtros aplicados.</td></tr>
                 ) : (
                   filteredVisitantes.map(v => (
                     <tr key={v.id} className={cn(v.credencial && credencialConfig[v.credencial]?.className.replace(/text-\S+/, '').replace(/dark:text-\S+/, ''))}>
                       <td className="px-4 py-3">
                         <div className="font-medium">{v.nome}</div>
+                      </td>
+                      <td className="px-4 py-3">
                         <CredencialBadge credencial={v.credencial} />
                       </td>
                       <td className="px-4 py-3">{v.documento}</td>

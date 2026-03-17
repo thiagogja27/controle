@@ -1,7 +1,7 @@
 'use client'
 
 import { cn } from "@/lib/utils"
-import { LayoutDashboard, Users, Utensils, CreditCard, Package, BarChart, Settings, Map } from "lucide-react"
+import { LayoutDashboard, Users, Utensils, CreditCard, Package, BarChart, Settings, Map, ShieldCheck } from "lucide-react"
 
 interface NavigationProps {
   activeSection: string
@@ -21,7 +21,13 @@ const sections = [
     description: "Gerenciar entrada e saída",
     icon: Users,
   },
-    {
+  {
+    id: "compliance",
+    label: "Compliance",
+    description: "Registro de ocorrências",
+    icon: ShieldCheck,
+  },
+  {
     id: "tpas",
     label: "Controle TPAs",
     description: "Terminais de pagamento",
