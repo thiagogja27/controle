@@ -36,8 +36,8 @@ import { cn } from "@/lib/utils"
 import { IMaskInput } from 'react-imask';
 
 const ForwardedInput = forwardRef<HTMLInputElement, any>((props, ref) => {
-    const { as, ...rest } = props;
-    return <Input ref={ref} {...rest} />;
+    const { as, inputRef, ...rest } = props;
+    return <Input ref={inputRef || ref} {...rest} />;
 });
 ForwardedInput.displayName = 'ForwardedInput';
 
@@ -63,6 +63,18 @@ const credencialConfig = {
 };
 
 type FormErrors = Record<string, string>;
+
+const toBrDate = (isoDate: string = ''): string => {
+    if (!isoDate || !/^\d{4}-\d{2}-\d{2}$/.test(isoDate)) return '';
+    const [year, month, day] = isoDate.split('-');
+    return `${day}/${month}/${year}`;
+};
+
+const toIsoDate = (brDate: string = ''): string => {
+    if (!brDate || !/^\d{2}\/\d{2}\/\d{4}$/.test(brDate)) return '';
+    const [day, month, year] = brDate.split('/');
+    return `${year}-${month}-${day}`;
+};
 
 export function ConsumoSection() {
   const { data: consumos, loading, addItem, updateItem, deleteItem } = useConsumos()
@@ -108,7 +120,7 @@ export function ConsumoSection() {
 
     setFormState({
         ...restOfConsumo, 
-        data: now.toISOString().split("T")[0],
+        data: toBrDate(now.toISOString().split("T")[0]),
         hora: now.toTimeString().slice(0, 5),
         individuos: [{
             id: `new-${Date.now()}`,
@@ -128,8 +140,9 @@ export function ConsumoSection() {
     if (isFormOpen && selectedConsumo) {
         setFormState({
           ...selectedConsumo,
+          data: toBrDate(selectedConsumo.data),
           tipoServico: selectedConsumo.tipoServico || "",
-          individuos: selectedConsumo.individuos.map(ind => ({ ...ind, documento: ind.documento || "", credencial: ind.credencial || "azul", dataSaida: ind.dataSaida || "", horaSaida: ind.horaSaida || "" })),
+          individuos: selectedConsumo.individuos.map(ind => ({ ...ind, documento: ind.documento || "", credencial: ind.credencial || "azul", dataSaida: toBrDate(ind.dataSaida), horaSaida: ind.horaSaida || "" })),
         })
         selectedConsumo.individuos.forEach((ind, index) => checkCompliance(ind.documento || "", index));
     } else if (!isFormOpen) {
@@ -230,7 +243,7 @@ export function ConsumoSection() {
     const now = new Date();
     setFormState({ 
         ...initialFormState,
-        data: now.toISOString().split("T")[0],
+        data: toBrDate(now.toISOString().split("T")[0]),
         hora: now.toTimeString().slice(0, 5),
         individuos: [{ id: `new-${Date.now()}`, nome: "", documento: "", status: "presente", dataSaida: "", horaSaida: "", credencial: "azul" }],
     }); 
@@ -270,10 +283,10 @@ export function ConsumoSection() {
   const validateForm = () => {
     const errors: FormErrors = {};
 
-    if (!formState.data) errors.data = "Data é obrigatória.";
+    if (!formState.data || !/^\d{2}\/\d{2}\/\d{4}$/.test(formState.data)) errors.data = "Data inválida (DD/MM/AAAA).";
     if (!formState.hora) errors.hora = "Hora é obrigatória.";
     if (!formState.veiculo.trim()) errors.veiculo = "Veículo é obrigatório.";
-    if (!formState.placa.trim()) errors.placa = "Placa é obrigatória.";
+    if (formState.placa.trim().length < 7) errors.placa = "Placa inválida.";
     if (!formState.produto.trim()) errors.produto = "Produto é obrigatório.";
     if (!formState.notaFiscal.trim()) errors.notaFiscal = "Nota Fiscal é obrigatória.";
     if (!formState.navio.trim()) errors.navio = "Navio é obrigatório.";
@@ -286,6 +299,9 @@ export function ConsumoSection() {
         }
         if (!ind.documento.trim() || ind.documento.length < 14) { // CPF mask
             errors[`individuo-${index}-documento`] = "Documento (CPF) é obrigatório.";
+        }
+        if (ind.dataSaida && !/^\d{2}\/\d{2}\/\d{4}$/.test(ind.dataSaida)) {
+            errors[`individuo-${index}-dataSaida`] = "Data de saída inválida (DD/MM/AAAA).";
         }
     });
 
@@ -308,6 +324,8 @@ export function ConsumoSection() {
             .filter(ind => ind.nome.trim() !== "")
             .map((ind): Individuo => {
                 const status: "presente" | "saiu" = (ind.horaSaida && ind.dataSaida) ? 'saiu' : 'presente';
+                const dataSaidaISO = toIsoDate(ind.dataSaida);
+                
                 if (status === "presente") {
                     return {
                         ...ind,
@@ -318,7 +336,8 @@ export function ConsumoSection() {
                 } else {
                     return {
                         ...ind,
-                        status: "saiu"
+                        status: "saiu",
+                        dataSaida: dataSaidaISO,
                     };
                 }
             });
@@ -328,7 +347,7 @@ export function ConsumoSection() {
             return;
         }
 
-        const dataToSave = { ...formState, individuos: individuosToSave };
+        const dataToSave = { ...formState, individuos: individuosToSave, data: toIsoDate(formState.data) };
 
         if (selectedConsumo) {
             await updateItem(selectedConsumo.id, dataToSave);
@@ -420,25 +439,11 @@ export function ConsumoSection() {
                     </div>
                     <div className="grid gap-2">
                         <Label htmlFor="dataInicio">Data Início</Label>
-                        <IMaskInput
-                            mask="0000-00-00"
-                            id="dataInicio"
-                            placeholder="AAAA-MM-DD"
-                            value={dataInicio}
-                            onAccept={(value) => setDataInicio(value as string)}
-                            as={ForwardedInput}
-                        />
+                        <Input id="dataInicio" type="date" value={dataInicio} onChange={e => setDataInicio(e.target.value)} />
                     </div>
                     <div className="grid gap-2">
                         <Label htmlFor="dataFim">Data Fim</Label>
-                        <IMaskInput
-                            mask="0000-00-00"
-                            id="dataFim"
-                            placeholder="AAAA-MM-DD"
-                            value={dataFim}
-                            onAccept={(value) => setDataFim(value as string)}
-                            as={ForwardedInput}
-                        />
+                        <Input id="dataFim" type="date" value={dataFim} onChange={e => setDataFim(e.target.value)} />
                     </div>
                     <div className="flex gap-2 md:col-span-3 lg:col-span-2">
                          <Button variant="outline" onClick={() => { setDataInicio(""); setDataFim(""); }} className="w-1/2"><XCircle className="mr-2 h-4 w-4"/>Limpar</Button>
@@ -505,9 +510,9 @@ export function ConsumoSection() {
                 <div className="grid gap-2">
                     <Label htmlFor="data">Data de Entrada</Label>
                     <IMaskInput
-                        mask="0000-00-00"
+                        mask="00/00/0000"
                         id="data"
-                        placeholder="AAAA-MM-DD"
+                        placeholder="DD/MM/AAAA"
                         value={formState.data}
                         onAccept={(value) => handleMaskedInputChange('data', value as string)}
                         as={ForwardedInput}
@@ -522,14 +527,23 @@ export function ConsumoSection() {
                 </div>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="grid gap-2">
+                 <div className="grid gap-2">
                     <Label htmlFor="veiculo">Veículo</Label>
                     <Input id="veiculo" placeholder="Ex: Caminhão Baú" value={formState.veiculo} onChange={handleInputChange} className={cn(formErrors.veiculo && "border-red-500")} />
                     {formErrors.veiculo && <p className="text-red-500 text-xs">{formErrors.veiculo}</p>}
                 </div>
                 <div className="grid gap-2">
                     <Label htmlFor="placa">Placa</Label>
-                    <Input id="placa" placeholder="Ex: ABC-1234" value={formState.placa} onChange={handleInputChange} className={cn(formErrors.placa && "border-red-500")} />
+                    <IMaskInput
+                        mask={[{ mask: 'aaa-0000' }, { mask: 'aaa0a00' }]}
+                        id="placa"
+                        placeholder="Ex: ABC-1234"
+                        value={formState.placa}
+                        onAccept={(value) => handleMaskedInputChange("placa", value as string)}
+                        prepare={(str) => str.toUpperCase()}
+                        as={ForwardedInput}
+                        className={cn(formErrors.placa && "border-red-500")}
+                    />
                     {formErrors.placa && <p className="text-red-500 text-xs">{formErrors.placa}</p>}
                 </div>
                </div>
@@ -586,13 +600,15 @@ export function ConsumoSection() {
                       <div className="grid gap-2">
                         <Label htmlFor={`data-saida-${index}`} className="text-xs text-muted-foreground">Data Saída</Label>
                         <IMaskInput
-                            mask="0000-00-00"
+                            mask="00/00/0000"
                             id={`data-saida-${index}`}
-                            placeholder="AAAA-MM-DD"
+                            placeholder="DD/MM/AAAA"
                             value={ind.dataSaida || ""}
                             onAccept={(value) => handleIndividuoChange(index, 'dataSaida', value as string)}
                             as={ForwardedInput}
+                            className={cn(formErrors[`individuo-${index}-dataSaida`] && "border-red-500")}
                         />
+                         {formErrors[`individuo-${index}-dataSaida`] && <p className="text-red-500 text-xs">{formErrors[`individuo-${index}-dataSaida`]}</p>}
                       </div>
                       <div className="grid gap-2">
                         <Label htmlFor={`hora-saida-${index}`} className="text-xs text-muted-foreground">Hora Saída</Label>

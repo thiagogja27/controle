@@ -39,8 +39,8 @@ import { IMaskInput } from 'react-imask';
 
 
 const ForwardedInput = forwardRef<HTMLInputElement, any>((props, ref) => {
-    const { as, ...rest } = props;
-    return <Input ref={ref} {...rest} />
+    const { as, inputRef, ...rest } = props;
+    return <Input ref={inputRef || ref} {...rest} />;
 });
 ForwardedInput.displayName = 'ForwardedInput';
 
@@ -314,6 +314,7 @@ export function VisitantesSection() {
     if (!formState.empresa.trim()) errors.empresa = "Empresa é obrigatória.";
     if (!formState.motivo.trim()) errors.motivo = "Motivo da visita é obrigatório.";
     if (!formState.destino.trim()) errors.destino = "Destino é obrigatório.";
+    if (formState.placa && formState.placa.trim().length > 0 && formState.placa.trim().length < 7) errors.placa = "Placa inválida.";
 
     if (formState.destino === "Outros" && !outroDestino.trim()) {
         errors.outroDestino = "Especifique o destino se 'Outros'.";
@@ -573,7 +574,20 @@ export function VisitantesSection() {
               <div className="grid gap-2"><Label htmlFor="horaSaida">Hora Saída</Label><Input id="horaSaida" type="time" value={formState.horaSaida || ""} onChange={handleInputChange} /></div>
 
               <div className="grid gap-2"><Label htmlFor="notaFiscal">Nota Fiscal</Label><Input id="notaFiscal" value={formState.notaFiscal || ""} onChange={handleInputChange} /></div>
-              <div className="grid gap-2"><Label htmlFor="placa">Placa</Label><Input id="placa" placeholder="N/A se não houver" value={formState.placa || ""} onChange={handleInputChange} /></div>
+              <div className="grid gap-2">
+                <Label htmlFor="placa">Placa</Label>
+                <IMaskInput
+                    mask={[{ mask: 'aaa-0000' }, { mask: 'aaa0a00' }]}
+                    id="placa"
+                    placeholder="N/A se não houver"
+                    value={formState.placa || ""}
+                    onAccept={(value) => handleMaskedInputChange("placa", value as string)}
+                    prepare={(str) => str.toUpperCase()}
+                    as={ForwardedInput}
+                    className={cn(formErrors.placa && "border-red-500")}
+                />
+                {formErrors.placa && <p className="text-red-500 text-xs">{formErrors.placa}</p>}
+              </div>
               
               <div className="grid gap-2 sm:col-span-2"><Label htmlFor="observacoes">Observações</Label><Textarea id="observacoes" value={formState.observacoes || ""} onChange={handleInputChange} /></div>
               <div className="flex items-center space-x-2 sm:col-span-2"><Checkbox id="diversos" checked={formState.diversos} onCheckedChange={(checked) => handleCheckboxChange("diversos", checked as boolean)} /><Label htmlFor="diversos">Diversos</Label></div>

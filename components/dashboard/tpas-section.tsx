@@ -47,6 +47,7 @@ const initialFormState: Omit<TPA, "id" | "status"> = {
   nome: "",
   funcao: "",
   documento: "",
+  placa: "",
   destino: "",
   navio: "",
   pier: "teg",
@@ -72,7 +73,7 @@ const funcoes = [
 
 const credencialConfig = {
     verde: { text: "Permissão de acesso ao navio", icon: ShieldCheck, className: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200" },
-    vermelho: { text: "Permissão de acesso ao pier", icon: ShieldAlert, className: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200" },
+    vermelho: { text: "Permissão de acesso ao pier", icon: ShieldAlert, className: "bg-red-100 text-red-800 dark:bg-red-900 dark:red-green-200" },
     azul: { text: "Acesso restrito à área administrativa", icon: null, className: "" },
 };
 
@@ -119,6 +120,7 @@ export function TPAsSection() {
 
     setFormState({
         ...restOfTPA,
+        placa: tpa.placa || '',
         data: now.toISOString().split("T")[0],
         hora: now.toTimeString().slice(0, 5),
         dataSaida: "",
@@ -133,6 +135,7 @@ export function TPAsSection() {
     if (isFormOpen && selectedTPA) {
         setFormState({
           ...selectedTPA,
+          placa: selectedTPA.placa || '',
           credencial: selectedTPA.credencial || "azul",
           dataSaida: selectedTPA.dataSaida || "",
           horaSaida: selectedTPA.horaSaida || "",
@@ -145,6 +148,7 @@ export function TPAsSection() {
     const textMatch = !searchLower || (
       r.nome?.toLowerCase().includes(searchLower) ||
       r.documento?.toLowerCase().includes(searchLower) ||
+      r.placa?.toLowerCase().includes(searchLower) ||
       r.navio?.toLowerCase().includes(searchLower)
     );
 
@@ -335,7 +339,7 @@ export function TPAsSection() {
                         <Label htmlFor="search">Busca</Label>
                         <div className="relative">
                             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                            <Input id="search" placeholder="Buscar por nome, documento, navio..." value={search} onChange={e => setSearch(e.target.value)} className="w-full pl-8" />
+                            <Input id="search" placeholder="Buscar por nome, doc, placa..." value={search} onChange={e => setSearch(e.target.value)} className="w-full pl-8" />
                         </div>
                     </div>
                     <div className="grid gap-2">
@@ -407,6 +411,18 @@ export function TPAsSection() {
                   as={ForwardedInput}
                 />
               </div>
+               <div className="grid gap-2">
+                <Label htmlFor="placa">Placa do Veículo</Label>
+                <IMaskInput
+                  mask={[{ mask: 'aaa-0000' }, { mask: 'aaa0a00' }]}
+                  id="placa"
+                  value={formState.placa || ''}
+                  onAccept={(value) => handleMaskedInputChange('placa', value as string)}
+                  prepare={(str) => str.toUpperCase()}
+                  as={ForwardedInput}
+                  placeholder="ABC-1234 ou ABC1D23"
+                />
+              </div>
               
               <div className="grid gap-2 sm:col-span-2">
                 <Label htmlFor="credencial">Credencial de Acesso</Label>
@@ -472,6 +488,7 @@ export function TPAsSection() {
                             <CredencialBadge credencial={r.credencial} />
                             <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm flex-grow">
                                 <div className="flex flex-col"><span className="text-muted-foreground">Documento</span><span>{r.documento}</span></div>
+                                <div className="flex flex-col"><span className="text-muted-foreground">Placa</span><span>{r.placa || '-'}</span></div>
                                 <div className="flex flex-col"><span className="text-muted-foreground">Navio</span><span>{r.navio}</span></div>
                                 <div className="flex flex-col"><span className="text-muted-foreground">Entrada</span><span>{formatDateTime(r.data, r.hora)}</span></div>
                                 <div className="flex flex-col"><span className="text-muted-foreground">Saída</span><span>{r.horaSaida ? formatDateTime(r.dataSaida || r.data, r.horaSaida) : '-'}</span></div>
@@ -503,6 +520,7 @@ export function TPAsSection() {
                             <th className="px-4 py-3 font-medium">Nome</th>
                             <th className="px-4 py-3 font-medium">Função</th>
                             <th className="px-4 py-3 font-medium">Documento</th>
+                            <th className="px-4 py-3 font-medium">Placa</th>
                             <th className="px-4 py-3 font-medium">Navio</th>
                             <th className="px-4 py-3 font-medium">Destino</th>
                             <th className="px-4 py-3 font-medium">Pier</th>
@@ -513,7 +531,7 @@ export function TPAsSection() {
                     </thead>
                     <tbody className="divide-y divide-border/50">
                         {filtered.length === 0 ? (
-                            <tr><td colSpan={11} className="py-8 text-center text-muted-foreground">Nenhum registro encontrado para os filtros aplicados.</td></tr>
+                            <tr><td colSpan={12} className="py-8 text-center text-muted-foreground">Nenhum registro encontrado para os filtros aplicados.</td></tr>
                         ) : (
                             filtered.map(r => (
                                 <tr key={r.id} className={cn("hover:bg-muted/50", r.credencial && credencialConfig[r.credencial]?.className.replace(/text-\S+/, '').replace(/dark:text-\S+/, ''))}>
@@ -525,6 +543,7 @@ export function TPAsSection() {
                                     </td>
                                     <td className="px-4 py-3 text-muted-foreground">{r.funcao}</td>
                                     <td className="px-4 py-3 tabular-nums text-muted-foreground">{r.documento}</td>
+                                    <td className="px-4 py-3 tabular-nums text-muted-foreground">{r.placa || '-'}</td>
                                     <td className="px-4 py-3 whitespace-nowrap text-foreground">{r.navio}</td>
                                     <td className="px-4 py-3 text-muted-foreground">{r.destino}</td>
                                     <td className="px-4 py-3"><span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ${r.pier === "teg" ? "bg-primary/10 text-primary" : "bg-info/10 text-info"}`}>{r.pier.toUpperCase()}</span></td>

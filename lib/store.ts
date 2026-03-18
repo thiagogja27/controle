@@ -1,4 +1,4 @@
-'''// Types for the control system
+// Types for the control system
 export interface Visitante {
   id: string
   nome: string
@@ -59,6 +59,7 @@ export interface TPA {
   nome: string
   funcao: string
   documento: string
+  placa?: string
   destino: string
   navio: string
   pier: "teg" | "teag"
@@ -98,4 +99,3 @@ export interface ConsumoBordo {
   data: string
   hora: string
 }
-'''
