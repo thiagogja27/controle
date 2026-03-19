@@ -1,22 +1,20 @@
-/** @type {import('next').NextConfig} */
-const withPWA = require('next-pwa')({
-  dest: 'public',
-  register: true,
-  skipWaiting: true,
-  disable: process.env.NODE_ENV === 'development',
-  customWorkerDir: 'public',
-  customWorker: 'sw.js',
-});
+const { GenerateSW } = require("workbox-webpack-plugin");
 
-const nextConfig = {
+module.exports = {
+  typescript: {
+    ignoreBuildErrors: true,
+  },
   images: {
-    remotePatterns: [
-      {
-        protocol: 'http',
-        hostname: 'localhost',
-      },
-    ],
+    unoptimized: true,
+  },
+  webpack: (config, { isServer }) => {
+    if (!isServer) {
+      config.plugins.push(
+        new GenerateSW({
+          swDest: "sw.js",
+        })
+      );
+    }
+    return config;
   },
 };
-
-module.exports = withPWA(nextConfig);
