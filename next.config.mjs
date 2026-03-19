@@ -1,4 +1,9 @@
 /** @type {import('next').NextConfig} */
+const withPWA = require("next-pwa")({
+  dest: "public",
+  disable: true, // Desativando temporariamente o PWA
+});
+
 const nextConfig = {
   typescript: {
     ignoreBuildErrors: true,
@@ -6,6 +11,6 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
-}
+};
 
-export default nextConfig
+module.exports = withPWA(nextConfig);
