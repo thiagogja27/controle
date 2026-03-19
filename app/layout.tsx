@@ -1,6 +1,7 @@
 'use client'
 
 import { AuthProvider } from '@/hooks/use-auth'
+import { useOnlineStatus } from '@/hooks/use-online-status'
 import { Geist, Geist_Mono } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
 import './globals.css'
@@ -13,9 +14,16 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode
 }>) {
+  const isOnline = useOnlineStatus();
+
   return (
     <html lang="en">
       <body className="font-sans antialiased">
+        {!isOnline && (
+          <div className="bg-yellow-500 text-center p-2 text-white">
+            Você está offline. Algumas funcionalidades podem não estar disponíveis.
+          </div>
+        )}
         <AuthProvider>
           {children}
           <Analytics />

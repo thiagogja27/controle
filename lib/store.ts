@@ -34,6 +34,7 @@ export interface OcorrenciaCompliance {
   motivo: string;
   descricao: string;
   autor: string; // Quem registrou
+  statusAlerta: "Nenhum" | "Crítico";
 }
 
 export interface IndividuoRefeicao {
@@ -71,6 +72,7 @@ export interface TPA {
   horaSaida?: string
   status: "presente" | "saiu"
   credencial?: "azul" | "vermelho" | "verde"
+  numeroCip: string
 }
 
 // Used by ConsumoBordo
@@ -98,4 +100,13 @@ export interface ConsumoBordo {
   vigilante: string
   data: string
   hora: string
+}
+
+export interface Navio {
+  id: "teg" | "teag";
+  nome: string;
+  dataAtracacao?: string;
+  horaAtracacao?: string;
+  dataDesatracacao?: string;
+  horaDesatracacao?: string;
 }

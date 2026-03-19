@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useEffect } from "react"
-import { Plus, Search, Loader2, FilePenLine, Trash2, MoreVertical } from "lucide-react"
+import { useState, useEffect, forwardRef } from "react"
+import { Plus, Search, Loader2, MoreVertical, Trash2, AlertTriangle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -22,9 +22,16 @@ import {
   DropdownMenuTrigger 
 } from "@/components/ui/dropdown-menu"
 import { Label } from "@/components/ui/label"
+import { Switch } from "@/components/ui/switch"
 import { type OcorrenciaCompliance } from "@/lib/store"
 import { useOcorrenciasCompliance } from "@/hooks/use-compliance"
-import { cn } from "@/lib/utils"
+import { IMaskInput } from 'react-imask';
+
+const ForwardedInput = forwardRef<HTMLInputElement, any>((props, ref) => {
+    const { as, ...rest } = props;
+    return <Input ref={ref} {...rest} />;
+});
+ForwardedInput.displayName = 'ForwardedInput';
 
 const initialFormState: Omit<OcorrenciaCompliance, "id" | "autor"> = {
   nomeIndividuo: "",
@@ -32,6 +39,7 @@ const initialFormState: Omit<OcorrenciaCompliance, "id" | "autor"> = {
   dataOcorrencia: "",
   motivo: "",
   descricao: "",
+  statusAlerta: "Nenhum",
 }
 
 export function ComplianceSection() {
@@ -60,6 +68,14 @@ export function ComplianceSection() {
     const { id, value } = e.target
     setFormState(prev => ({ ...prev, [id]: value }))
   }
+
+  const handleSwitchChange = (checked: boolean) => {
+    setFormState(prev => ({ ...prev, statusAlerta: checked ? "Crítico" : "Nenhum" }))
+  }
+
+  const handleMaskedInputChange = (id: string, value: string) => {
+    setFormState(prev => ({ ...prev, [id]: value }));
+  };
 
   const handleAddNew = () => {
     setSelectedOcorrencia(null)
@@ -96,9 +112,8 @@ export function ComplianceSection() {
   }
 
   const handleSave = async () => {
-    // Basic validation
-    if (!formState.nomeIndividuo || !formState.documentoIndividuo || !formState.motivo) {
-        alert("Por favor, preencha todos os campos obrigatórios: Nome, Documento e Motivo.");
+    if (!formState.nomeIndividuo || !formState.documentoIndividuo || !formState.motivo || formState.documentoIndividuo.length < 14) {
+        alert("Por favor, preencha todos os campos obrigatórios: Nome, Documento (válido) e Motivo.");
         return;
     }
 
@@ -106,7 +121,6 @@ export function ComplianceSection() {
     try {
         const dataToSave = { 
             ...formState, 
-            // Hardcoded author for now, should be replaced with real user data
             autor: "Compliance User" 
         };
 
@@ -150,16 +164,29 @@ export function ComplianceSection() {
             </CardContent>
         </Card>
 
-      {/* Add/Edit Dialog */}
       <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
         <DialogContent>
           <DialogHeader><DialogTitle>{selectedOcorrencia ? "Editar Ocorrência" : "Registrar Nova Ocorrência"}</DialogTitle></DialogHeader>
           <div className="grid gap-4 py-4">
               <div className="grid gap-2"><Label htmlFor="nomeIndividuo">Nome do Indivíduo</Label><Input id="nomeIndividuo" value={formState.nomeIndividuo} onChange={handleInputChange} /></div>
-              <div className="grid gap-2"><Label htmlFor="documentoIndividuo">Documento (CPF)</Label><Input id="documentoIndividuo" value={formState.documentoIndividuo} onChange={handleInputChange} /></div>
+               <div className="grid gap-2">
+                <Label htmlFor="documentoIndividuo">Documento (CPF)</Label>
+                <IMaskInput
+                  mask="000.000.000-00"
+                  id="documentoIndividuo"
+                  value={formState.documentoIndividuo}
+                  onAccept={(value) => handleMaskedInputChange('documentoIndividuo', value as string)}
+                  as={ForwardedInput}
+                  placeholder="___.___.___-__"
+                />
+              </div>
               <div className="grid gap-2"><Label htmlFor="dataOcorrencia">Data da Ocorrência</Label><Input id="dataOcorrencia" type="date" value={formState.dataOcorrencia} onChange={handleInputChange} /></div>
               <div className="grid gap-2"><Label htmlFor="motivo">Motivo</Label><Input id="motivo" value={formState.motivo} onChange={handleInputChange} /></div>
               <div className="grid gap-2"><Label htmlFor="descricao">Descrição Detalhada</Label><Textarea id="descricao" value={formState.descricao} onChange={handleInputChange} /></div>
+              <div className="flex items-center space-x-2 mt-2">
+                <Switch id="statusAlerta" checked={formState.statusAlerta === "Crítico"} onCheckedChange={handleSwitchChange} />
+                <Label htmlFor="statusAlerta" className="font-bold text-red-600">Marcar como Alerta Crítico</Label>
+              </div>
           </div>
           <DialogFooter>
             <DialogClose asChild><Button variant="outline">Cancelar</Button></DialogClose>
@@ -171,7 +198,6 @@ export function ComplianceSection() {
         </DialogContent>
       </Dialog>
 
-      {/* Delete Confirmation Dialog */}
       <Dialog open={isDeleteConfirmOpen} onOpenChange={setIsDeleteConfirmOpen}>
         <DialogContent>
           <DialogHeader>
@@ -187,7 +213,6 @@ export function ComplianceSection() {
         </DialogContent>
       </Dialog>
 
-      {/* Occurrences List */}
       <Card>
         <CardHeader><CardTitle>Histórico de Ocorrências</CardTitle></CardHeader>
         <CardContent>
@@ -208,8 +233,13 @@ export function ComplianceSection() {
                   <tr><td colSpan={6} className="py-8 text-center text-muted-foreground">Nenhuma ocorrência encontrada.</td></tr>
                 ) : (
                   filteredOcorrencias.map(o => (
-                    <tr key={o.id} className="hover:bg-muted/50">
-                      <td className="px-4 py-3 font-medium">{o.nomeIndividuo}</td>
+                    <tr key={o.id} className={`${o.statusAlerta === 'Crítico' ? 'bg-red-100/50 dark:bg-red-900/20' : 'hover:bg-muted/50'}`}>
+                      <td className="px-4 py-3 font-medium">
+                        <div className="flex items-center gap-2">
+                            {o.statusAlerta === 'Crítico' && <AlertTriangle className="h-4 w-4 text-red-500" />}
+                            {o.nomeIndividuo}
+                        </div>
+                      </td>
                       <td className="px-4 py-3">{o.documentoIndividuo}</td>
                       <td className="px-4 py-3">{formatDate(o.dataOcorrencia)}</td>
                       <td className="px-4 py-3">{o.motivo}</td>

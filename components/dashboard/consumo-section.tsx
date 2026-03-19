@@ -1,37 +1,23 @@
 'use client'
 
 import { useState, useEffect, forwardRef, useMemo } from "react"
-import { LogIn, LogOut, Plus, Search, Ship, Truck, Users, X, Loader2, FilePenLine, Trash2, MoreVertical, XCircle, ShieldCheck, ShieldAlert } from "lucide-react"
+import { LogIn, LogOut, Plus, Search, Ship, Truck, Users, X, Loader2, FilePenLine, Trash2, MoreVertical, XCircle, ShieldCheck, ShieldAlert, WifiOff } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogClose
-} from "@/components/ui/dialog"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogClose } from "@/components/ui/dialog"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Label } from "@/components/ui/label"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { type ConsumoBordo, type Individuo, type OcorrenciaCompliance } from "@/lib/store"
 import { useConsumos } from "@/hooks/use-firebase"
 import { useOcorrenciasCompliance } from "@/hooks/use-compliance"
+import { useOnlineStatus } from "@/hooks/use-online-status"
+import { addToOutbox } from "@/utils/db"
+import { v4 as uuidv4 } from 'uuid'
+import { toast } from "sonner"
 import { cn } from "@/lib/utils"
 import { IMaskInput } from 'react-imask';
 
@@ -79,6 +65,8 @@ const toIsoDate = (brDate: string = ''): string => {
 export function ConsumoSection() {
   const { data: consumos, loading, addItem, updateItem, deleteItem } = useConsumos()
   const { data: ocorrencias } = useOcorrenciasCompliance();
+  const isOnline = useOnlineStatus();
+
   const [search, setSearch] = useState("")
   const [dataInicio, setDataInicio] = useState("");
   const [dataFim, setDataFim] = useState("");
@@ -251,6 +239,10 @@ export function ConsumoSection() {
   }
 
   const handleEdit = (consumoId: string) => {
+    if (!isOnline) {
+        toast.error("A edição está desabilitada em modo offline.");
+        return;
+    }
     const consumoToEdit = consumos.find(c => c.id === consumoId)
     if (consumoToEdit) {
       setSelectedConsumo(consumoToEdit)
@@ -259,6 +251,10 @@ export function ConsumoSection() {
   }
 
   const handleDelete = (consumoId: string) => {
+    if (!isOnline) {
+        toast.error("A exclusão está desabilitada em modo offline.");
+        return;
+    }
     const consumoToDelete = consumos.find(c => c.id === consumoId)
     if (consumoToDelete) {
       setSelectedConsumo(consumoToDelete)
@@ -267,14 +263,16 @@ export function ConsumoSection() {
   }
 
   const handleConfirmDelete = async () => {
-    if (!selectedConsumo) return
+    if (!selectedConsumo || !isOnline) return
     setIsSaving(true)
     try {
       await deleteItem(selectedConsumo.id)
+      toast.success("Registro de consumo excluído com sucesso!");
       setIsDeleteConfirmOpen(false)
       setSelectedConsumo(null)
     } catch (error) {
       console.error("Erro ao excluir consumo:", error)
+      toast.error("Erro ao excluir registro de consumo.");
     } finally {
       setIsSaving(false)
     }
@@ -315,42 +313,78 @@ export function ConsumoSection() {
 
  const handleSave = async () => {
     if (!validateForm()) {
+      toast.warning("Por favor, verifique os erros no formulário.");
       return;
     }
 
     setIsSaving(true);
-    try {
-        const individuosToSave: Individuo[] = formState.individuos
-            .filter(ind => ind.nome.trim() !== "")
-            .map((ind): Individuo => {
-                const status: "presente" | "saiu" = (ind.horaSaida && ind.dataSaida) ? 'saiu' : 'presente';
-                const dataSaidaISO = toIsoDate(ind.dataSaida);
-                
-                if (status === "presente") {
-                    return {
-                        ...ind,
-                        status: "presente",
-                        horaSaida: "",
-                        dataSaida: ""
-                    };
-                } else {
-                    return {
-                        ...ind,
-                        status: "saiu",
-                        dataSaida: dataSaidaISO,
-                    };
-                }
-            });
 
-        if (individuosToSave.length === 0) {
+    const individuosToSave: Individuo[] = formState.individuos
+        .filter(ind => ind.nome.trim() !== "")
+        .map((ind): Individuo => {
+            const status: "presente" | "saiu" = (ind.horaSaida && ind.dataSaida) ? 'saiu' : 'presente';
+            const dataSaidaISO = toIsoDate(ind.dataSaida);
+            
+            if (status === "presente") {
+                return {
+                    ...ind,
+                    status: "presente",
+                    horaSaida: "",
+                    dataSaida: ""
+                };
+            } else {
+                return {
+                    ...ind,
+                    status: "saiu",
+                    dataSaida: dataSaidaISO,
+                };
+            }
+        });
+
+    if (individuosToSave.length === 0) {
+        toast.warning("É necessário registrar ao menos um indivíduo.");
+        setIsSaving(false);
+        return;
+    }
+
+    const dataToSave = { ...formState, individuos: individuosToSave, data: toIsoDate(formState.data) };
+
+    if (!isOnline) {
+        if (selectedConsumo) {
+            toast.error("Não é possível editar registros existentes offline.");
             setIsSaving(false);
             return;
         }
+        try {
+            const tempId = uuidv4();
+            const entry: Omit<ConsumoBordo, "id"> = {
+                ...dataToSave,
+                individuos: dataToSave.individuos.map(ind => ({
+                    ...ind,
+                    id: ind.id.startsWith('new-') ? `ind-${new Date().getTime()}-${Math.random().toString(36).substring(2, 9)}` : ind.id
+                })),
+            };
+            await addToOutbox({ id: tempId, tableName: 'consumos', data: entry });
 
-        const dataToSave = { ...formState, individuos: individuosToSave, data: toIsoDate(formState.data) };
+            if ('serviceWorker' in navigator && 'SyncManager' in window) {
+                navigator.serviceWorker.ready.then(sw => sw.sync.register('sync-new-items'));
+            }
 
+            toast.info("Registro salvo localmente. Será sincronizado quando a conexão for restaurada.");
+            setIsFormOpen(false);
+        } catch (error) {
+            console.error("Erro ao salvar consumo offline:", error);
+            toast.error("Falha ao salvar o registro localmente.");
+        } finally {
+            setIsSaving(false);
+        }
+        return;
+    }
+
+    try {
         if (selectedConsumo) {
             await updateItem(selectedConsumo.id, dataToSave);
+            toast.success("Registro de consumo atualizado com sucesso!");
         } else {
             const entry: Omit<ConsumoBordo, "id"> = {
                 ...dataToSave,
@@ -360,16 +394,22 @@ export function ConsumoSection() {
                 })),
             };
             await addItem(entry);
+            toast.success("Consumo registrado com sucesso!");
         }
         setIsFormOpen(false);
     } catch (error) {
         console.error("Erro ao salvar consumo:", error);
+        toast.error("Ocorreu um erro ao salvar o registro.");
     } finally {
         setIsSaving(false);
     }
   }
 
   const handleSaida = async (consumoId: string, individuoId: string) => {
+    if (!isOnline) {
+        toast.error("Funcionalidade desabilitada em modo offline.");
+        return;
+    }
     const consumo = consumos.find(c => c.id === consumoId)
     if (!consumo) return
 
@@ -382,8 +422,10 @@ export function ConsumoSection() {
 
     try {
       await updateItem(consumoId, { individuos: updatedIndividuos })
+      toast.success("Saída do indivíduo registrada com sucesso!");
     } catch (error) {
       console.error("Erro ao registrar saída do indivíduo:", error)
+      toast.error("Erro ao registrar a saída.")
     }
   }
 
@@ -398,6 +440,8 @@ export function ConsumoSection() {
     if(!data || !hora) return "-";
     return `${formatDate(data)} ${hora}`;
   }
+
+  const saveButtonDisabled = isSaving || (!isOnline && !!selectedConsumo);
 
   if (loading) {
     return <div className="flex items-center justify-center py-12"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
@@ -418,6 +462,7 @@ export function ConsumoSection() {
   };
 
   return (
+    <TooltipProvider>
     <div className="space-y-4 md:space-y-6">
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
         <Card><CardContent className="flex items-center gap-4 p-4"><div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10"><Truck className="h-6 w-6 text-primary" /></div><div><p className="text-2xl font-bold">{totalRegistros}</p><p className="text-sm text-muted-foreground">Total de Registros</p></div></CardContent></Card>
@@ -456,7 +501,12 @@ export function ConsumoSection() {
       {/* Add/Edit Dialog */}
       <Dialog open={isFormOpen} onOpenChange={(isOpen) => { if(!isOpen) { setFormState(initialFormState); setComplianceAlerts({}) }; setIsFormOpen(isOpen); }}>
         <DialogContent className="max-w-2xl w-full mx-4 sm:mx-auto">
-          <DialogHeader><DialogTitle>{selectedConsumo ? "Editar Registro" : "Registrar Consumo de Bordo"}</DialogTitle></DialogHeader>
+            <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                {selectedConsumo ? "Editar Registro" : "Registrar Consumo de Bordo"}
+                {!isOnline && <span className="inline-flex items-center gap-1.5 rounded-full bg-yellow-100 px-2 py-0.5 text-xs font-medium text-yellow-800"><WifiOff className="h-3 w-3"/>Offline</span>}
+                </DialogTitle>
+            </DialogHeader>
           <div className="max-h-[80vh] overflow-y-auto p-1">
             <div className="grid gap-4 py-4">
               <div className="rounded-lg border bg-secondary/30 p-4 space-y-3">
@@ -623,7 +673,17 @@ export function ConsumoSection() {
           </div>
            <DialogFooter>
                 <DialogClose asChild><Button variant="outline">Cancelar</Button></DialogClose>
-                <Button onClick={handleSave} disabled={isSaving}>{isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}{selectedConsumo ? "Salvar" : "Registrar"}</Button>
+                <Tooltip>
+                    <TooltipTrigger asChild>
+                         <div style={{ display: 'inline-block' }}> 
+                            <Button onClick={handleSave} disabled={saveButtonDisabled}>
+                                {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                {selectedConsumo ? "Salvar Alterações" : "Registrar"}
+                            </Button>
+                        </div>
+                    </TooltipTrigger>
+                    {saveButtonDisabled && !isOnline && selectedConsumo && <TooltipContent>A edição está desabilitada em modo offline.</TooltipContent>}
+                </Tooltip>
             </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -637,7 +697,7 @@ export function ConsumoSection() {
           </DialogHeader>
           <DialogFooter className="gap-2 sm:justify-end">
             <Button variant="outline" onClick={() => setIsDeleteConfirmOpen(false)} disabled={isSaving}>Cancelar</Button>
-            <Button variant="destructive" onClick={handleConfirmDelete} disabled={isSaving}>{isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}Excluir</Button>
+            <Button variant="destructive" onClick={handleConfirmDelete} disabled={isSaving || !isOnline}>{isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}Excluir</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -676,7 +736,7 @@ export function ConsumoSection() {
                                         </div>
                                          <div className="flex items-center justify-end gap-2 pt-2">
                                             {individuo.status === 'presente' ? (
-                                                <Button size="sm" variant="outline" onClick={() => handleSaida(consumo.id, individuo.id)}>Registrar Saída</Button>
+                                                <Button size="sm" variant="outline" onClick={() => handleSaida(consumo.id, individuo.id)} disabled={!isOnline}>Registrar Saída</Button>
                                             ) : (
                                                 <Button size="sm" variant="outline" onClick={() => handleReEntry(consumo, individuo)}>Nova Entrada</Button>
                                             )}
@@ -694,7 +754,7 @@ export function ConsumoSection() {
 
                             <div className="border-t pt-3 flex items-center justify-end">
                                  <DropdownMenu>
-                                    <DropdownMenuTrigger asChild><Button variant="ghost" size="icon"><MoreVertical className="h-4 w-4"/></Button></DropdownMenuTrigger>
+                                    <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" disabled={!isOnline}><MoreVertical className="h-4 w-4"/></Button></DropdownMenuTrigger>
                                     <DropdownMenuContent align="end">
                                         <DropdownMenuItem onClick={() => handleEdit(consumo.id)}>Editar Grupo</DropdownMenuItem>
                                         <DropdownMenuItem onClick={() => handleDelete(consumo.id)} className="text-destructive">Excluir Grupo</DropdownMenuItem>
@@ -746,7 +806,7 @@ export function ConsumoSection() {
                                     <td className="px-4 py-3 text-muted-foreground">{individuoIndex === 0 ? formatDateTime(consumo.data, consumo.hora) : ''}</td>
                                     <td className="px-4 py-3">
                                         {individuo.status === 'presente' ? (
-                                            <Button size="xs" variant="outline" onClick={() => handleSaida(consumo.id, individuo.id)}><LogOut className="mr-1 h-3 w-3" /> Sair</Button>
+                                            <Button size="xs" variant="outline" onClick={() => handleSaida(consumo.id, individuo.id)} disabled={!isOnline}><LogOut className="mr-1 h-3 w-3" /> Sair</Button>
                                         ) : individuo.horaSaida ? (
                                             <div className="flex items-center gap-2">
                                                 <span>{formatDateTime(individuo.dataSaida || consumo.data, individuo.horaSaida)}</span>
@@ -769,7 +829,7 @@ export function ConsumoSection() {
                                             <td rowSpan={consumo.individuos.length} className="px-4 py-3 align-top">{consumo.vigilante}</td>
                                             <td rowSpan={consumo.individuos.length} className="px-4 py-3 align-top text-right">
                                                 <DropdownMenu>
-                                                    <DropdownMenuTrigger asChild><Button variant="ghost" size="icon"><MoreVertical className="h-4 w-4"/></Button></DropdownMenuTrigger>
+                                                    <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" disabled={!isOnline}><MoreVertical className="h-4 w-4"/></Button></DropdownMenuTrigger>
                                                     <DropdownMenuContent align="end">
                                                         <DropdownMenuItem onClick={() => handleEdit(consumo.id)}>Editar Grupo</DropdownMenuItem>
                                                         <DropdownMenuItem onClick={() => handleDelete(consumo.id)} className="text-destructive">Excluir Grupo</DropdownMenuItem>
@@ -788,5 +848,6 @@ export function ConsumoSection() {
         </CardContent>
       </Card>
     </div>
+    </TooltipProvider>
   )
 }

@@ -1,30 +1,24 @@
 'use client'
 
 import { useState, useEffect, useMemo } from "react"
-import { LogIn, LogOut, Plus, Search, Shield, Users, Loader2, FilePenLine, Trash2, X, MoreVertical, XCircle } from "lucide-react"
+import { LogIn, LogOut, Plus, Search, Shield, Users, Loader2, FilePenLine, Trash2, X, MoreVertical, XCircle, WifiOff } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogClose
-} from "@/components/ui/dialog"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
+import { toast } from "sonner"
+import { v4 as uuidv4 } from 'uuid';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogClose } from "@/components/ui/dialog"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { type RefeicaoPolicial as RefeicaoPolicialType, type IndividuoRefeicao } from "@/lib/store"
 import { useRefeicoes } from "@/hooks/use-firebase"
+import { useOnlineStatus } from "@/hooks/use-online-status"
+import { addToOutbox } from "@/utils/db"
 import { cn } from "@/lib/utils"
+
+// ... (o resto do código permanece o mesmo até a função RefeicoesSection)
 
 const categoriaConfig = {
   pm: { label: "PM", icon: Shield, color: "text-blue-400", bg: "bg-blue-400/10" },
@@ -45,6 +39,7 @@ export type RefeicaoPolicial = RefeicaoPolicialType;
 
 export function RefeicoesSection() {
   const { data: rawRefeicoes, loading, addItem, updateItem, deleteItem } = useRefeicoes()
+  const isOnline = useOnlineStatus();
   
   const refeicoes = useMemo(() => {
     const transformed = (rawRefeicoes as Array<OldRefeicaoPolicial | RefeicaoPolicial>).map(r => {
@@ -175,24 +170,34 @@ export function RefeicoesSection() {
   }
 
   const handleEdit = (refeicao: RefeicaoPolicial) => {
+    if (!isOnline) {
+      toast.error("Funcionalidade desabilitada em modo offline.");
+      return;
+    }
     setSelectedRefeicao(refeicao)
     setIsFormOpen(true)
   }
 
   const handleDelete = (refeicao: RefeicaoPolicial) => {
+    if (!isOnline) {
+      toast.error("Funcionalidade desabilitada em modo offline.");
+      return;
+    }
     setSelectedRefeicao(refeicao)
     setIsDeleteConfirmOpen(true)
   }
 
   const handleConfirmDelete = async () => {
-    if (!selectedRefeicao) return
+    if (!selectedRefeicao || !isOnline) return
     setIsSaving(true)
     try {
       await deleteItem(selectedRefeicao.id)
+      toast.success("Registro excluído com sucesso!")
       setIsDeleteConfirmOpen(false)
       setSelectedRefeicao(null)
     } catch (error) {
       console.error("Erro ao excluir refeição:", error)
+      toast.error("Erro ao excluir o registro.")
     } finally {
       setIsSaving(false)
     }
@@ -200,36 +205,74 @@ export function RefeicoesSection() {
 
   const handleSave = async () => {
     setIsSaving(true);
-    try {
-        const individuosToSave: IndividuoRefeicao[] = formState.individuos
-            .filter(ind => ind.nome.trim() !== "")
-            .map((ind): IndividuoRefeicao => {
-                const status: "presente" | "saiu" = (ind.horaSaida && ind.dataSaida) ? 'saiu' : 'presente';
-                if (status === "presente") {
-                    return {
-                        ...ind,
-                        status: "presente",
-                        horaSaida: "",
-                        dataSaida: "",
-                    };
-                } else {
-                    return {
-                        ...ind,
-                        status: "saiu",
-                    };
-                }
-            });
 
-        if (individuosToSave.length === 0 || !formState.vigilante.trim()) {
+    const individuosToSave: IndividuoRefeicao[] = formState.individuos
+        .filter(ind => ind.nome.trim() !== "")
+        .map((ind): IndividuoRefeicao => {
+            const status: "presente" | "saiu" = (ind.horaSaida && ind.dataSaida) ? 'saiu' : 'presente';
+            if (status === "presente") {
+                return {
+                    ...ind,
+                    status: "presente",
+                    horaSaida: "",
+                    dataSaida: "",
+                };
+            } else {
+                return {
+                    ...ind,
+                    status: "saiu",
+                };
+            }
+        });
+
+    if (individuosToSave.length === 0 || !formState.vigilante.trim()) {
+        toast.warning("Preencha o nome do policial e do vigilante.")
+        setIsSaving(false);
+        return;
+    }
+
+    const dataToSave = { ...formState, individuos: individuosToSave };
+
+    if (!isOnline) {
+        if (selectedRefeicao) {
+            toast.error("Não é possível editar registros existentes enquanto estiver offline.");
             setIsSaving(false);
             return;
         }
 
-        const dataToSave = { ...formState, individuos: individuosToSave };
+        try {
+            const tempId = uuidv4();
+            const entry: Omit<RefeicaoPolicial, "id"> = {
+                ...dataToSave,
+                individuos: dataToSave.individuos.map(ind => ({
+                    ...ind,
+                    id: ind.id.startsWith('new-') ? `ind-${new Date().getTime()}-${Math.random().toString(36).substring(2, 9)}` : ind.id
+                })),
+            };
+            await addToOutbox({ id: tempId, tableName: 'refeicoes', data: entry });
+            
+            if ('serviceWorker' in navigator && 'SyncManager' in window) {
+                navigator.serviceWorker.ready.then(swRegistration => {
+                    return swRegistration.sync.register('sync-new-items');
+                });
+            }
 
+            toast.info("Você está offline. O registro foi salvo e será sincronizado automaticamente.");
+            setIsFormOpen(false);
+        } catch (error) {
+            console.error("Erro ao salvar offline:", error);
+            toast.error("Ocorreu um erro ao salvar o registro localmente.");
+        } finally {
+            setIsSaving(false);
+        }
+        return;
+    }
+
+    try {
         if (selectedRefeicao) {
             const { nome, status, horaSaida, dataSaida, ...restOfData } = dataToSave as any;
             await updateItem(selectedRefeicao.id, { ...restOfData, individuos: dataToSave.individuos });
+            toast.success("Refeição atualizada com sucesso!");
         } else {
             const entry: Omit<RefeicaoPolicial, "id"> = {
                 ...dataToSave,
@@ -239,16 +282,22 @@ export function RefeicoesSection() {
                 })),
             };
             await addItem(entry);
+            toast.success("Refeição registrada com sucesso!");
         }
         setIsFormOpen(false);
     } catch (error) {
         console.error("Erro ao salvar refeição:", error);
+        toast.error("Ocorreu um erro ao salvar a refeição.");
     } finally {
         setIsSaving(false);
     }
   }
   
   const handleSaida = async (refeicaoId: string, individuoId: string) => {
+    if (!isOnline) {
+      toast.error("Funcionalidade desabilitada em modo offline.");
+      return;
+    }
     const refeicao = refeicoes.find(r => r.id === refeicaoId);
     if (!refeicao || !refeicao.individuos) return;
 
@@ -261,8 +310,10 @@ export function RefeicoesSection() {
 
     try {
       await updateItem(refeicaoId, { individuos: updatedIndividuos });
+      toast.success("Saída registrada com sucesso!")
     } catch (error) {
       console.error("Erro ao registrar saída do indivíduo:", error);
+      toast.error("Erro ao registrar a saída.")
     }
   };
   
@@ -306,13 +357,17 @@ export function RefeicoesSection() {
     formState.data.trim() !== "" && 
     formState.hora.trim() !== "";
 
+    const saveButtonDisabled = isSaving || !isFormValid || (!isOnline && !!selectedRefeicao);
+
   if (loading) {
     return <div className="flex items-center justify-center py-12"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
   }
 
   return (
+    <TooltipProvider>
     <div className="space-y-4 md:space-y-6">
-      <div className="grid gap-4 sm:grid-cols-2">
+      {/* ... (código do header e stats inalterado) ... */}
+       <div className="grid gap-4 sm:grid-cols-2">
         {(["pm", "civil"] as const).map(cat => {
           const { label, icon: Icon, color, bg } = categoriaConfig[cat]
           const count = cat === "pm" ? totalPM : totalCivil
@@ -322,38 +377,44 @@ export function RefeicoesSection() {
         })}
       </div>
 
-        <Card>
-            <CardContent className="pt-6">
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 items-end">
-                    <div className="lg:col-span-1 grid gap-2">
-                        <Label htmlFor="search">Busca</Label>
-                        <div className="relative">
-                            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                            <Input id="search" placeholder="Buscar por nome, prefixo..." value={search} onChange={e => setSearch(e.target.value)} className="w-full pl-8" />
-                        </div>
-                    </div>
-                    <div className="grid gap-2">
-                        <Label htmlFor="dataInicio">Data Início</Label>
-                        <Input id="dataInicio" type="date" value={dataInicio} onChange={e => setDataInicio(e.target.value)} />
-                    </div>
-                    <div className="grid gap-2">
-                        <Label htmlFor="dataFim">Data Fim</Label>
-                        <Input id="dataFim" type="date" value={dataFim} onChange={e => setDataFim(e.target.value)} />
-                    </div>
-                    <div className="flex gap-2 md:col-span-3 lg:col-span-2">
-                         <Button variant="outline" onClick={() => { setDataInicio(""); setDataFim(""); }} className="w-1/2"><XCircle className="mr-2 h-4 w-4"/>Limpar</Button>
-                        <Button onClick={handleAddNew} className="w-1/2"><Plus className="mr-2 h-4 w-4" />Registrar Refeição</Button>
+      <Card>
+        <CardContent className="pt-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 items-end">
+                <div className="lg:col-span-1 grid gap-2">
+                    <Label htmlFor="search">Busca</Label>
+                    <div className="relative">
+                        <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                        <Input id="search" placeholder="Buscar por nome, prefixo..." value={search} onChange={e => setSearch(e.target.value)} className="w-full pl-8" />
                     </div>
                 </div>
-            </CardContent>
-        </Card>
+                <div className="grid gap-2">
+                    <Label htmlFor="dataInicio">Data Início</Label>
+                    <Input id="dataInicio" type="date" value={dataInicio} onChange={e => setDataInicio(e.target.value)} />
+                </div>
+                <div className="grid gap-2">
+                    <Label htmlFor="dataFim">Data Fim</Label>
+                    <Input id="dataFim" type="date" value={dataFim} onChange={e => setDataFim(e.target.value)} />
+                </div>
+                <div className="flex gap-2 md:col-span-3 lg:col-span-2">
+                      <Button variant="outline" onClick={() => { setDataInicio(""); setDataFim(""); }} className="w-1/2"><XCircle className="mr-2 h-4 w-4"/>Limpar</Button>
+                    <Button onClick={handleAddNew} className="w-1/2"><Plus className="mr-2 h-4 w-4" />Registrar Refeição</Button>
+                </div>
+            </div>
+        </CardContent>
+      </Card>
 
       <Dialog open={isFormOpen} onOpenChange={(isOpen) => { if(!isOpen) setFormState(initialFormState); setIsFormOpen(isOpen); }}>
         <DialogContent className="max-w-lg w-full mx-4 sm:mx-auto">
-          <DialogHeader><DialogTitle>{selectedRefeicao ? "Editar Refeição" : "Registrar Refeição"}</DialogTitle></DialogHeader>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">              
+              {selectedRefeicao ? "Editar Refeição" : "Registrar Refeição"}
+              {!isOnline && <span className="inline-flex items-center gap-1.5 rounded-full bg-yellow-100 px-2 py-0.5 text-xs font-medium text-yellow-800"><WifiOff className="h-3 w-3"/>Offline</span>}
+            </DialogTitle>
+          </DialogHeader>
            <div className="max-h-[80vh] overflow-y-auto p-1">
                 <div className="grid gap-5 py-4">
-                    <div className="rounded-lg border bg-secondary/30 p-4 space-y-3">
+                    {/* ... (conteúdo do formulário inalterado) ... */}
+                     <div className="rounded-lg border bg-secondary/30 p-4 space-y-3">
                         <div className="flex items-center justify-between">
                             <Label>Policiais</Label>
                             <Button type="button" variant="outline" size="sm" onClick={addIndividuo} disabled={!!selectedRefeicao}><Plus className="mr-1 h-3 w-3" />Adicionar</Button>
@@ -402,7 +463,18 @@ export function RefeicoesSection() {
            </div>
             <DialogFooter>
                 <DialogClose asChild><Button variant="outline">Cancelar</Button></DialogClose>
-                <Button onClick={handleSave} disabled={isSaving || !isFormValid}>{isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}{selectedRefeicao ? "Salvar Alterações" : "Registrar"}</Button>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div style={{ display: 'inline-block' }}>
+                      <Button onClick={handleSave} disabled={saveButtonDisabled}>
+                        {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                        {selectedRefeicao ? "Salvar Alterações" : "Registrar"}
+                      </Button>
+                    </div>
+                  </TooltipTrigger>
+                  {saveButtonDisabled && !isFormValid && <TooltipContent>Preencha todos os campos obrigatórios.</TooltipContent>}
+                  {saveButtonDisabled && !isOnline && selectedRefeicao && <TooltipContent>A edição está desabilitada em modo offline.</TooltipContent>}
+                </Tooltip>
             </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -412,7 +484,7 @@ export function RefeicoesSection() {
           <DialogHeader><DialogTitle>Confirmar Exclusão</DialogTitle><DialogDescription>Tem certeza de que deseja excluir este registro? Todos os policiais associados serão removidos. Esta ação não pode ser desfeita.</DialogDescription></DialogHeader>
           <DialogFooter className="gap-2 sm:justify-end">
             <Button variant="outline" onClick={() => setIsDeleteConfirmOpen(false)} disabled={isSaving}>Cancelar</Button>
-            <Button variant="destructive" onClick={handleConfirmDelete} disabled={isSaving}>{isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}Excluir</Button>
+            <Button variant="destructive" onClick={handleConfirmDelete} disabled={isSaving || !isOnline}>{isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}Excluir</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -420,6 +492,7 @@ export function RefeicoesSection() {
       <Card>
         <CardHeader><CardTitle>Histórico de Refeições</CardTitle></CardHeader>
         <CardContent>
+          {/* ... (tabela e layout de cartões inalterados) ... */}
            <div className="grid grid-cols-1 md:col-span-2 gap-4 lg:hidden">
                  {filteredRefeicoes.length === 0 ? (
                     <p className="py-8 text-center text-muted-foreground col-span-full">Nenhum registro encontrado para os filtros aplicados.</p>
@@ -445,7 +518,7 @@ export function RefeicoesSection() {
                                             <span className="text-muted-foreground">Saída: {individuo.horaSaida ? formatDateTime(individuo.dataSaida || refeicao.data, individuo.horaSaida) : '-'}</span>
                                              <div className="flex items-center justify-end gap-2">
                                                 {individuo.status === "presente" ? (
-                                                    <Button size="xs" variant="outline" onClick={() => handleSaida(refeicao.id, individuo.id)}>Sair</Button>
+                                                    <Button size="xs" variant="outline" onClick={() => handleSaida(refeicao.id, individuo.id)} disabled={!isOnline}>Sair</Button>
                                                 ) : (
                                                     <Button size="xs" variant="outline" onClick={() => handleReEntry(refeicao, individuo)}>Nova Entrada</Button>
                                                 )}
@@ -459,8 +532,8 @@ export function RefeicoesSection() {
                                 <DropdownMenu>
                                     <DropdownMenuTrigger asChild><Button variant="ghost" size="icon"><MoreVertical className="h-4 w-4"/></Button></DropdownMenuTrigger>
                                     <DropdownMenuContent align="end">
-                                        <DropdownMenuItem onClick={() => handleEdit(refeicao)}>Editar Grupo</DropdownMenuItem>
-                                        <DropdownMenuItem onClick={() => handleDelete(refeicao)} className="text-destructive">Excluir Grupo</DropdownMenuItem>
+                                        <DropdownMenuItem onClick={() => handleEdit(refeicao)} disabled={!isOnline}>Editar Grupo</DropdownMenuItem>
+                                        <DropdownMenuItem onClick={() => handleDelete(refeicao)} className="text-destructive" disabled={!isOnline}>Excluir Grupo</DropdownMenuItem>
                                     </DropdownMenuContent>
                                 </DropdownMenu>
                             </div>
@@ -494,7 +567,7 @@ export function RefeicoesSection() {
                                 <td className="px-4 py-3 tabular-nums text-muted-foreground">{formatDateTime(refeicao.data, refeicao.hora)}</td>
                                 <td className="px-4 py-3 tabular-nums text-muted-foreground">
                                     {individuo.status === 'presente' ? (
-                                        <Button size="xs" variant="outline" onClick={() => handleSaida(refeicao.id, individuo.id)}>Sair</Button>
+                                        <Button size="xs" variant="outline" onClick={() => handleSaida(refeicao.id, individuo.id)} disabled={!isOnline}>Sair</Button>
                                     ) : individuo.horaSaida ? (
                                         <div className="flex items-center gap-2">
                                         <span>{formatDateTime(individuo.dataSaida || refeicao.data, individuo.horaSaida)}</span>
@@ -508,7 +581,7 @@ export function RefeicoesSection() {
                                 <td className="px-4 py-3 text-right">
                                     <div className="flex items-center justify-end">
                                         <DropdownMenu>
-                                            <DropdownMenuTrigger asChild><Button variant="ghost" size="icon"><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger>
+                                            <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" disabled={!isOnline}><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger>
                                             <DropdownMenuContent align="end">
                                             <DropdownMenuItem onClick={() => handleEdit(refeicao)}><FilePenLine className="mr-2 h-4 w-4" />Editar Grupo</DropdownMenuItem>
                                             <DropdownMenuItem onClick={() => handleDelete(refeicao)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4" />Excluir Grupo</DropdownMenuItem>
@@ -526,5 +599,6 @@ export function RefeicoesSection() {
         </CardContent>
       </Card>
     </div>
+    </TooltipProvider>
   )
 }

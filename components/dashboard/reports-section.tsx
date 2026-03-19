@@ -1,12 +1,12 @@
 'use client'
 
 import { useState } from 'react'
-import { Download } from 'lucide-react'
+import { Download, Ship } from 'lucide-react'
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { useTPAs, useConsumos, useVisitantes, useRefeicoes } from "@/hooks/use-firebase"
+import { useTPAs, useConsumos, useVisitantes, useRefeicoes, useHistoricoNavios } from "@/hooks/use-firebase"
 import * as XLSX from 'xlsx'
 
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
@@ -16,12 +16,13 @@ export function ReportsSection() {
   const { data: consumos, loading: consumosLoading } = useConsumos();
   const { data: visitantes, loading: visitantesLoading } = useVisitantes();
   const { data: refeicoes, loading: refeicoesLoading } = useRefeicoes();
+  const { data: historicoNavios, loading: naviosLoading } = useHistoricoNavios();
 
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [isExporting, setIsExporting] = useState<string | null>(null);
 
-  const filterByDate = (data: any[]) => {
+  const filterByDate = (data: any[], dateField: string) => {
     if (!startDate || !endDate) return data;
     
     const start = new Date(startDate);
@@ -31,7 +32,7 @@ export function ReportsSection() {
     end.setUTCHours(23, 59, 59, 999);
 
     return data.filter(item => {
-      const itemDateStr = item.data || item.dataEntrada;
+      const itemDateStr = item[dateField];
       if (!itemDateStr) return false;
       
       const itemDate = new Date(`${itemDateStr}T00:00:00Z`);
@@ -45,10 +46,11 @@ export function ReportsSection() {
     await sleep(1000); 
 
     const dataMap: { [key: string]: any[] } = {
-      TPAs: filterByDate(tpas),
-      Consumos: filterByDate(consumos),
-      Visitantes: filterByDate(visitantes),
-      Refeicoes: filterByDate(refeicoes),
+      TPAs: filterByDate(tpas, 'data'),
+      Consumos: filterByDate(consumos, 'data'),
+      Visitantes: filterByDate(visitantes, 'dataEntrada'),
+      Refeicoes: filterByDate(refeicoes, 'data'),
+      Navios: filterByDate(historicoNavios, 'dataAtracacao'),
     };
 
     const wb = XLSX.utils.book_new();
@@ -56,18 +58,30 @@ export function ReportsSection() {
       ? `${section}_${startDate}_a_${endDate}.xlsx`
       : `${section}_completo.xlsx`;
 
+    const exportData = (data: any[], sheetName: string) => {
+        if(data && data.length > 0) {
+            let ws;
+            if (sheetName === 'Navios') {
+                const formattedData = data.map(navio => ({
+                    'Píer': navio.pier?.toUpperCase(),
+                    'Nome do Navio': navio.nome,
+                    'Atracação': `${navio.dataAtracacao || ''} ${navio.horaAtracacao || ''}`.trim(),
+                    'Desatracação': `${navio.dataDesatracacao || ''} ${navio.horaDesatracacao || ''}`.trim(),
+                }));
+                ws = XLSX.utils.json_to_sheet(formattedData);
+            } else {
+                ws = XLSX.utils.json_to_sheet(data);
+            }
+            XLSX.utils.book_append_sheet(wb, ws, sheetName);
+        }
+    }
+
     if (section === 'geral') {
       Object.keys(dataMap).forEach(key => {
-        if (dataMap[key] && dataMap[key].length > 0) {
-          const ws = XLSX.utils.json_to_sheet(dataMap[key]);
-          XLSX.utils.book_append_sheet(wb, ws, key);
-        }
+        exportData(dataMap[key], key);
       });
     } else if (dataMap[section]) {
-      if (dataMap[section].length > 0) {
-        const ws = XLSX.utils.json_to_sheet(dataMap[section]);
-        XLSX.utils.book_append_sheet(wb, ws, section);
-      }
+        exportData(dataMap[section], section);
     }
 
     if (wb.SheetNames.length > 0) {
@@ -79,7 +93,7 @@ export function ReportsSection() {
     setIsExporting(null);
   };
   
-  const isLoading = tpasLoading || consumosLoading || visitantesLoading || refeicoesLoading;
+  const isLoading = tpasLoading || consumosLoading || visitantesLoading || refeicoesLoading || naviosLoading;
 
   const reportCards = [
     { id: 'geral', title: 'Consolidado Geral' },
@@ -87,6 +101,7 @@ export function ReportsSection() {
     { id: 'Consumos', title: 'Relatórios de Consumo' },
     { id: 'Visitantes', title: 'Relatórios de Visitantes' },
     { id: 'Refeicoes', title: 'Relatórios de Refeições' },
+    { id: 'Navios', title: 'Histórico de Navios', icon: Ship },
   ];
 
   return (
@@ -111,7 +126,10 @@ export function ReportsSection() {
             {reportCards.map(report => (
             <Card key={report.id}>
                 <CardContent className="p-6 flex items-center justify-between">
-                    <h3 className="font-medium">{report.title}</h3>
+                    <div className="flex items-center gap-3">
+                        {report.icon && <report.icon className="h-5 w-5 text-muted-foreground"/>}
+                        <h3 className="font-medium">{report.title}</h3>
+                    </div>
                     <Button 
                         onClick={() => handleExport(report.id)} 
                         size="sm" 
