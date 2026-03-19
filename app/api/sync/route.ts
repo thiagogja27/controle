@@ -2,7 +2,7 @@
 
 import { NextResponse } from 'next/server'
 import { getFirestore, collection, addDoc, serverTimestamp } from "firebase/firestore";
-import { app } from "@/lib/firebase-config";
+import { app } from "@/lib/firebase";
 
 const db = getFirestore(app);
 
