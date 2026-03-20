@@ -13,9 +13,17 @@ const firebaseConfig = {
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
 };
 
-// Initialize Firebase
-const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
-const auth = getAuth(app);
-const db = getDatabase(app);
+// Initialize Firebase only if we have an API Key (prevents build errors)
+let app;
+try {
+    if (firebaseConfig.apiKey) {
+        app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
+    }
+} catch (error) {
+    console.error("Firebase initialization error:", error);
+}
+
+const auth = app ? getAuth(app) : null;
+const db = app ? getDatabase(app) : ({} as any); // Fallback to avoid crashes in type-checks or early evaluation
 
 export { app, auth, db };
