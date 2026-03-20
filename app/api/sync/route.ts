@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server'
 import { ref, push, set, update, serverTimestamp } from "firebase/database";
 import { db } from "@/lib/firebase";
 
+export const dynamic = 'force-dynamic';
+
 export async function POST(request: Request) {
   try {
     const { data, tableName, action = 'create', originalId } = await request.json();
