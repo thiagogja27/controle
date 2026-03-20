@@ -4,6 +4,8 @@ interface OutboxRecord {
   id: string;
   data: any;
   tableName: string;
+  action: 'create' | 'update';
+  originalId?: string;
 }
 
 interface MyDB extends DBSchema {

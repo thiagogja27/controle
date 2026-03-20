@@ -693,21 +693,42 @@ export function VisitantesSection() {
     }
   };
 
-  const handleRegistrarSaida = async (id: string) => {
-    if (!isOnline) {
-        toast.error("Funcionalidade desabilitada em modo offline.");
-        return;
-    }
+  const handleRegistrarSaida = async (visitanteId: string) => {
+    const now = new Date();
+    const saidaData = {
+      status: "saiu" as const,
+      dataSaida: now.toISOString().split("T")[0],
+      horaSaida: now.toTimeString().slice(0, 5),
+    };
+
     try {
-      const now = new Date();
-      await updateItem(id, {
-        status: "saiu",
-        dataSaida: now.toISOString().split("T")[0],
-        horaSaida: now.toTimeString().slice(0, 5),
-      })
+      if (!isOnline) {
+        // Optimistic update for local UI
+        const updatedVisitantes = visitantes.map(v => 
+          v.id === visitanteId ? { ...v, ...saidaData } : v
+        );
+        // Note: This won't persist across refresh unless we update localStorage too, 
+        // but it gives immediate feedback.
+        
+        await addToOutbox({ 
+          id: uuidv4(), 
+          tableName: 'visitantes', 
+          action: 'update',
+          originalId: visitanteId,
+          data: saidaData 
+        });
+
+        if ('serviceWorker' in navigator && 'SyncManager' in window) {
+            navigator.serviceWorker.ready.then(sw => sw.sync.register('sync-new-items'));
+        }
+        toast.info("Saída registrada localmente. Será sincronizada quando a conexão for restaurada.");
+        return;
+      }
+
+      await updateItem(visitanteId, saidaData);
       toast.success("Saída registrada com sucesso!");
     } catch (error) {
-      console.error("Erro ao registrar saída:", error)
+      console.error("Erro ao registrar saída:", error);
       toast.error("Erro ao registrar a saída.");
     }
   }
@@ -1030,12 +1051,12 @@ export function VisitantesSection() {
                              {v.observacoes && <div className="border-t pt-3 text-sm flex-grow"><p className="text-muted-foreground">Observações</p><p>{v.observacoes}</p></div>}
                              <div className="border-t pt-3 flex items-center justify-end gap-2">
                                 {v.status === "presente" ? (
-                                    <Button size="sm" variant="outline" onClick={() => handleRegistrarSaida(v.id)} disabled={!isOnline}>Sair</Button>
+                                    <Button size="sm" variant="outline" onClick={() => handleRegistrarSaida(v.id)}>Sair</Button>
                                 ) : (
                                     <Button size="sm" variant="outline" onClick={() => handleReEntry(v)}>Nova Entrada</Button>
                                 )}
                                  <DropdownMenu>
-                                    <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" disabled={!isOnline}><MoreVertical className="h-4 w-4"/></Button></DropdownMenuTrigger>
+                                    <DropdownMenuTrigger asChild><Button variant="ghost" size="icon"><MoreVertical className="h-4 w-4"/></Button></DropdownMenuTrigger>
                                     <DropdownMenuContent align="end">
                                         <DropdownMenuItem onClick={() => handleEdit(v)}>Editar</DropdownMenuItem>
                                         <DropdownMenuItem onClick={() => handleDelete(v)} className="text-destructive">Excluir</DropdownMenuItem>
@@ -1094,7 +1115,7 @@ export function VisitantesSection() {
                       <td className="px-4 py-3">
                         <div className="flex items-center justify-end gap-2">
                           {v.status === "presente" ? (
-                            <Button size="sm" variant="outline" onClick={() => handleRegistrarSaida(v.id)} disabled={!isOnline} className="flex items-center gap-2"><Clock className="h-4 w-4" /><span>Sair</span></Button>
+                            <Button size="sm" variant="outline" onClick={() => handleRegistrarSaida(v.id)} className="flex items-center gap-2"><Clock className="h-4 w-4" /><span>Sair</span></Button>
                           ) : (
                             <Button size="sm" variant="outline" onClick={() => handleReEntry(v)} className="flex items-center gap-2"><LogIn className="h-4 w-4" /><span>Nova Entrada</span></Button>
                           )}
