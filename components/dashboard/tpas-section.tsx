@@ -311,7 +311,12 @@ export function TPAsSection() {
         }
         try {
             const tempId = uuidv4();
-            await addToOutbox({ id: tempId, tableName: 'tpas', data: dataToSave });
+            await addToOutbox({ 
+                id: tempId, 
+                tableName: 'tpas', 
+                data: dataToSave,
+                action: 'create'
+            });
 
             if ('serviceWorker' in navigator && 'SyncManager' in window) {
                 navigator.serviceWorker.ready.then(sw => sw.sync.register('sync-new-items'));
@@ -346,21 +351,35 @@ export function TPAsSection() {
   }
 
   const handleSaida = async (id: string) => {
-    if (!isOnline) {
-        toast.error("Funcionalidade desabilitada em modo offline.");
-        return;
-    }
+    const now = new Date();
+    const saidaData = {
+      status: "saiu" as const,
+      dataSaida: now.toISOString().split("T")[0],
+      horaSaida: now.toTimeString().slice(0, 5),
+    };
+
     try {
-      const now = new Date();
-      await updateItem(id, {
-        status: "saiu",
-        dataSaida: now.toISOString().split("T")[0],
-        horaSaida: now.toTimeString().slice(0, 5),
-      })
+      if (!isOnline) {
+        await addToOutbox({ 
+          id: uuidv4(), 
+          tableName: 'tpas', 
+          action: 'update',
+          originalId: id,
+          data: saidaData 
+        });
+
+        if ('serviceWorker' in navigator && 'SyncManager' in window) {
+            navigator.serviceWorker.ready.then(sw => sw.sync.register('sync-new-items'));
+        }
+        toast.info("Saída registrada localmente. Será sincronizada quando a conexão for restaurada.");
+        return;
+      }
+
+      await updateItem(id, saidaData);
       toast.success("Saída registrada com sucesso!");
     } catch (error) {
-      console.error("Erro ao registrar saída:", error)
-      toast.error("Erro ao registrar a saída.")
+      console.error("Erro ao registrar saída:", error);
+      toast.error("Erro ao registrar a saída.");
     }
   }
 
@@ -635,7 +654,7 @@ export function TPAsSection() {
                             </div>
                              <div className="border-t pt-3 flex items-center justify-end gap-2">
                                 {r.status === "presente" ? (
-                                    <Button size="sm" variant="outline" onClick={() => handleSaida(r.id)} disabled={!isOnline}>Registrar Saída</Button>
+                                    <Button size="sm" variant="outline" onClick={() => handleSaida(r.id)}>Registrar Saída</Button>
                                 ) : (
                                     <Button size="sm" variant="outline" onClick={() => handleReEntry(r)}>Nova Entrada</Button>
                                 )}
@@ -694,7 +713,7 @@ export function TPAsSection() {
                                     <td className="px-4 py-3">
                                         <div className="flex items-center justify-end gap-2">
                                             {r.status === "presente" ? (
-                                                <Button size="sm" variant="outline" onClick={() => handleSaida(r.id)} disabled={!isOnline}><LogOut className="mr-2 h-3 w-3" />Registrar Saída</Button>
+                                                <Button size="sm" variant="outline" onClick={() => handleSaida(r.id)}><LogOut className="mr-2 h-3 w-3" />Registrar Saída</Button>
                                             ) : (
                                                 <Button size="sm" variant="outline" onClick={() => handleReEntry(r)}><LogIn className="mr-2 h-3 w-3" />Nova Entrada</Button>
                                             )}

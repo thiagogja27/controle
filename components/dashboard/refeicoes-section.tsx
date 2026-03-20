@@ -249,7 +249,12 @@ export function RefeicoesSection() {
                     id: ind.id.startsWith('new-') ? `ind-${new Date().getTime()}-${Math.random().toString(36).substring(2, 9)}` : ind.id
                 })),
             };
-            await addToOutbox({ id: tempId, tableName: 'refeicoes', data: entry });
+            await addToOutbox({ 
+                id: tempId, 
+                tableName: 'refeicoes', 
+                data: entry,
+                action: 'create'
+            });
             
             if ('serviceWorker' in navigator && 'SyncManager' in window) {
                 navigator.serviceWorker.ready.then(swRegistration => {
@@ -294,21 +299,41 @@ export function RefeicoesSection() {
   }
   
   const handleSaida = async (refeicaoId: string, individuoId: string) => {
-    if (!isOnline) {
-      toast.error("Funcionalidade desabilitada em modo offline.");
-      return;
-    }
+    const now = new Date();
+    const saidaData = { 
+        status: "saiu" as const, 
+        dataSaida: now.toISOString().split("T")[0], 
+        horaSaida: now.toTimeString().slice(0, 5) 
+    };
+
     const refeicao = refeicoes.find(r => r.id === refeicaoId);
     if (!refeicao || !refeicao.individuos) return;
 
-    const now = new Date();
-    const updatedIndividuos = refeicao.individuos.map(ind =>
-      ind.id === individuoId
-        ? { ...ind, status: "saiu" as const, dataSaida: now.toISOString().split("T")[0], horaSaida: now.toTimeString().slice(0, 5) }
-        : ind
-    );
-
     try {
+      if (!isOnline) {
+        // Find existing individuals and update the specific one
+        const updatedIndividuos = refeicao.individuos.map(ind =>
+          ind.id === individuoId ? { ...ind, ...saidaData } : ind
+        );
+
+        await addToOutbox({ 
+          id: uuidv4(), 
+          tableName: 'refeicoes', 
+          action: 'update',
+          originalId: refeicaoId,
+          data: { individuos: updatedIndividuos } 
+        });
+
+        if ('serviceWorker' in navigator && 'SyncManager' in window) {
+            navigator.serviceWorker.ready.then(sw => sw.sync.register('sync-new-items'));
+        }
+        toast.info("Saída registrada localmente. Será sincronizada quando a conexão for restaurada.");
+        return;
+      }
+
+      const updatedIndividuos = refeicao.individuos.map(ind =>
+        ind.id === individuoId ? { ...ind, ...saidaData } : ind
+      );
       await updateItem(refeicaoId, { individuos: updatedIndividuos });
       toast.success("Saída registrada com sucesso!")
     } catch (error) {
@@ -514,15 +539,12 @@ export function RefeicoesSection() {
                                             <p>{individuo.nome}</p>
                                             <span className={cn("inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold", individuo.status === "presente" ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-800")}>{individuo.status === "presente" ? "Presente" : "Saiu"}</span>
                                         </div>
-                                        <div className="flex items-center justify-between text-sm mt-2">
-                                            <span className="text-muted-foreground">Saída: {individuo.horaSaida ? formatDateTime(individuo.dataSaida || refeicao.data, individuo.horaSaida) : '-'}</span>
-                                             <div className="flex items-center justify-end gap-2">
-                                                {individuo.status === "presente" ? (
-                                                    <Button size="sm" variant="outline" onClick={() => handleSaida(refeicao.id, individuo.id)} disabled={!isOnline}>Sair</Button>
-                                                ) : (
-                                                    <Button size="sm" variant="outline" onClick={() => handleReEntry(refeicao, individuo)}>Nova Entrada</Button>
-                                                )}
-                                            </div>
+                                        <div className="flex items-center justify-end gap-2">
+                                            {individuo.status === "presente" ? (
+                                                <Button size="sm" variant="outline" onClick={() => handleSaida(refeicao.id, individuo.id)}>Sair</Button>
+                                            ) : (
+                                                <Button size="sm" variant="outline" onClick={() => handleReEntry(refeicao, individuo)}>Nova Entrada</Button>
+                                            )}
                                         </div>
                                     </div>
                                 ))}
@@ -567,7 +589,7 @@ export function RefeicoesSection() {
                                 <td className="px-4 py-3 tabular-nums text-muted-foreground">{formatDateTime(refeicao.data, refeicao.hora)}</td>
                                 <td className="px-4 py-3 tabular-nums text-muted-foreground">
                                     {individuo.status === 'presente' ? (
-                                        <Button size="sm" variant="outline" onClick={() => handleSaida(refeicao.id, individuo.id)} disabled={!isOnline}>Sair</Button>
+                                        <Button size="sm" variant="outline" onClick={() => handleSaida(refeicao.id, individuo.id)}>Sair</Button>
                                     ) : individuo.horaSaida ? (
                                         <div className="flex items-center gap-2">
                                         <span>{formatDateTime(individuo.dataSaida || refeicao.data, individuo.horaSaida)}</span>

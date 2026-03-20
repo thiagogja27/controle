@@ -666,7 +666,12 @@ export function VisitantesSection() {
 
             if (!isOnline) {
                 const tempId = uuidv4();
-                return addToOutbox({ id: tempId, tableName: 'visitantes', data: visitorData });
+                return addToOutbox({ 
+                  id: tempId, 
+                  tableName: 'visitantes', 
+                  data: visitorData,
+                  action: 'create'
+                });
             }
             return addItem(visitorData);
         });

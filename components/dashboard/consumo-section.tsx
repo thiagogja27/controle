@@ -364,7 +364,12 @@ export function ConsumoSection() {
                     id: ind.id.startsWith('new-') ? `ind-${new Date().getTime()}-${Math.random().toString(36).substring(2, 9)}` : ind.id
                 })),
             };
-            await addToOutbox({ id: tempId, tableName: 'consumos', data: entry });
+            await addToOutbox({ 
+                id: tempId, 
+                tableName: 'consumos', 
+                data: entry,
+                action: 'create'
+            });
 
             if ('serviceWorker' in navigator && 'SyncManager' in window) {
                 navigator.serviceWorker.ready.then(sw => sw.sync.register('sync-new-items'));
@@ -406,25 +411,45 @@ export function ConsumoSection() {
   }
 
   const handleSaida = async (consumoId: string, individuoId: string) => {
-    if (!isOnline) {
-        toast.error("Funcionalidade desabilitada em modo offline.");
-        return;
-    }
-    const consumo = consumos.find(c => c.id === consumoId)
-    if (!consumo) return
+    const now = new Date();
+    const saidaData = { 
+        status: "saiu" as const, 
+        dataSaida: now.toISOString().split('T')[0], 
+        horaSaida: now.toTimeString().slice(0, 5) 
+    };
 
-    const now = new Date()
-    const updatedIndividuos = consumo.individuos.map((ind): Individuo =>
-      ind.id === individuoId
-        ? { ...ind, status: "saiu", dataSaida: now.toISOString().split('T')[0], horaSaida: now.toTimeString().slice(0, 5) }
-        : ind
-    )
+    const consumo = consumos.find(c => c.id === consumoId);
+    if (!consumo) return;
 
     try {
-      await updateItem(consumoId, { individuos: updatedIndividuos })
+      if (!isOnline) {
+        // Find existing individuals and update the specific one
+        const updatedIndividuos = consumo.individuos.map(ind =>
+          ind.id === individuoId ? { ...ind, ...saidaData } : ind
+        );
+
+        await addToOutbox({ 
+          id: uuidv4(), 
+          tableName: 'consumos', 
+          action: 'update',
+          originalId: consumoId,
+          data: { individuos: updatedIndividuos } 
+        });
+
+        if ('serviceWorker' in navigator && 'SyncManager' in window) {
+            navigator.serviceWorker.ready.then(sw => sw.sync.register('sync-new-items'));
+        }
+        toast.info("Saída registrada localmente. Será sincronizada quando a conexão for restaurada.");
+        return;
+      }
+
+      const updatedIndividuos = consumo.individuos.map((ind): Individuo =>
+        ind.id === individuoId ? { ...ind, ...saidaData } : ind
+      );
+      await updateItem(consumoId, { individuos: updatedIndividuos });
       toast.success("Saída do indivíduo registrada com sucesso!");
     } catch (error) {
-      console.error("Erro ao registrar saída do indivíduo:", error)
+      console.error("Erro ao registrar saída do indivíduo:", error);
       toast.error("Erro ao registrar a saída.")
     }
   }
@@ -736,7 +761,7 @@ export function ConsumoSection() {
                                         </div>
                                          <div className="flex items-center justify-end gap-2 pt-2">
                                             {individuo.status === 'presente' ? (
-                                                <Button size="sm" variant="outline" onClick={() => handleSaida(consumo.id, individuo.id)} disabled={!isOnline}>Registrar Saída</Button>
+                                                <Button size="sm" variant="outline" onClick={() => handleSaida(consumo.id, individuo.id)}>Registrar Saída</Button>
                                             ) : (
                                                 <Button size="sm" variant="outline" onClick={() => handleReEntry(consumo, individuo)}>Nova Entrada</Button>
                                             )}
@@ -806,7 +831,7 @@ export function ConsumoSection() {
                                     <td className="px-4 py-3 text-muted-foreground">{individuoIndex === 0 ? formatDateTime(consumo.data, consumo.hora) : ''}</td>
                                     <td className="px-4 py-3">
                                         {individuo.status === 'presente' ? (
-                                            <Button size="sm" variant="outline" onClick={() => handleSaida(consumo.id, individuo.id)} disabled={!isOnline}><LogOut className="mr-1 h-3 w-3" /> Sair</Button>
+                                            <Button size="sm" variant="outline" onClick={() => handleSaida(consumo.id, individuo.id)}><LogOut className="mr-1 h-3 w-3" /> Sair</Button>
                                         ) : individuo.horaSaida ? (
                                             <div className="flex items-center gap-2">
                                                 <span>{formatDateTime(individuo.dataSaida || consumo.data, individuo.horaSaida)}</span>
