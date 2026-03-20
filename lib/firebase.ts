@@ -1,7 +1,6 @@
-
 import { initializeApp, getApps, getApp } from "firebase/app";
-import { getAuth } from "firebase/auth";
-import { getDatabase } from "firebase/database";
+import { Auth, getAuth } from "firebase/auth";
+import { Database, getDatabase } from "firebase/database";
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -23,7 +22,7 @@ try {
     console.error("Firebase initialization error:", error);
 }
 
-const auth = app ? getAuth(app) : null;
-const db = app ? getDatabase(app) : ({} as any); // Fallback to avoid crashes in type-checks or early evaluation
+const auth = (app ? getAuth(app) : null) as Auth;
+const db = (app ? getDatabase(app) : {}) as Database;
 
 export { app, auth, db };
