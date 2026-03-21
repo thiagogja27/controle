@@ -376,7 +376,7 @@ export function MapaTerminalSection() {
                           azul: 'text-blue-500 dark:text-blue-400',
                           vermelho: 'text-red-500 dark:text-red-400',
                           verde: 'text-green-500 dark:text-green-400',
-                        } as Record<string, string>)[pessoa.credencial] || 'text-muted-foreground';
+                        } as Record<string, string>)[pessoa.credencial?.toLowerCase() ?? ''] || 'text-muted-foreground';
 
                         return (
                           <li key={i} className="text-sm border-b border-dashed pb-2 last:border-b-0 last:pb-0">
