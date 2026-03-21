@@ -23,12 +23,17 @@ const dbPromise = openDB<MyDB>('my-app-db', 1, {
 
 export async function addToOutbox(record: OutboxRecord) {
   const db = await dbPromise;
-  await db.add('outbox', record);
+  await db.put('outbox', record);
 }
 
 export async function getOutbox() {
   const db = await dbPromise;
   return db.getAll('outbox');
+}
+
+export async function deleteFromOutbox(id: string) {
+  const db = await dbPromise;
+  await db.delete('outbox', id);
 }
 
 export async function clearOutbox() {
