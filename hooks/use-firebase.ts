@@ -38,10 +38,10 @@ function useFirebaseCollection<T extends { id: string }>(collectionPath: string)
             
             setData(prev => {
                 // Filtra itens que NÃO são do outbox (ou seja, vieram do Firebase/Cache)
-                const nonOfflineItems = prev.filter(item => !(item as any).isOffline);
+                const nonOfflineItems = prev.filter((item: any) => !item.isOffline);
                 // Evita duplicatas se já houver algo no cache com o mesmo ID
-                const existingIds = new Set(nonOfflineItems.map(item => item.id));
-                const newOfflineItems = relevantOutbox.filter(item => !existingIds.has(item.id));
+                const existingIds = new Set(nonOfflineItems.map((item: any) => item.id));
+                const newOfflineItems = relevantOutbox.filter((item: any) => !existingIds.has(item.id));
                 return [...newOfflineItems, ...nonOfflineItems];
             });
         } catch (e) {
