@@ -1,5 +1,9 @@
 import { openDB, DBSchema } from 'idb';
 
+// This code runs in the browser AND the service worker.
+// We need to dispatch an event ONLY in the browser context.
+const isBrowser = typeof window !== 'undefined' && typeof window.document !== 'undefined';
+
 interface OutboxRecord {
   id: string;
   data: any;
@@ -37,7 +41,7 @@ export async function addToOutbox(record: OutboxRecord) {
   if (!db) return;
   await db.put('outbox', record);
   // Dispatch custom event to notify hooks/components (Browser only)
-  if (typeof window !== 'undefined' && 'dispatchEvent' in window) {
+  if (isBrowser) {
     window.dispatchEvent(new CustomEvent('outbox-updated'));
   }
 }
@@ -52,7 +56,7 @@ export async function deleteFromOutbox(id: string) {
   const db = await getDB();
   if (!db) return;
   await db.delete('outbox', id);
-  if (typeof window !== 'undefined' && 'dispatchEvent' in window) {
+  if (isBrowser) {
     window.dispatchEvent(new CustomEvent('outbox-updated'));
   }
 }
