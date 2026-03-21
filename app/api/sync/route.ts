@@ -1,15 +1,12 @@
-import { NextResponse } from 'next/server'
-import { ref, push, set, update, serverTimestamp } from "firebase/database";
-import { db } from "@/lib/firebase";
+'''
+import { NextResponse } from 'next/server';
+import { adminDb } from '@/lib/firebase-admin';
+import { firestore } from 'firebase-admin';
 
 export const dynamic = 'force-dynamic';
 
 export async function POST(request: Request) {
   try {
-    if (!db) {
-      console.warn("Database not initialized properly.");
-      return NextResponse.json({ success: false, message: 'Banco de dados não disponível.' }, { status: 503 });
-    }
     const { data, tableName, action = 'create', originalId } = await request.json();
 
     if (!data || !tableName) {
@@ -17,24 +14,23 @@ export async function POST(request: Request) {
     }
 
     if (action === 'update' && originalId) {
-      const itemRef = ref(db, `${tableName}/${originalId}`);
-      await update(itemRef, {
+      // Use Firestore from firebase-admin for update
+      const itemRef = adminDb.collection(tableName).doc(originalId);
+      await itemRef.update({
         ...data,
-        timestamp_update: serverTimestamp(),
+        timestamp_update: firestore.FieldValue.serverTimestamp(),
       });
-      console.log(`Documento ${originalId} atualizado no Realtime Database.`);
+      console.log(`Documento ${originalId} atualizado no Firestore.`);
       return NextResponse.json({ success: true, id: originalId });
     } else {
-      const collectionRef = ref(db, tableName);
-      const newRef = push(collectionRef);
-      
-      await set(newRef, {
+      // Use Firestore from firebase-admin for create
+      const collectionRef = adminDb.collection(tableName);
+      const newDoc = await collectionRef.add({
         ...data,
-        timestamp_server: serverTimestamp(),
+        timestamp_server: firestore.FieldValue.serverTimestamp(),
       });
-      
-      console.log("Documento criado no Realtime Database com ID: ", newRef.key);
-      return NextResponse.json({ success: true, id: newRef.key });
+      console.log("Documento criado no Firestore com ID: ", newDoc.id);
+      return NextResponse.json({ success: true, id: newDoc.id });
     }
 
   } catch (error) {
@@ -43,3 +39,4 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: false, message: `Erro ao sincronizar: ${errorMessage}` }, { status: 500 });
   }
 }
+'''
