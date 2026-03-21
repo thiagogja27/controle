@@ -14,15 +14,16 @@ function useFirebaseCollection<T extends { id: string }>(collectionPath: string)
   useEffect(() => {
     // 1. Tenta carregar do cache local primeiro (localStorage)
     const cacheKey = `firebase_cache_${collectionPath}`;
-    const cachedData = localStorage.getItem(cacheKey);
-    let initialData: T[] = [];
-    if (cachedData) {
-      try {
-        initialData = JSON.parse(cachedData);
-        setData(initialData);
-        setLoading(false);
-      } catch (e) {
-        console.error("Erro ao carregar cache:", e);
+    if (typeof window !== 'undefined') {
+      const cachedData = localStorage.getItem(cacheKey);
+      if (cachedData) {
+        try {
+          const initialData = JSON.parse(cachedData);
+          setData(initialData);
+          setLoading(false);
+        } catch (e) {
+          console.error("Erro ao carregar cache:", e);
+        }
       }
     }
 
@@ -71,7 +72,9 @@ function useFirebaseCollection<T extends { id: string }>(collectionPath: string)
         setLoading(false)
         
         // Salva no cache local para uso offline futuro
-        localStorage.setItem(cacheKey, JSON.stringify(items));
+        if (typeof window !== 'undefined') {
+          localStorage.setItem(cacheKey, JSON.stringify(items));
+        }
       },
       (err) => {
         console.error(`Erro no Firebase (${collectionPath}):`, err);
