@@ -1,12 +1,14 @@
-
-import { NextResponse } from 'next/server';
-import { adminDb } from '@/lib/firebase-admin';
+'''import { NextResponse } from 'next/server';
+import { getFirebaseAdmin } from '@/lib/firebase-admin';
 import { firestore } from 'firebase-admin';
 
 export const dynamic = 'force-dynamic';
 
 export async function POST(request: Request) {
   try {
+    // Initialize Firebase Admin on demand
+    const adminDb = getFirebaseAdmin();
+
     const { data, tableName, action = 'create', originalId } = await request.json();
 
     if (!data || !tableName) {
@@ -14,7 +16,6 @@ export async function POST(request: Request) {
     }
 
     if (action === 'update' && originalId) {
-      // Use Firestore from firebase-admin for update
       const itemRef = adminDb.collection(tableName).doc(originalId);
       await itemRef.update({
         ...data,
@@ -23,7 +24,6 @@ export async function POST(request: Request) {
       console.log(`Documento ${originalId} atualizado no Firestore.`);
       return NextResponse.json({ success: true, id: originalId });
     } else {
-      // Use Firestore from firebase-admin for create
       const collectionRef = adminDb.collection(tableName);
       const newDoc = await collectionRef.add({
         ...data,
@@ -39,3 +39,4 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: false, message: `Erro ao sincronizar: ${errorMessage}` }, { status: 500 });
   }
 }
+'''
