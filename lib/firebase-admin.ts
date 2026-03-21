@@ -1,9 +1,5 @@
 import admin from 'firebase-admin';
 
-// This new structure ensures that we only attempt to initialize and connect to Firebase
-// when the API route is actually being used, not during the build process.
-
-// We will store the initialized instance here to reuse it across function invocations.
 let adminDb: admin.firestore.Firestore;
 
 function initializeAdmin() {
@@ -11,29 +7,32 @@ function initializeAdmin() {
     return admin.app();
   }
 
+  // The private key is now expected to be a Base64 encoded string.
+  const privateKeyBase64 = process.env.FIREBASE_PRIVATE_KEY;
+
+  if (!privateKeyBase64) {
+    throw new Error('FIREBASE_PRIVATE_KEY environment variable is not set or empty.');
+  }
+
+  // Decode the Base64 string back to the original PEM format.
+  const privateKey = Buffer.from(privateKeyBase64, 'base64').toString('utf-8');
+
   const serviceAccount = {
     projectId: process.env.FIREBASE_PROJECT_ID,
     clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-    privateKey: process.env.FIREBASE_PRIVATE_KEY,
+    privateKey: privateKey, // Use the decoded key
   };
 
-  // This check is crucial. If the secrets aren't here, we can't initialize.
-  // This is what was causing the build to fail.
-  if (!serviceAccount.projectId || !serviceAccount.clientEmail || !serviceAccount.privateKey) {
-    throw new Error('Firebase Admin credentials are not available in environment variables.');
+  if (!serviceAccount.projectId || !serviceAccount.clientEmail) {
+    throw new Error('Incomplete Firebase Admin credentials in environment variables.');
   }
 
   return admin.initializeApp({
-    credential: admin.credential.cert({
-      ...serviceAccount,
-      privateKey: serviceAccount.privateKey.replace(/\\n/g, '\n'),
-    }),
+    credential: admin.credential.cert(serviceAccount),
     databaseURL: `https://${process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID}.firebaseio.com`,
   });
 }
 
-// This is the function our API route will now use.
-// It initializes the app (if needed) and returns the database connection.
 export const getFirebaseAdmin = () => {
   if (!adminDb) {
     initializeAdmin();
