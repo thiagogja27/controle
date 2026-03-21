@@ -7,20 +7,18 @@ function initializeAdmin() {
     return admin.app();
   }
 
-  // The private key is now expected to be a Base64 encoded string.
-  const privateKeyBase64 = process.env.FIREBASE_PRIVATE_KEY;
+  const privateKey = process.env.FIREBASE_PRIVATE_KEY;
 
-  if (!privateKeyBase64) {
+  if (!privateKey) {
     throw new Error('FIREBASE_PRIVATE_KEY environment variable is not set or empty.');
   }
-
-  // Decode the Base64 string back to the original PEM format.
-  const privateKey = Buffer.from(privateKeyBase64, 'base64').toString('utf-8');
 
   const serviceAccount = {
     projectId: process.env.FIREBASE_PROJECT_ID,
     clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-    privateKey: privateKey, // Use the decoded key
+    // Vercel's environment variable UI often replaces newlines with the literal string "\\n".
+    // We need to replace them back with actual newline characters `\n` for the Firebase SDK to parse the key correctly.
+    privateKey: privateKey.replace(/\\n/g, '\n'),
   };
 
   if (!serviceAccount.projectId || !serviceAccount.clientEmail) {
