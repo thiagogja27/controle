@@ -753,7 +753,10 @@ export function ConsumoSection() {
                                                 <p className="text-sm text-muted-foreground">{individuo.documento}</p>
                                                 <CredencialBadge credencial={individuo.credencial} />
                                             </div>
-                                            <span className={cn("inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold", individuo.status === "presente" ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-800")}>{individuo.status === "presente" ? "A Bordo" : "Saiu"}</span>
+                                            <div className="flex flex-col items-end gap-1">
+                                                <span className={cn("inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold", individuo.status === "presente" ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-800")}>{individuo.status === "presente" ? "A Bordo" : "Saiu"}</span>
+                                                {(consumo as any).isOffline && <span className="inline-flex items-center rounded-full bg-amber-100 px-2.5 py-0.5 text-[10px] font-medium text-amber-800 animate-pulse"><WifiOff className="mr-1 h-3 w-3" /> Sincronizando...</span>}
+                                            </div>
                                         </div>
                                         <div className="grid grid-cols-2 gap-x-4 text-sm">
                                             <div className="flex flex-col"><span className="text-muted-foreground">Entrada</span><span>{formatDateTime(consumo.data, consumo.hora)}</span></div>
@@ -819,7 +822,10 @@ export function ConsumoSection() {
                                 consumo.individuos.map((individuo, individuoIndex) => (
                                 <tr key={individuo.id} className={cn("hover:bg-muted/50", individuo.credencial && credencialConfig[individuo.credencial]?.className.replace(/text-\S+/, '').replace(/dark:text-\S+/, ''))}>
                                     <td className="px-4 py-3 font-medium">
-                                        <div>{individuo.nome}</div>
+                                        <div className="flex items-center gap-2">
+                                            {individuo.nome}
+                                            {(consumo as any).isOffline && <Tooltip><TooltipTrigger><WifiOff className="h-3 w-3 text-amber-500 animate-pulse" /></TooltipTrigger><TooltipContent>Aguardando conexão para sincronizar grupo</TooltipContent></Tooltip>}
+                                        </div>
                                         <CredencialBadge credencial={individuo.credencial} />
                                     </td>
                                     <td className="px-4 py-3 text-muted-foreground">{individuo.documento}</td>

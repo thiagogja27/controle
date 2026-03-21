@@ -12,17 +12,42 @@ function useFirebaseCollection<T extends { id: string }>(collectionPath: string)
   const [error, setError] = useState<Error | null>(null)
 
   useEffect(() => {
-    // 1. Tenta carregar do cache local primeiro
+    // 1. Tenta carregar do cache local primeiro (localStorage)
     const cacheKey = `firebase_cache_${collectionPath}`;
     const cachedData = localStorage.getItem(cacheKey);
+    let initialData: T[] = [];
     if (cachedData) {
       try {
-        setData(JSON.parse(cachedData));
+        initialData = JSON.parse(cachedData);
+        setData(initialData);
         setLoading(false);
       } catch (e) {
         console.error("Erro ao carregar cache:", e);
       }
     }
+
+    // 2. Busca itens do outbox (IndexedDB) para mostrar o que ainda não sincronizou
+    const fetchOutbox = async () => {
+        try {
+            const { getOutbox } = await import("@/utils/db");
+            const outboxRecords = await getOutbox();
+            const relevantOutbox = outboxRecords
+                .filter(rec => rec.tableName === collectionPath && rec.action === 'create')
+                .map(rec => ({ id: rec.id, ...rec.data, isOffline: true } as T & { isOffline?: boolean }));
+            
+            if (relevantOutbox.length > 0) {
+                setData(prev => {
+                    // Evita duplicatas se já houver algo no cache
+                    const existingIds = new Set(prev.map(item => item.id));
+                    const newItems = relevantOutbox.filter(item => !existingIds.has(item.id));
+                    return [...newItems, ...prev];
+                });
+            }
+        } catch (e) {
+            console.error("Erro ao carregar outbox no hook:", e);
+        }
+    };
+    fetchOutbox();
 
     const collectionRef = ref(db, collectionPath)
     
@@ -40,7 +65,7 @@ function useFirebaseCollection<T extends { id: string }>(collectionPath: string)
         setData(items)
         setLoading(false)
         
-        // 2. Salva no cache local para uso offline futuro
+        // Salva no cache local para uso offline futuro
         localStorage.setItem(cacheKey, JSON.stringify(items));
       },
       (err) => {

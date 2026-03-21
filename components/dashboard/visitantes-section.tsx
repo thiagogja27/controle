@@ -1039,7 +1039,10 @@ export function VisitantesSection() {
                                     <p className="font-semibold">{v.nome}</p>
                                     <p className="text-sm text-muted-foreground">{v.empresa}</p>
                                 </div>
-                                 <span className={cn("inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold", v.status === "presente" ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-800")}>{v.status === "presente" ? "Presente" : "Saiu"}</span>
+                                 <div className="flex flex-col items-end gap-1">
+                                    <span className={cn("inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold", v.status === "presente" ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-800")}>{v.status === "presente" ? "Presente" : "Saiu"}</span>
+                                    {(v as any).isOffline && <span className="inline-flex items-center rounded-full bg-amber-100 px-2.5 py-0.5 text-[10px] font-medium text-amber-800 animate-pulse"><WifiOff className="mr-1 h-3 w-3" /> Sincronizando...</span>}
+                                 </div>
                             </div>
                             <CredencialBadge credencial={v.credencial} />
                              <div className="border-t pt-3 grid grid-cols-2 gap-x-4 gap-y-2 text-sm flex-grow">
@@ -1098,7 +1101,10 @@ export function VisitantesSection() {
                   filteredVisitantes.map(v => (
                     <tr key={v.id} className={cn(v.credencial && credencialConfig[v.credencial]?.className.replace(/text-\S+/, '').replace(/dark:text-\S+/, ''))}>
                       <td className="px-4 py-3">
-                        <div className="font-medium">{v.nome}</div>
+                        <div className="font-medium flex items-center gap-2">
+                            {v.nome}
+                            {(v as any).isOffline && <Tooltip><TooltipTrigger><WifiOff className="h-3 w-3 text-amber-500 animate-pulse" /></TooltipTrigger><TooltipContent>Aguardando conexão para sincronizar</TooltipContent></Tooltip>}
+                        </div>
                       </td>
                       <td className="px-4 py-3">
                         <CredencialBadge credencial={v.credencial} />
@@ -1116,7 +1122,12 @@ export function VisitantesSection() {
                         <div><span className="font-medium">Ent:</span> {formatDate(v.dataEntrada)} {v.horaEntrada}</div>
                         <div><span className="font-medium">Saí:</span> {v.horaSaida ? `${formatDate(v.dataSaida || v.dataEntrada)} ${v.horaSaida}` : "-"}</div>
                       </td>
-                      <td className="px-4 py-3"><span className={cn("inline-flex items-center rounded-full px-2 py-1 text-xs font-semibold", v.status === "presente" ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300" : "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300")}>{v.status === "presente" ? "Presente" : "Saiu"}</span></td>
+                      <td className="px-4 py-3">
+                        <div className="flex flex-col gap-1">
+                            <span className={cn("inline-flex items-center rounded-full px-2 py-1 text-xs font-semibold", v.status === "presente" ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300" : "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300")}>{v.status === "presente" ? "Presente" : "Saiu"}</span>
+                            {(v as any).isOffline && <span className="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-800 animate-pulse w-fit"><WifiOff className="mr-1 h-2 w-2" /> Offline</span>}
+                        </div>
+                      </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center justify-end gap-2">
                           {v.status === "presente" ? (

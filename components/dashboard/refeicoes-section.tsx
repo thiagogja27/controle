@@ -529,7 +529,10 @@ export function RefeicoesSection() {
                                     <p className="font-semibold">{refeicao.prefixo} <span className={cn("font-normal", refeicao.categoria === 'pm' ? categoriaConfig.pm.color : categoriaConfig.civil.color)}>({refeicao.categoria.toUpperCase()})</span></p>
                                     <p className="text-sm text-muted-foreground">Por: {refeicao.vigilante}</p>
                                 </div>
-                                <p className="text-sm text-muted-foreground">{formatDateTime(refeicao.data, refeicao.hora)}</p>
+                                 <div className="flex flex-col items-end gap-1">
+                                    <p className="text-sm text-muted-foreground">{formatDateTime(refeicao.data, refeicao.hora)}</p>
+                                    {(refeicao as any).isOffline && <span className="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-800 animate-pulse"><WifiOff className="mr-1 h-3 w-3" /> Sincronizando...</span>}
+                                </div>
                             </div>
 
                              <div className="border-t pt-3 space-y-3 flex-grow">
@@ -584,7 +587,12 @@ export function RefeicoesSection() {
                         filteredRefeicoes.flatMap((refeicao, refeicaoIndex) =>
                             refeicao.individuos?.map((individuo, individuoIndex) => (
                             <tr key={`${refeicao.id}-${individuo.id}-${refeicaoIndex}-${individuoIndex}`} className="hover:bg-muted/50">
-                                <td className="px-4 py-3 font-medium">{individuo.nome}</td>
+                                <td className="px-4 py-3 font-medium">
+                                    <div className="flex items-center gap-2">
+                                        {individuo.nome}
+                                        {(refeicao as any).isOffline && <Tooltip><TooltipTrigger><WifiOff className="h-3 w-3 text-amber-500 animate-pulse" /></TooltipTrigger><TooltipContent>Aguardando conexão para sincronizar grupo</TooltipContent></Tooltip>}
+                                    </div>
+                                </td>
                                 <td className="px-4 py-3"><span className={cn("inline-flex items-center rounded-full px-2 py-1 text-xs font-semibold", individuo.status === "presente" ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300" : "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300")}>{individuo.status === "presente" ? "Presente" : "Saiu"}</span></td>
                                 <td className="px-4 py-3 tabular-nums text-muted-foreground">{formatDateTime(refeicao.data, refeicao.hora)}</td>
                                 <td className="px-4 py-3 tabular-nums text-muted-foreground">

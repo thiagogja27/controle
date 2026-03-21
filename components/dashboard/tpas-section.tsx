@@ -641,7 +641,10 @@ export function TPAsSection() {
                                     <p className="font-semibold">{r.nome}</p>
                                     <p className="text-sm text-muted-foreground">{r.funcao}</p>
                                 </div>
-                                 <span className={cn("inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold", r.status === "presente" ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-800")}>{r.status}</span>
+                                 <div className="flex flex-col items-end gap-1">
+                                    <span className={cn("inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold", r.status === "presente" ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-800")}>{r.status}</span>
+                                    {(r as any).isOffline && <span className="inline-flex items-center rounded-full bg-amber-100 px-2.5 py-0.5 text-[10px] font-medium text-amber-800 animate-pulse"><WifiOff className="mr-1 h-3 w-3" /> Sincronizando...</span>}
+                                 </div>
                             </div>
                             <CredencialBadge credencial={r.credencial} />
                             <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm flex-grow">
@@ -698,7 +701,10 @@ export function TPAsSection() {
                                     <td className="px-4 py-3 whitespace-nowrap tabular-nums text-muted-foreground">{formatDateTime(r.data, r.hora)}</td>
                                     <td className="px-4 py-3 whitespace-nowrap tabular-nums text-muted-foreground">{r.horaSaida ? formatDateTime(r.dataSaida || r.data, r.horaSaida) : "-"}</td>
                                     <td className="px-4 py-3 font-medium whitespace-nowrap text-foreground">
-                                        <div>{r.nome}</div>
+                                        <div className="flex items-center gap-2">
+                                            {r.nome}
+                                            {(r as any).isOffline && <Tooltip><TooltipTrigger><WifiOff className="h-3 w-3 text-amber-500 animate-pulse" /></TooltipTrigger><TooltipContent>Aguardando conexão para sincronizar</TooltipContent></Tooltip>}
+                                        </div>
                                         <CredencialBadge credencial={r.credencial} />
                                     </td>
                                     <td className="px-4 py-3 text-muted-foreground">{r.funcao}</td>
