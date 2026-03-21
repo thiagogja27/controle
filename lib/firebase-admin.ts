@@ -1,4 +1,4 @@
-'''import admin from 'firebase-admin';
+import admin from 'firebase-admin';
 
 // This new structure ensures that we only attempt to initialize and connect to Firebase
 // when the API route is actually being used, not during the build process.
@@ -41,4 +41,3 @@ export const getFirebaseAdmin = () => {
   }
   return adminDb;
 };
-'''
