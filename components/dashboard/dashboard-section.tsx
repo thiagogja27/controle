@@ -1,7 +1,7 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { Users, Utensils, Ship, FileText, ArrowRight, Clock, Shield } from 'lucide-react'
+import { Users, Utensils, Ship, FileText, ArrowRight, Clock, Shield, RefreshCw, Wifi, WifiOff } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { 
     Dialog, DialogContent, DialogHeader, DialogTitle, 
@@ -9,11 +9,13 @@ import {
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { useVisitantes, useRefeicoes, useTPAs, useConsumos } from "@/hooks/use-firebase"
+import { useSync } from '@/hooks/use-sync'
 import { 
     BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, 
     PieChart, Pie, Cell, Legend, TooltipProps 
 } from 'recharts'
 import { type RefeicaoPolicial, type OldRefeicaoPolicial } from './refeicoes-section'
+import { cn } from "@/lib/utils"
 
 const COLORS = ['#3b82f6', '#10b981', '#f97316', '#8b5cf6', '#ec4899'];
 
@@ -54,6 +56,7 @@ export function DashboardSection() {
   const { data: rawRefeicoes = [] } = useRefeicoes()
   const { data: tpas = [] } = useTPAs()
   const { data: consumos = [] } = useConsumos()
+  const { syncOutbox, isSyncing, pendingCount } = useSync()
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalData, setModalData] = useState({ title: '', data: [] as any[] });
 
@@ -182,6 +185,24 @@ export function DashboardSection() {
 
   return (
     <div className="space-y-4 md:space-y-8">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+                <h2 className="text-3xl font-bold tracking-tight">Painel de Controle</h2>
+                <p className="text-muted-foreground">Visão geral do tráfego e operações nos terminais.</p>
+            </div>
+            {pendingCount > 0 && (
+                <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={() => syncOutbox()} 
+                    disabled={isSyncing}
+                    className={cn("gap-2 border-amber-500/50 bg-amber-500/5 hover:bg-amber-500/10 text-amber-600 dark:text-amber-400", isSyncing && "cursor-not-allowed")}
+                >
+                    <RefreshCw className={cn("h-4 w-4", isSyncing && "animate-spin")} />
+                    {isSyncing ? "Sincronizando..." : `Sincronizar ${pendingCount} pendente(s)`}
+                </Button>
+            )}
+        </div>
         <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
             <Card className="cursor-pointer sm:col-span-1 md:col-span-1 lg:col-span-1 hover:bg-muted/50" onClick={() => openModal('Presentes no TEG', presentesTEG)}><CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">Presentes no TEG</CardTitle><Users className="h-4 w-4 text-muted-foreground" /></CardHeader><CardContent><div className="text-2xl font-bold">{totalTEG}</div></CardContent></Card>
             <Card className="cursor-pointer sm:col-span-1 md:col-span-1 lg:col-span-1 hover:bg-muted/50" onClick={() => openModal('Presentes no TEAG', presentesTEAG)}><CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">Presentes no TEAG</CardTitle><Users className="h-4 w-4 text-muted-foreground" /></CardHeader><CardContent><div className="text-2xl font-bold">{totalTEAG}</div></CardContent></Card>

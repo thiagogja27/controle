@@ -6,9 +6,9 @@ export const dynamic = 'force-dynamic';
 
 export async function POST(request: Request) {
   try {
-    if (!db || Object.keys(db).length === 0) {
-      console.warn("Database not initialized, likely during build.");
-      return NextResponse.json({ success: false, message: 'Database not initialized.' }, { status: 503 });
+    if (!db) {
+      console.warn("Database not initialized properly.");
+      return NextResponse.json({ success: false, message: 'Banco de dados não disponível.' }, { status: 503 });
     }
     const { data, tableName, action = 'create', originalId } = await request.json();
 
