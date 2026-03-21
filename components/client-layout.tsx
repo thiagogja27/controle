@@ -4,9 +4,11 @@ import { AuthProvider } from '@/hooks/use-auth'
 import { useOnlineStatus } from '@/hooks/use-online-status'
 import { Analytics } from '@vercel/analytics/next'
 import { useEffect } from 'react'
+import { useSync } from '@/hooks/use-sync'
 
 export function ClientLayout({ children }: { children: React.ReactNode }) {
   const isOnline = useOnlineStatus();
+  useSync(); // Ativa a sincronização automática
 
   useEffect(() => {
     if (
