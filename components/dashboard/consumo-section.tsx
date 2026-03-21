@@ -375,7 +375,7 @@ export function ConsumoSection() {
                 navigator.serviceWorker.ready.then(sw => sw.sync.register('sync-new-items'));
             }
 
-            toast.info("Registro salvo localmente. Será sincronizado quando a conexão for restaurada.");
+            toast.success("Salvo com sucesso no navegador! O registro será sincronizado assim que a conexão for restaurada.");
             setIsFormOpen(false);
         } catch (error) {
             console.error("Erro ao salvar consumo offline:", error);
@@ -439,7 +439,7 @@ export function ConsumoSection() {
         if ('serviceWorker' in navigator && 'SyncManager' in window) {
             navigator.serviceWorker.ready.then(sw => sw.sync.register('sync-new-items'));
         }
-        toast.info("Saída registrada localmente. Será sincronizada quando a conexão for restaurada.");
+        toast.success("Saída salva com sucesso no navegador! Será sincronizada quando a conexão for restaurada.");
         return;
       }
 

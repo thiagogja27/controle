@@ -680,9 +680,9 @@ export function VisitantesSection() {
             await Promise.all(promises);
             if (!isOnline) {
                 if ('serviceWorker' in navigator && 'SyncManager' in window) {
-                    navigator.serviceWorker.ready.then(sw => sw.sync.register('sync-new-items'));
+                    navigator.serviceWorker.ready.then(sw => sw.sync.register('sync-new-items')).catch(console.error);
                 }
-                toast.info("Registros salvos localmente. Serão sincronizados quando a conexão for restaurada.");
+                toast.success("Salvo com sucesso no navegador! Os dados serão sincronizados assim que a internet voltar.");
             } else {
                 toast.success(`${persons.length} visitante(s) registrado(s) com sucesso!`);
             }

@@ -24,6 +24,10 @@ const dbPromise = openDB<MyDB>('my-app-db', 1, {
 export async function addToOutbox(record: OutboxRecord) {
   const db = await dbPromise;
   await db.put('outbox', record);
+  // Dispatch custom event to notify hooks/components
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('outbox-updated'));
+  }
 }
 
 export async function getOutbox() {
@@ -34,6 +38,9 @@ export async function getOutbox() {
 export async function deleteFromOutbox(id: string) {
   const db = await dbPromise;
   await db.delete('outbox', id);
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('outbox-updated'));
+  }
 }
 
 export async function clearOutbox() {

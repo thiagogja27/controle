@@ -35,19 +35,24 @@ function useFirebaseCollection<T extends { id: string }>(collectionPath: string)
                 .filter(rec => rec.tableName === collectionPath && rec.action === 'create')
                 .map(rec => ({ id: rec.id, ...rec.data, isOffline: true } as T & { isOffline?: boolean }));
             
-            if (relevantOutbox.length > 0) {
-                setData(prev => {
-                    // Evita duplicatas se já houver algo no cache
-                    const existingIds = new Set(prev.map(item => item.id));
-                    const newItems = relevantOutbox.filter(item => !existingIds.has(item.id));
-                    return [...newItems, ...prev];
-                });
-            }
+            setData(prev => {
+                // Filtra itens que NÃO são do outbox (ou seja, vieram do Firebase/Cache)
+                const nonOfflineItems = prev.filter(item => !(item as any).isOffline);
+                // Evita duplicatas se já houver algo no cache com o mesmo ID
+                const existingIds = new Set(nonOfflineItems.map(item => item.id));
+                const newOfflineItems = relevantOutbox.filter(item => !existingIds.has(item.id));
+                return [...newOfflineItems, ...nonOfflineItems];
+            });
         } catch (e) {
             console.error("Erro ao carregar outbox no hook:", e);
         }
     };
+    
     fetchOutbox();
+
+    // Listener para atualizações manuais do outbox
+    const handleOutboxUpdate = () => fetchOutbox();
+    window.addEventListener('outbox-updated', handleOutboxUpdate);
 
     const collectionRef = ref(db, collectionPath)
     
@@ -75,7 +80,10 @@ function useFirebaseCollection<T extends { id: string }>(collectionPath: string)
       }
     )
 
-    return () => unsubscribe()
+    return () => {
+      unsubscribe();
+      window.removeEventListener('outbox-updated', handleOutboxUpdate);
+    };
   }, [collectionPath])
 
   const addItem = useCallback(async (item: Omit<T, "id">) => {
