@@ -18,7 +18,10 @@ interface MyDB extends DBSchema {
 let dbPromise: Promise<any> | null = null;
 
 function getDB() {
-  if (typeof window === 'undefined') return null;
+  // O Service Worker não tem 'window', mas tem 'self.indexedDB'
+  // O Node.js (build) não tem nenhum dos dois.
+  if (typeof indexedDB === 'undefined' && typeof self === 'undefined') return null;
+  
   if (!dbPromise) {
     dbPromise = openDB<MyDB>('my-app-db', 1, {
       upgrade(db) {
@@ -33,8 +36,8 @@ export async function addToOutbox(record: OutboxRecord) {
   const db = await getDB();
   if (!db) return;
   await db.put('outbox', record);
-  // Dispatch custom event to notify hooks/components
-  if (typeof window !== 'undefined') {
+  // Dispatch custom event to notify hooks/components (Browser only)
+  if (typeof window !== 'undefined' && 'dispatchEvent' in window) {
     window.dispatchEvent(new CustomEvent('outbox-updated'));
   }
 }
@@ -49,7 +52,7 @@ export async function deleteFromOutbox(id: string) {
   const db = await getDB();
   if (!db) return;
   await db.delete('outbox', id);
-  if (typeof window !== 'undefined') {
+  if (typeof window !== 'undefined' && 'dispatchEvent' in window) {
     window.dispatchEvent(new CustomEvent('outbox-updated'));
   }
 }
