@@ -33,8 +33,8 @@ function useFirebaseCollection<T extends { id: string }>(collectionPath: string)
             const { getOutbox } = await import("@/utils/db");
             const outboxRecords = await getOutbox();
             const relevantOutbox = outboxRecords
-                .filter(rec => rec.tableName === collectionPath && rec.action === 'create')
-                .map(rec => ({ id: rec.id, ...rec.data, isOffline: true } as T & { isOffline?: boolean }));
+                .filter((rec: any) => rec.tableName === collectionPath && rec.action === 'create')
+                .map((rec: any) => ({ id: rec.id, ...rec.data, isOffline: true } as T & { isOffline?: boolean }));
             
             setData(prev => {
                 // Filtra itens que NÃO são do outbox (ou seja, vieram do Firebase/Cache)
