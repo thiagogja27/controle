@@ -157,26 +157,30 @@ export function TPAsSection() {
   }, [selectedTPA, isFormOpen])
 
   const filtered = useMemo(() => registros.filter(r => {
-    const searchLower = search.toLowerCase().trim()
+    if (!r) return false; // Defensively filter out null/undefined records
+
+    const searchLower = search.toLowerCase().trim();
     const textMatch = !searchLower || (
-      r.nome?.toLowerCase().includes(searchLower) ||
-      r.documento?.toLowerCase().includes(searchLower) ||
-      r.placa?.toLowerCase().includes(searchLower) ||
-      r.navio?.toLowerCase().includes(searchLower)
+      (r.nome || '').toLowerCase().includes(searchLower) ||
+      (r.documento || '').toLowerCase().includes(searchLower) ||
+      (r.placa || '').toLowerCase().includes(searchLower) ||
+      (r.navio || '').toLowerCase().includes(searchLower)
     );
 
-     const dateMatch = (() => {
-        if (!dataInicio && !dataFim) {
-            if (searchLower) {
-                return true;
-            }
-            const today = new Date().toISOString().split('T')[0];
-            return r.data === today;
+    const dateMatch = (() => {
+      if (!dataInicio && !dataFim) {
+        if (searchLower) {
+          return true;
         }
-        const entrada = r.data;
-        const afterStart = dataInicio ? entrada >= dataInicio : true;
-        const beforeEnd = dataFim ? entrada <= dataFim : true;
-        return afterStart && beforeEnd;
+        const today = new Date().toISOString().split('T')[0];
+        return r.data === today;
+      }
+      if (!r.data) {
+        return false;
+      }
+      const afterStart = dataInicio ? r.data >= dataInicio : true;
+      const beforeEnd = dataFim ? r.data <= dataFim : true;
+      return afterStart && beforeEnd;
     })();
 
     const shiftMatch = (() => {
@@ -204,10 +208,10 @@ export function TPAsSection() {
     return textMatch && dateMatch && shiftMatch;
   }), [registros, search, dataInicio, dataFim, activeShift]);
 
-  const totalPresentes = registros.filter(r => r.status === "presente").length
-  const totalTeg = registros.filter(r => r.pier === "teg").length
-  const totalTeag = registros.filter(r => r.pier === "teag").length
-  const totalRegistros = registros.length;
+  const totalPresentes = registros.filter(r => r && r.status === "presente").length
+  const totalTeg = registros.filter(r => r && r.pier === "teg").length
+  const totalTeag = registros.filter(r => r && r.pier === "teag").length
+  const totalRegistros = registros.filter(r => !!r).length;
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { id, value } = e.target
