@@ -280,24 +280,27 @@ export function VisitantesSection() {
   const navioTeag = navios.find(n => n.id === 'teag');
 
   const filteredVisitantes = useMemo(() => visitantes.filter(v => {
-      const searchLower = search.toLowerCase().trim();
-      const textMatch = !searchLower || (
-          v.nome.toLowerCase().includes(searchLower) ||
-          v.empresa.toLowerCase().includes(searchLower) ||
-          v.documento.includes(searchLower) ||
-          (v.placa && v.placa.toLowerCase().includes(searchLower))
-      );
+    if (!v) return false;
+    const searchLower = search.toLowerCase().trim();
+    const textMatch = !searchLower || (
+        (v.nome || '').toLowerCase().includes(searchLower) ||
+        (v.empresa || '').toLowerCase().includes(searchLower) ||
+        (v.documento || '').toLowerCase().includes(searchLower) ||
+        (v.placa || '').toLowerCase().includes(searchLower)
+    );
 
-      if (!dataInicio && !dataFim) {
-          const today = new Date().toISOString().split('T')[0];
-          return v.dataEntrada === today && textMatch;
-      }
+    if (!dataInicio && !dataFim) {
+        const today = new Date().toISOString().split('T')[0];
+        return (v.dataEntrada || '') === today && textMatch;
+    }
 
-      const entrada = v.dataEntrada;
-      const afterStart = dataInicio ? entrada >= dataInicio : true;
-      const beforeEnd = dataFim ? entrada <= dataFim : true;
-      return afterStart && beforeEnd && textMatch;
-  }), [visitantes, search, dataInicio, dataFim]);
+    if (!v.dataEntrada) return false;
+
+    const entrada = v.dataEntrada;
+    const afterStart = dataInicio ? entrada >= dataInicio : true;
+    const beforeEnd = dataFim ? entrada <= dataFim : true;
+    return afterStart && beforeEnd && textMatch;
+}), [visitantes, search, dataInicio, dataFim]);
 
   const clearError = (field: string, personIndex?: number) => {
     if (typeof personIndex === 'number') {
