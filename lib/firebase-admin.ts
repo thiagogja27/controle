@@ -1,6 +1,6 @@
 import admin from 'firebase-admin';
 
-let adminDb: admin.firestore.Firestore;
+let adminDb: admin.database.Database;
 
 function initializeAdmin() {
   if (admin.apps.length > 0) {
@@ -27,14 +27,14 @@ function initializeAdmin() {
 
   return admin.initializeApp({
     credential: admin.credential.cert(serviceAccount),
-    databaseURL: `https://${process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID}.firebaseio.com`,
+    databaseURL: `https://${process.env.FIREBASE_PROJECT_ID}.firebaseio.com`,
   });
 }
 
 export const getFirebaseAdmin = () => {
   if (!adminDb) {
     initializeAdmin();
-    adminDb = admin.firestore();
+    adminDb = admin.database();
   }
   return adminDb;
 };

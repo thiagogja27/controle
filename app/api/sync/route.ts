@@ -1,12 +1,12 @@
 import { NextResponse } from 'next/server';
 import { getFirebaseAdmin } from '@/lib/firebase-admin';
-import { firestore } from 'firebase-admin';
+import admin from 'firebase-admin';
 
 export const dynamic = 'force-dynamic';
 
 export async function POST(request: Request) {
   try {
-    // Initialize Firebase Admin on demand
+    // Initialize Firebase Admin for Realtime Database on demand
     const adminDb = getFirebaseAdmin();
 
     const { data, tableName, action = 'create', originalId } = await request.json();
@@ -16,21 +16,21 @@ export async function POST(request: Request) {
     }
 
     if (action === 'update' && originalId) {
-      const itemRef = adminDb.collection(tableName).doc(originalId);
+      const itemRef = adminDb.ref(`${tableName}/${originalId}`);
       await itemRef.update({
         ...data,
-        timestamp_update: firestore.FieldValue.serverTimestamp(),
+        timestamp_update: admin.database.ServerValue.TIMESTAMP,
       });
-      console.log(`Documento ${originalId} atualizado no Firestore.`);
+      console.log(`Documento ${originalId} atualizado no Realtime Database.`);
       return NextResponse.json({ success: true, id: originalId });
     } else {
-      const collectionRef = adminDb.collection(tableName);
-      const newDoc = await collectionRef.add({
+      const collectionRef = adminDb.ref(tableName);
+      const newDoc = await collectionRef.push({
         ...data,
-        timestamp_server: firestore.FieldValue.serverTimestamp(),
+        timestamp_server: admin.database.ServerValue.TIMESTAMP,
       });
-      console.log("Documento criado no Firestore com ID: ", newDoc.id);
-      return NextResponse.json({ success: true, id: newDoc.id });
+      console.log("Documento criado no Realtime Database com ID: ", newDoc.key);
+      return NextResponse.json({ success: true, id: newDoc.key });
     }
 
   } catch (error) {
