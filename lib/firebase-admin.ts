@@ -1,4 +1,4 @@
-'''
+
 import admin from 'firebase-admin';
 
 // Check if the app is already initialized to prevent errors
@@ -23,4 +23,3 @@ const adminDb = admin.firestore();
 const adminAuth = admin.auth();
 
 export { admin, adminDb, adminAuth };
-'''
