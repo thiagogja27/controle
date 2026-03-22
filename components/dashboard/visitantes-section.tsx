@@ -17,7 +17,7 @@ import { type Visitante, type OcorrenciaCompliance } from "@/lib/store"
 import { useVisitantes, useNavios } from "@/hooks/use-firebase"
 import { useOcorrenciasCompliance } from "@/hooks/use-compliance"
 import { useOnlineStatus } from "@/hooks/use-online-status"
-import { addToOutbox } from "@/utils/db"
+import { addToOutbox, getOutbox } from "@/utils/db"
 import { v4 as uuidv4 } from "uuid";
 import { toast } from "sonner"
 import { cn } from "@/lib/utils"
@@ -126,13 +126,15 @@ const toIsoDate = (brDate: string = ''): string => {
 };
 
 export function VisitantesSection() {
-  const { data: visitantes, loading, addItem, updateItem, deleteItem } = useVisitantes()
+  const { data: firebaseVisitantes, loading, addItem, updateItem, deleteItem } = useVisitantes()
+  const [localVisitantes, setLocalVisitantes] = useState<Visitante[]>([]);
+
   const { data: ocorrencias } = useOcorrenciasCompliance();
   const { data: navios, loading: loadingNavios } = useNavios();
   const isOnline = useOnlineStatus();
 
   const [search, setSearch] = useState("")
-  const [dataInicio, setDataInicio] = useState("");
+  const [dataInicio, setDataInicio] = useState("")
   const [dataFim, setDataFim] = useState("");
 
   const [isFormOpen, setIsFormOpen] = useState(false)
@@ -149,6 +151,47 @@ export function VisitantesSection() {
   const [complianceAlert, setComplianceAlert] = useState<OcorrenciaCompliance | null>(null);
   const [personComplianceAlerts, setPersonComplianceAlerts] = useState<(OcorrenciaCompliance | null)[]>([]);
   const [isCriticalAlertOpen, setIsCriticalAlertOpen] = useState(false);
+
+  // Combina dados do Firebase com dados locais (offline)
+  const visitantes = useMemo(() => {
+    const all = [...firebaseVisitantes, ...localVisitantes];
+    // Remove duplicatas locais se o item já chegou do Firebase
+    return all.filter((v, index, self) => 
+      index === self.findIndex(t => t.id === v.id)
+    );
+  }, [firebaseVisitantes, localVisitantes]);
+
+  // Efeito para carregar itens do outbox na UI ao iniciar
+  useEffect(() => {
+    async function loadOutboxData() {
+      if (!isOnline) {
+        const outboxItems = await getOutbox();
+        const offlineVisitantes = outboxItems.map(item => ({
+          ...item.data,
+          id: item.id, // Usa o tempId como id
+          isOffline: true, // Flag para a UI
+        })) as Visitante[];
+        setLocalVisitantes(offlineVisitantes);
+      }
+    }
+    loadOutboxData();
+  }, [isOnline]);
+
+  // Efeito para ouvir eventos de sincronização do Service Worker
+  useEffect(() => {
+    const handleSyncSuccess = (event: any) => {
+      const { originalId, newId } = event.detail;
+      console.log(`SYNC-SUCCESS event received: Removendo ID temporário ${originalId}`);
+      // Remove o item local que foi sincronizado
+      setLocalVisitantes(prev => prev.filter(v => v.id !== originalId));
+      toast.success(`Visitante (ID: ${originalId.substring(0,4)}...) sincronizado com sucesso.`);
+    };
+
+    window.addEventListener('sync-success', handleSyncSuccess);
+    return () => {
+      window.removeEventListener('sync-success', handleSyncSuccess);
+    };
+  }, []);
 
   const checkCompliance = (documento: string, personIndex?: number) => {
     const unmaskedDoc = documento.replace(/\D/g, '');
@@ -652,8 +695,10 @@ export function VisitantesSection() {
             status: "presente" as const,
         };
         
-        const promises = persons.map(person => {
-            const visitorData: Omit<Visitante, "id"> = {
+        const savePromises = persons.map(person => {
+            const tempId = uuidv4();
+            const visitorData: Omit<Visitante, "id"> & { id: string, isOffline?: boolean } = {
+                id: tempId,
                 ...commonData,
                 nome: person.nome,
                 documento: person.documento,
@@ -668,7 +713,11 @@ export function VisitantesSection() {
             };
 
             if (!isOnline) {
-                const tempId = uuidv4();
+                // Adiciona à UI localmente
+                visitorData.isOffline = true;
+                setLocalVisitantes(prev => [...prev, visitorData as Visitante]);
+                
+                // Adiciona ao outbox para sincronização
                 return addToOutbox({ 
                   id: tempId, 
                   tableName: 'visitantes', 
@@ -680,7 +729,7 @@ export function VisitantesSection() {
         });
 
         try {
-            await Promise.all(promises);
+            await Promise.all(savePromises);
             if (!isOnline) {
                 if ('serviceWorker' in navigator && 'SyncManager' in window) {
                     navigator.serviceWorker.ready.then(sw => sw.sync.register('sync-new-items')).catch(console.error);
@@ -794,7 +843,7 @@ export function VisitantesSection() {
         <Card><CardContent className="flex items-center gap-4 p-4"><div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10"><UserCheck className="h-6 w-6 text-primary" /></div><div><p className="text-2xl font-bold">{presentes}</p><p className="text-sm text-muted-foreground">Presentes</p></div></CardContent></Card>
         <Card><CardContent className="flex items-center gap-4 p-4"><div className="flex h-12 w-12 items-center justify-center rounded-lg bg-secondary"><UserX className="h-6 w-6 text-muted-foreground" /></div><div><p className="text-2xl font-bold">{sairam}</p><p className="text-sm text-muted-foreground">Saíram Hoje</p></div></CardContent></Card>
         <Card><CardContent className="flex items-center gap-4 p-4"><div className="flex h-12 w-12 items-center justify-center rounded-lg bg-teal-100 dark:bg-teal-900"><Ship className="h-6 w-6 text-teal-600 dark:text-teal-400" /></div><div><p className="text-lg font-bold truncate">{navioTeg?.nome || 'Sem navio'}</p><p className="text-sm text-muted-foreground">Navio no TEG</p></div></CardContent></Card>
-        <Card><CardContent className="flex items-center gap-4 p-4"><div className="flex h-12 w-12 items-center justify-center rounded-lg bg-sky-100 dark:bg-sky-900"><Ship className="h-6 w-6 text-sky-600 dark:text-sky-400" /></div><div><p className="text-lg font-bold truncate">{navioTeag?.nome || 'Sem navio'}</p><p className="text-sm text-muted-foreground">Navio no TEAG</p></div></CardContent></Card>
+        <Card><CardContent className="flex items-center gap-4 p-4"><div className="flex h-12 w-12 items-center justify-center rounded-lg bg-sky-100 dark:bg-sky-900"><Ship className="h-6 w-6 text-sky-600 dark:sky-400" /></div><div><p className="text-lg font-bold truncate">{navioTeag?.nome || 'Sem navio'}</p><p className="text-sm text-muted-foreground">Navio no TEAG</p></div></CardContent></Card>
       </div>
 
       {/* Search and Actions */}
@@ -961,12 +1010,8 @@ export function VisitantesSection() {
                                   <div className="grid gap-2">
                                       <Label htmlFor={`categoriaCnh-${index}`}>Categoria CNH</Label>
                                       <Select value={person.categoriaCnh} onValueChange={(value) => handlePersonSelectChange(index, "categoriaCnh", value)}>
-                                          <SelectTrigger className={cn(formErrors.persons[index]?.categoriaCnh && "border-red-500")}>
-                                              <SelectValue placeholder="Selecione" />
-                                          </SelectTrigger>
-                                          <SelectContent>
-                                              {cnhCategorias.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-                                          </SelectContent>
+                                          <SelectTrigger className={cn(formErrors.persons[index]?.categoriaCnh && "border-red-500")}><SelectValue placeholder="Selecione" /></SelectTrigger>
+                                          <SelectContent>{cnhCategorias.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
                                       </Select>
                                       {formErrors.persons[index]?.categoriaCnh && <p className="text-red-500 text-xs">{formErrors.persons[index]?.categoriaCnh}</p>}
                                   </div>
