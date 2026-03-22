@@ -11,13 +11,34 @@ export function ClientLayout({ children }: { children: React.ReactNode }) {
   useSync(); // Ativa a sincronização automática
 
   useEffect(() => {
-    if (
-      'serviceWorker' in navigator &&
-      process.env.NODE_ENV === 'production'
-    ) {
-      navigator.serviceWorker.register('/sw.js').catch(err => {
-        console.warn('Service worker registration failed:', err);
-      });
+    if ('serviceWorker' in navigator) {
+      const handleServiceWorkerMessage = (event: MessageEvent) => {
+        // Verifica se a mensagem é do tipo SYNC_SUCCESS
+        if (event.data && event.data.type === 'SYNC_SUCCESS') {
+          // Dispara um evento customizado na window para que a UI possa reagir
+          window.dispatchEvent(
+            new CustomEvent('sync-success', { 
+              detail: { 
+                originalId: event.data.originalId, 
+                newId: event.data.newId 
+              } 
+            })
+          );
+        }
+      };
+
+      navigator.serviceWorker.addEventListener('message', handleServiceWorkerMessage);
+
+      if (process.env.NODE_ENV === 'production') {
+        navigator.serviceWorker.register('/sw.js').catch(err => {
+          console.warn('Service worker registration failed:', err);
+        });
+      }
+
+      // Limpeza do listener ao desmontar o componente
+      return () => {
+        navigator.serviceWorker.removeEventListener('message', handleServiceWorkerMessage);
+      };
     }
   }, []);
 

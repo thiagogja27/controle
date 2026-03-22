@@ -1,4 +1,3 @@
-// Helper to promisify IndexedDB requests
 function promisifyRequest(request) {
     return new Promise((resolve, reject) => {
         request.onsuccess = () => resolve(request.result);
@@ -13,11 +12,19 @@ function openDb() {
         request.onsuccess = (event) => resolve(event.target.result);
         request.onupgradeneeded = (event) => {
             const db = event.target.result;
-            // Ensure the 'outbox' object store exists and uses 'id' as the key.
             if (!db.objectStoreNames.contains('outbox')) {
                 db.createObjectStore('outbox', { keyPath: 'id' });
             }
         };
+    });
+}
+
+// Envia uma mensagem para todos os clientes (abas do navegador)
+function postMessageToClients(message) {
+    self.clients.matchAll().then(clients => {
+        clients.forEach(client => {
+            client.postMessage(message);
+        });
     });
 }
 
@@ -49,14 +56,21 @@ async function syncItems() {
                     throw new Error(`Sync failed for item ${item.id}: ${err.message || response.statusText}`);
                 });
             }
-            console.log(`Item ${item.id} synced successfully.`);
-            // On success, resolve with the ID of the item.
-            return item.id;
+            return response.json(); // Retorna o corpo da resposta JSON
+        })
+        .then(result => {
+            console.log(`Item ${result.originalId} synced successfully. New ID: ${result.id}`);
+            // Envia mensagem para UI sobre a sincronização bem-sucedida
+            postMessageToClients({ 
+                type: 'SYNC_SUCCESS', 
+                originalId: result.originalId, 
+                newId: result.id 
+            });
+            return result.originalId; // Retorna o ID original para remoção
         });
     });
 
     const results = await Promise.allSettled(syncPromises);
-
     const successfulIds = [];
     results.forEach((result, index) => {
         if (result.status === 'fulfilled') {
@@ -67,24 +81,17 @@ async function syncItems() {
         }
     });
 
-    if (successfulIds.length === 0) {
-        console.log("No items were successfully synced in this batch.");
-        return;
+    if (successfulIds.length > 0) {
+        console.log(`Removing ${successfulIds.length} successfully synced items from the outbox.`);
+        const writeTransaction = db.transaction(['outbox'], 'readwrite');
+        const writeStore = writeTransaction.objectStore('outbox');
+        const deletePromises = successfulIds.map(id => promisifyRequest(writeStore.delete(id)));
+        await Promise.all(deletePromises);
+        console.log("Outbox cleaned of synced items.");
     }
-    
-    console.log(`Removing ${successfulIds.length} successfully synced items from the outbox.`);
-    
-    const writeTransaction = db.transaction(['outbox'], 'readwrite');
-    const writeStore = writeTransaction.objectStore('outbox');
-    
-    const deletePromises = successfulIds.map(id => promisifyRequest(writeStore.delete(id)));
-
-    await Promise.all(deletePromises);
-
-    console.log("Outbox cleaned of synced items.");
 }
 
-self.addEventListener('sync', function(event) {
+self.addEventListener('sync', (event) => {
     if (event.tag == 'sync-new-items') {
         console.log("'sync-new-items' event received!");
         event.waitUntil(syncItems());
