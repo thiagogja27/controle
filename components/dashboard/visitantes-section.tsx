@@ -178,18 +178,26 @@ export function VisitantesSection() {
   }, [isOnline]);
 
   // Efeito para ouvir eventos de sincronização do Service Worker
-  useEffect(() => {
-    const handleSyncSuccess = (event: any) => {
-      const { originalId, newId } = event.detail;
-      console.log(`SYNC-SUCCESS event received: Removendo ID temporário ${originalId}`);
-      // Remove o item local que foi sincronizado
-      setLocalVisitantes(prev => prev.filter(v => v.id !== originalId));
-      toast.success(`Visitante (ID: ${originalId.substring(0,4)}...) sincronizado com sucesso.`);
+    useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      // Garante que a mensagem é do tipo esperado
+      if (event.data && event.data.type === 'SYNC_SUCCESS') {
+        const { originalId, newId } = event.data.payload;
+        if (originalId) {
+          console.log(`UI: Recebido SYNC_SUCCESS para ID temporário ${originalId}. Removendo da lista local.`);
+          // Remove o item temporário da lista local, pois o item real (com newId) chegará via hook do Firebase.
+          setLocalVisitantes(prev => prev.filter(v => v.id !== originalId));
+          toast.success(`Visitante (ID: ${originalId.substring(0,4)}...) foi sincronizado com sucesso.`);
+        }
+      }
     };
 
-    window.addEventListener('sync-success', handleSyncSuccess);
+    // Ouve mensagens do Service Worker
+    navigator.serviceWorker.addEventListener('message', handleMessage);
+
     return () => {
-      window.removeEventListener('sync-success', handleSyncSuccess);
+      // Limpa o listener quando o componente é desmontado
+      navigator.serviceWorker.removeEventListener('message', handleMessage);
     };
   }, []);
 
