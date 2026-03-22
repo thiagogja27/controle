@@ -4,7 +4,7 @@ import { openDB, DBSchema } from 'idb';
 // We need to dispatch an event ONLY in the browser context.
 const isBrowser = typeof window !== 'undefined' && typeof window.document !== 'undefined';
 
-interface OutboxRecord {
+export interface OutboxRecord {
   id: string;
   data: any;
   tableName: string;
@@ -46,7 +46,7 @@ export async function addToOutbox(record: OutboxRecord) {
   }
 }
 
-export async function getOutbox() {
+export async function getOutbox(): Promise<OutboxRecord[]> {
   const db = await getDB();
   if (!db) return [];
   return db.getAll('outbox');

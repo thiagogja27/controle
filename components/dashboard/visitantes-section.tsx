@@ -17,7 +17,7 @@ import { type Visitante, type OcorrenciaCompliance } from "@/lib/store"
 import { useVisitantes, useNavios } from "@/hooks/use-firebase"
 import { useOcorrenciasCompliance } from "@/hooks/use-compliance"
 import { useOnlineStatus } from "@/hooks/use-online-status"
-import { addToOutbox, getOutbox } from "@/utils/db"
+import { addToOutbox, getOutbox, type OutboxRecord } from "@/utils/db"
 import { v4 as uuidv4 } from "uuid";
 import { toast } from "sonner"
 import { cn } from "@/lib/utils"
@@ -166,7 +166,7 @@ export function VisitantesSection() {
     async function loadOutboxData() {
       if (!isOnline) {
         const outboxItems = await getOutbox();
-        const offlineVisitantes = outboxItems.map(item => ({
+        const offlineVisitantes = outboxItems.map((item: OutboxRecord) => ({
           ...item.data,
           id: item.id, // Usa o tempId como id
           isOffline: true, // Flag para a UI
@@ -843,7 +843,7 @@ export function VisitantesSection() {
         <Card><CardContent className="flex items-center gap-4 p-4"><div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10"><UserCheck className="h-6 w-6 text-primary" /></div><div><p className="text-2xl font-bold">{presentes}</p><p className="text-sm text-muted-foreground">Presentes</p></div></CardContent></Card>
         <Card><CardContent className="flex items-center gap-4 p-4"><div className="flex h-12 w-12 items-center justify-center rounded-lg bg-secondary"><UserX className="h-6 w-6 text-muted-foreground" /></div><div><p className="text-2xl font-bold">{sairam}</p><p className="text-sm text-muted-foreground">Saíram Hoje</p></div></CardContent></Card>
         <Card><CardContent className="flex items-center gap-4 p-4"><div className="flex h-12 w-12 items-center justify-center rounded-lg bg-teal-100 dark:bg-teal-900"><Ship className="h-6 w-6 text-teal-600 dark:text-teal-400" /></div><div><p className="text-lg font-bold truncate">{navioTeg?.nome || 'Sem navio'}</p><p className="text-sm text-muted-foreground">Navio no TEG</p></div></CardContent></Card>
-        <Card><CardContent className="flex items-center gap-4 p-4"><div className="flex h-12 w-12 items-center justify-center rounded-lg bg-sky-100 dark:bg-sky-900"><Ship className="h-6 w-6 text-sky-600 dark:sky-400" /></div><div><p className="text-lg font-bold truncate">{navioTeag?.nome || 'Sem navio'}</p><p className="text-sm text-muted-foreground">Navio no TEAG</p></div></CardContent></Card>
+        <Card><CardContent className="flex items-center gap-4 p-4"><div className="flex h-12 w-12 items-center justify-center rounded-lg bg-sky-100 dark:bg-sky-900"><Ship className="h-6 w-6 text-sky-600 dark:text-sky-400" /></div><div><p className="text-lg font-bold truncate">{navioTeag?.nome || 'Sem navio'}</p><p className="text-sm text-muted-foreground">Navio no TEAG</p></div></CardContent></Card>
       </div>
 
       {/* Search and Actions */}
