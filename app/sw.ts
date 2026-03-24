@@ -19,7 +19,7 @@ self.addEventListener("activate", (event) => {
   event.waitUntil(self.clients.claim());
 });
 
-self.addEventListener("sync", (event) => {
+self.addEventListener("sync", (event: any) => {
   if (event.tag === "sync-new-items") {
     console.log("Service Worker: Evento de sincronização 'sync-new-items' recebido.");
     event.waitUntil(handleSync());
