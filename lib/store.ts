@@ -76,6 +76,7 @@ export interface TPA {
   status: "presente" | "saiu"
   credencial?: "azul" | "vermelho" | "verde"
   numeroCip: string
+  meioDeAcesso: "terra" | "mar"
 }
 
 // Used by ConsumoBordo
@@ -87,6 +88,14 @@ export interface Individuo {
   dataSaida?: string
   horaSaida?: string
   credencial?: "azul" | "vermelho" | "verde"
+  diversos?: boolean
+  rg?: string
+  cnh?: string
+  dataNascimento?: string
+  validadeRg?: string
+  validadeCnh?: string
+  telefone?: string
+  categoriaCnh?: string
 }
 
 export interface ConsumoBordo {

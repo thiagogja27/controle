@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Label } from "@/components/ui/label"
+import { Checkbox } from "@/components/ui/checkbox"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { type ConsumoBordo, type Individuo, type OcorrenciaCompliance } from "@/lib/store"
 import { useConsumos } from "@/hooks/use-firebase"
@@ -28,7 +29,23 @@ const ForwardedInput: any = forwardRef<HTMLInputElement, any>((props, ref) => {
 ForwardedInput.displayName = 'ForwardedInput';
 
 const initialFormState: Omit<ConsumoBordo, "id"> = {
-  individuos: [{ id: `new-${Date.now()}`, nome: "", documento: "", status: "presente", dataSaida: "", horaSaida: "", credencial: "azul" }],
+  individuos: [{
+    id: `new-${Date.now()}`,
+    nome: "",
+    documento: "",
+    status: "presente",
+    dataSaida: "",
+    horaSaida: "",
+    credencial: "azul",
+    diversos: false,
+    rg: "",
+    cnh: "",
+    dataNascimento: "",
+    validadeRg: "",
+    validadeCnh: "",
+    telefone: "",
+    categoriaCnh: "",
+  }],
   veiculo: "",
   placa: "",
   produto: "",
@@ -41,6 +58,8 @@ const initialFormState: Omit<ConsumoBordo, "id"> = {
   data: "",
   hora: "",
 }
+
+const cnhCategorias = ["A", "B", "C", "D", "E", "AB", "AC", "AD", "AE"];
 
 const credencialConfig = {
     verde: { text: "Permissão de acesso ao navio", icon: ShieldCheck, className: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200" },
@@ -118,6 +137,14 @@ export function ConsumoSection() {
             dataSaida: "",
             horaSaida: "",
             credencial: individuo.credencial || "azul",
+            diversos: individuo.diversos || false,
+            rg: individuo.rg || "",
+            cnh: individuo.cnh || "",
+            dataNascimento: toBrDate(individuo.dataNascimento),
+            validadeRg: toBrDate(individuo.validadeRg),
+            validadeCnh: toBrDate(individuo.validadeCnh),
+            telefone: individuo.telefone || "",
+            categoriaCnh: individuo.categoriaCnh || "",
         }],
     });
     checkCompliance(individuo.documento, 0);
@@ -130,7 +157,21 @@ export function ConsumoSection() {
           ...selectedConsumo,
           data: toBrDate(selectedConsumo.data),
           tipoServico: selectedConsumo.tipoServico || "",
-          individuos: selectedConsumo.individuos.map(ind => ({ ...ind, documento: ind.documento || "", credencial: ind.credencial || "azul", dataSaida: toBrDate(ind.dataSaida), horaSaida: ind.horaSaida || "" })),
+          individuos: selectedConsumo.individuos.map(ind => ({
+            ...ind,
+            documento: ind.documento || "",
+            credencial: ind.credencial || "azul",
+            dataSaida: toBrDate(ind.dataSaida),
+            horaSaida: ind.horaSaida || "",
+            diversos: ind.diversos || false,
+            rg: ind.rg || "",
+            cnh: ind.cnh || "",
+            dataNascimento: toBrDate(ind.dataNascimento),
+            validadeRg: toBrDate(ind.validadeRg),
+            validadeCnh: toBrDate(ind.validadeCnh),
+            telefone: ind.telefone || "",
+            categoriaCnh: ind.categoriaCnh || "",
+          })),
         })
         selectedConsumo.individuos.forEach((ind, index) => checkCompliance(ind.documento || "", index));
     } else if (!isFormOpen) {
@@ -197,20 +238,20 @@ export function ConsumoSection() {
     clearError(id);
   }
 
-  const handleIndividuoChange = (index: number, field: keyof Omit<Individuo, 'id'>, value: string) => {
+  const handleIndividuoChange = (index: number, field: keyof Omit<Individuo, 'id'>, value: string | boolean) => {
     const newIndividuos = [...formState.individuos];
     (newIndividuos[index] as any)[field] = value;
     setFormState(prev => ({ ...prev, individuos: newIndividuos }));
     clearError(`individuo-${index}-${field}`);
      if (field === 'documento') {
-      checkCompliance(value, index);
+      checkCompliance(value as string, index);
     }
   }
 
   const addIndividuo = () => {
     setFormState(prev => ({
       ...prev,
-      individuos: [...prev.individuos, { id: `new-${Date.now()}`, nome: "", documento: "", status: "presente", dataSaida: "", horaSaida: "", credencial: "azul" }],
+      individuos: [...prev.individuos, { ...initialFormState.individuos[0], id: `new-${Date.now()}`}],
     }))
   }
 
@@ -233,7 +274,23 @@ export function ConsumoSection() {
         ...initialFormState,
         data: toBrDate(now.toISOString().split("T")[0]),
         hora: now.toTimeString().slice(0, 5),
-        individuos: [{ id: `new-${Date.now()}`, nome: "", documento: "", status: "presente", dataSaida: "", horaSaida: "", credencial: "azul" }],
+        individuos: [{
+          id: `new-${Date.now()}`,
+          nome: "",
+          documento: "",
+          status: "presente",
+          dataSaida: "",
+          horaSaida: "",
+          credencial: "azul",
+          diversos: false,
+          rg: "",
+          cnh: "",
+          dataNascimento: "",
+          validadeRg: "",
+          validadeCnh: "",
+          telefone: "",
+          categoriaCnh: "",
+        }],
     }); 
     setIsFormOpen(true)
   }
@@ -280,6 +337,8 @@ export function ConsumoSection() {
 
   const validateForm = () => {
     const errors: FormErrors = {};
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
 
     if (!formState.data || !/^\d{2}\/\d{2}\/\d{4}$/.test(formState.data)) errors.data = "Data inválida (DD/MM/AAAA).";
     if (!formState.hora) errors.hora = "Hora é obrigatória.";
@@ -292,15 +351,49 @@ export function ConsumoSection() {
     if (!formState.vigilante.trim()) errors.vigilante = "Vigilante é obrigatório.";
 
     formState.individuos.forEach((ind, index) => {
-        if (!ind.nome.trim()) {
-            errors[`individuo-${index}-nome`] = "Nome do indivíduo é obrigatório.";
+        if (!ind.nome.trim()) errors[`individuo-${index}-nome`] = "Nome do indivíduo é obrigatório.";
+        if (!ind.documento.trim() || ind.documento.length < 14) errors[`individuo-${index}-documento`] = "Documento (CPF) é obrigatório.";
+        if (ind.dataSaida && !/^\d{2}\/\d{2}\/\d{4}$/.test(ind.dataSaida)) errors[`individuo-${index}-dataSaida`] = "Data de saída inválida (DD/MM/AAAA).";
+
+        if (ind.diversos) {
+            const requiredFields: Partial<Record<keyof Individuo, string>> = {
+                rg: "RG é obrigatório.",
+                validadeRg: "Validade do RG é obrigatória.",
+                cnh: "CNH é obrigatória.",
+                validadeCnh: "Validade da CNH é obrigatória.",
+                categoriaCnh: "Categoria da CNH é obrigatória.",
+                dataNascimento: "Data de nascimento é obrigatória.",
+                telefone: "Telefone é obrigatório."
+            };
+            for (const [field, message] of Object.entries(requiredFields)) {
+                if (!ind[field as keyof typeof ind]) {
+                    errors[`individuo-${index}-${field}`] = message;
+                }
+            }
         }
-        if (!ind.documento.trim() || ind.documento.length < 14) { // CPF mask
-            errors[`individuo-${index}-documento`] = "Documento (CPF) é obrigatório.";
-        }
-        if (ind.dataSaida && !/^\d{2}\/\d{2}\/\d{4}$/.test(ind.dataSaida)) {
-            errors[`individuo-${index}-dataSaida`] = "Data de saída inválida (DD/MM/AAAA).";
-        }
+
+        const dateFields: Array<keyof Individuo> = ['validadeRg', 'validadeCnh', 'dataNascimento'];
+        dateFields.forEach(field => {
+            const brDateValue = ind[field] as string;
+            if (brDateValue) {
+                if (!/^\d{2}\/\d{2}\/\d{4}$/.test(brDateValue)) {
+                    errors[`individuo-${index}-${field}`] = "Formato de data inválido (DD/MM/AAAA).";
+                } else {
+                    const isoDate = toIsoDate(brDateValue);
+                    const date = new Date(isoDate + "T00:00:00");
+                    if (isNaN(date.getTime())) {
+                         errors[`individuo-${index}-${field}`] = "Data inválida.";
+                        return;
+                    }
+                    if (field === 'validadeRg' || field === 'validadeCnh') {
+                        if (date < today) errors[`individuo-${index}-${field}`] = "Documento vencido.";
+                    }
+                    if (field === 'dataNascimento') {
+                        if (date >= today) errors[`individuo-${index}-${field}`] = "Data de nascimento deve ser no passado.";
+                    }
+                }
+            }
+        });
     });
 
     if (formState.individuos.length === 0 || !formState.individuos[0].nome.trim()) {
@@ -325,20 +418,15 @@ export function ConsumoSection() {
             const status: "presente" | "saiu" = (ind.horaSaida && ind.dataSaida) ? 'saiu' : 'presente';
             const dataSaidaISO = toIsoDate(ind.dataSaida);
             
-            if (status === "presente") {
-                return {
-                    ...ind,
-                    status: "presente",
-                    horaSaida: "",
-                    dataSaida: ""
-                };
-            } else {
-                return {
-                    ...ind,
-                    status: "saiu",
-                    dataSaida: dataSaidaISO,
-                };
-            }
+            return {
+                ...ind,
+                status: status,
+                dataSaida: status === 'saiu' ? dataSaidaISO : "",
+                horaSaida: status === 'saiu' ? ind.horaSaida : "",
+                validadeRg: toIsoDate(ind.validadeRg),
+                validadeCnh: toIsoDate(ind.validadeCnh),
+                dataNascimento: toIsoDate(ind.dataNascimento),
+            };
         });
 
     if (individuosToSave.length === 0) {
@@ -574,6 +662,52 @@ export function ConsumoSection() {
                             <SelectItem value="verde">Verde (Navio)</SelectItem>
                           </SelectContent>
                         </Select>
+                         <div className="flex items-center space-x-2">
+                            <Checkbox id={`diversos-${index}`} checked={ind.diversos} onCheckedChange={(checked) => handleIndividuoChange(index, "diversos", checked as boolean)} />
+                            <Label htmlFor={`diversos-${index}`} className="text-amber-500 font-semibold">Informações Adicionais</Label>
+                        </div>
+                        {ind.diversos && (
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t mt-2">
+                                <div className="grid gap-2">
+                                    <Label htmlFor={`rg-${index}`}>RG</Label>
+                                    <IMaskInput mask="00.000.000-0" id={`rg-${index}`} value={ind.rg} onAccept={(value) => handleIndividuoChange(index, 'rg', value as string)} as={ForwardedInput} className={cn(formErrors[`individuo-${index}-rg`] && "border-red-500")} />
+                                    {formErrors[`individuo-${index}-rg`] && <p className="text-red-500 text-xs">{formErrors[`individuo-${index}-rg`]}</p>}
+                                </div>
+                                <div className="grid gap-2">
+                                    <Label htmlFor={`validadeRg-${index}`}>Validade RG</Label>
+                                    <IMaskInput mask="00/00/0000" id={`validadeRg-${index}`} placeholder="DD/MM/AAAA" value={ind.validadeRg} onAccept={(value) => handleIndividuoChange(index, 'validadeRg', value as string)} as={ForwardedInput} className={cn(formErrors[`individuo-${index}-validadeRg`] && "border-red-500")} />
+                                    {formErrors[`individuo-${index}-validadeRg`] && <p className="text-red-500 text-xs">{formErrors[`individuo-${index}-validadeRg`]}</p>}
+                                </div>
+                                <div className="grid gap-2">
+                                    <Label htmlFor={`cnh-${index}`}>CNH</Label>
+                                    <IMaskInput mask="00000000000" id={`cnh-${index}`} value={ind.cnh} onAccept={(value) => handleIndividuoChange(index, 'cnh', value as string)} as={ForwardedInput} className={cn(formErrors[`individuo-${index}-cnh`] && "border-red-500")} />
+                                    {formErrors[`individuo-${index}-cnh`] && <p className="text-red-500 text-xs">{formErrors[`individuo-${index}-cnh`]}</p>}
+                                </div>
+                                <div className="grid gap-2">
+                                    <Label htmlFor={`validadeCnh-${index}`}>Validade CNH</Label>
+                                    <IMaskInput mask="00/00/0000" id={`validadeCnh-${index}`} placeholder="DD/MM/AAAA" value={ind.validadeCnh} onAccept={(value) => handleIndividuoChange(index, 'validadeCnh', value as string)} as={ForwardedInput} className={cn(formErrors[`individuo-${index}-validadeCnh`] && "border-red-500")} />
+                                    {formErrors[`individuo-${index}-validadeCnh`] && <p className="text-red-500 text-xs">{formErrors[`individuo-${index}-validadeCnh`]}</p>}
+                                </div>
+                                <div className="grid gap-2">
+                                    <Label htmlFor={`categoriaCnh-${index}`}>Categoria CNH</Label>
+                                    <Select value={ind.categoriaCnh} onValueChange={(value) => handleIndividuoChange(index, "categoriaCnh", value)}>
+                                        <SelectTrigger className={cn(formErrors[`individuo-${index}-categoriaCnh`] && "border-red-500")}><SelectValue placeholder="Selecione" /></SelectTrigger>
+                                        <SelectContent>{cnhCategorias.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
+                                    </Select>
+                                    {formErrors[`individuo-${index}-categoriaCnh`] && <p className="text-red-500 text-xs">{formErrors[`individuo-${index}-categoriaCnh`]}</p>}
+                                </div>
+                                <div className="grid gap-2">
+                                    <Label htmlFor={`dataNascimento-${index}`}>Data de Nascimento</Label>
+                                    <IMaskInput mask="00/00/0000" id={`dataNascimento-${index}`} placeholder="DD/MM/AAAA" value={ind.dataNascimento} onAccept={(value) => handleIndividuoChange(index, 'dataNascimento', value as string)} as={ForwardedInput} className={cn(formErrors[`individuo-${index}-dataNascimento`] && "border-red-500")} />
+                                    {formErrors[`individuo-${index}-dataNascimento`] && <p className="text-red-500 text-xs">{formErrors[`individuo-${index}-dataNascimento`]}</p>}
+                                </div>
+                                <div className="grid gap-2 sm:col-span-2">
+                                    <Label htmlFor={`telefone-${index}`}>Telefone</Label>
+                                    <IMaskInput mask={['(00) 0000-0000', '(00) 00000-0000']} id={`telefone-${index}`} value={ind.telefone} onAccept={(value) => handleIndividuoChange(index, 'telefone', value as string)} as={ForwardedInput} className={cn(formErrors[`individuo-${index}-telefone`] && "border-red-500")} />
+                                    {formErrors[`individuo-${index}-telefone`] && <p className="text-red-500 text-xs">{formErrors[`individuo-${index}-telefone`]}</p>}
+                                </div>
+                            </div>
+                        )}
                       </div>
                       {formState.individuos.length > 1 && 
                         <Button type="button" variant="ghost" size="icon" onClick={() => removeIndividuo(index)} className="shrink-0 text-destructive hover:text-destructive mt-2"><X className="h-4 w-4" /></Button>}

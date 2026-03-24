@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useMemo, forwardRef } from "react"
-import { LogIn, LogOut, Plus, Search, Ship, Users, Loader2, FilePenLine, Trash2, MoreVertical, XCircle, ShieldCheck, ShieldAlert, WifiOff, AlertTriangle } from "lucide-react"
+import { LogIn, LogOut, Plus, Search, Ship, Users, Loader2, FilePenLine, Trash2, MoreVertical, XCircle, ShieldCheck, ShieldAlert, WifiOff, AlertTriangle, LandPlot, Waves } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -45,6 +45,7 @@ const initialFormState: Omit<TPA, "id" | "status"> = {
   horaSaida: "",
   credencial: "azul",
   numeroCip: "",
+  meioDeAcesso: "terra",
 }
 
 const funcoes = [
@@ -104,6 +105,7 @@ export function TPAsSection() {
     if (!formState.data.trim()) newErrors.data = "Data de entrada é obrigatória";
     if (!formState.hora.trim()) newErrors.hora = "Hora de entrada é obrigatória";
     if (!formState.numeroCip.trim()) newErrors.numeroCip = "Número CIP é obrigatório";
+    if (!formState.meioDeAcesso) newErrors.meioDeAcesso = "O meio de acesso é obrigatório";
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -138,6 +140,7 @@ export function TPAsSection() {
         horaSaida: "",
         credencial: tpa.credencial || "azul",
         numeroCip: tpa.numeroCip || "",
+        meioDeAcesso: tpa.meioDeAcesso || "terra",
     });
     checkCompliance(tpa.documento);
     setIsFormOpen(true);
@@ -152,6 +155,7 @@ export function TPAsSection() {
           dataSaida: selectedTPA.dataSaida || "",
           horaSaida: selectedTPA.horaSaida || "",
           numeroCip: selectedTPA.numeroCip || "",
+          meioDeAcesso: selectedTPA.meioDeAcesso || "terra",
         })
     }
   }, [selectedTPA, isFormOpen])
@@ -509,6 +513,14 @@ export function TPAsSection() {
 
           <div className="max-h-[70vh] overflow-y-auto p-1 mt-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 py-4">
+             <div className="grid gap-2 sm:col-span-2">
+                <Label className={cn({ 'text-red-500': errors.meioDeAcesso })}>Meio de Acesso</Label>
+                <ToggleGroup type="single" value={formState.meioDeAcesso} onValueChange={(value) => handleSelectChange("meioDeAcesso", value)} className="grid grid-cols-2 gap-2">
+                    <ToggleGroupItem value="terra" className="flex flex-col h-16"><LandPlot className="h-5 w-5 mb-1"/><span>Via Terra</span></ToggleGroupItem>
+                    <ToggleGroupItem value="mar" className="flex flex-col h-16"><Waves className="h-5 w-5 mb-1"/><span>Via Mar</span></ToggleGroupItem>
+                </ToggleGroup>
+                {errors.meioDeAcesso && <p className="text-xs text-red-500">{errors.meioDeAcesso}</p>}
+              </div>
               <div className="grid gap-2">
                 <Label htmlFor="nome">Nome</Label>
                 <Input id="nome" placeholder="Nome completo" value={formState.nome} onChange={handleInputChange} className={cn({ 'border-red-500': errors.nome })} />
@@ -653,6 +665,7 @@ export function TPAsSection() {
                             <CredencialBadge credencial={r.credencial} />
                             <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm flex-grow">
                                 <div className="flex flex-col"><span className="text-muted-foreground">Documento</span><span>{r.documento}</span></div>
+                                <div className="flex flex-col"><span className="text-muted-foreground">Acesso</span><span className="capitalize">{r.meioDeAcesso}</span></div>
                                 <div className="flex flex-col"><span className="text-muted-foreground">Placa</span><span>{r.placa || '-'}</span></div>
                                 <div className="flex flex-col"><span className="text-muted-foreground">Navio</span><span>{r.navio}</span></div>
                                 <div className="flex flex-col"><span className="text-muted-foreground">Entrada</span><span>{formatDateTime(r.data, r.hora)}</span></div>
@@ -687,6 +700,7 @@ export function TPAsSection() {
                             <th className="px-4 py-3 font-medium">Função</th>
                             <th className="px-4 py-3 font-medium">Documento</th>
                             <th className="px-4 py-3 font-medium">CIP</th>
+                            <th className="px-4 py-3 font-medium">Acesso</th>
                             <th className="px-4 py-3 font-medium">Placa</th>
                             <th className="px-4 py-3 font-medium">Navio</th>
                             <th className="px-4 py-3 font-medium">Destino</th>
@@ -698,7 +712,7 @@ export function TPAsSection() {
                     </thead>
                     <tbody className="divide-y divide-border/50">
                         {filtered.length === 0 ? (
-                            <tr><td colSpan={13} className="py-8 text-center text-muted-foreground">Nenhum registro encontrado para os filtros aplicados.</td></tr>
+                            <tr><td colSpan={14} className="py-8 text-center text-muted-foreground">Nenhum registro encontrado para os filtros aplicados.</td></tr>
                         ) : (
                             filtered.map(r => (
                                 <tr key={r.id} className={cn("hover:bg-muted/50", r.credencial && credencialConfig[r.credencial]?.className.replace(/text-\S+/, '').replace(/dark:text-\S+/, ''))}>
@@ -714,6 +728,7 @@ export function TPAsSection() {
                                     <td className="px-4 py-3 text-muted-foreground">{r.funcao}</td>
                                     <td className="px-4 py-3 tabular-nums text-muted-foreground">{r.documento}</td>
                                     <td className="px-4 py-3 tabular-nums text-muted-foreground">{r.numeroCip || '-'}</td>
+                                    <td className="px-4 py-3 capitalize text-muted-foreground"><div className="flex items-center gap-2"><IconeAcesso meio={r.meioDeAcesso} /> {r.meioDeAcesso}</div></td>
                                     <td className="px-4 py-3 tabular-nums text-muted-foreground">{r.placa || '-'}</td>
                                     <td className="px-4 py-3 whitespace-nowrap text-foreground">{r.navio}</td>
                                     <td className="px-4 py-3 text-muted-foreground">{r.destino}</td>
@@ -743,3 +758,10 @@ export function TPAsSection() {
     </TooltipProvider>
   )
 }
+
+const IconeAcesso = ({ meio }: { meio: 'terra' | 'mar' }) => {
+    if (meio === 'terra') {
+        return <LandPlot className="h-4 w-4 text-gray-500" />;
+    }
+    return <Waves className="h-4 w-4 text-blue-500" />;
+};
