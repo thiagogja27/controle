@@ -102,6 +102,7 @@ function useFirebaseCollection<T extends { id: string }>(collectionPath: string)
   }, [collectionPath])
 
   const updateItem = useCallback(async (id: string, updates: Partial<T>) => {
+    console.log(`useFirebaseCollection: Updating item in ${collectionPath}. ID: ${id}, Updates:`, updates); // ADDED LOG
     try {
       const itemRef = ref(db, `${collectionPath}/${id}`)
       await update(itemRef, updates)

@@ -1,6 +1,13 @@
 {
   "rules": {
-    ".read": true,
-    ".write": true
+    "refeicoes": {
+      ".read": true,
+      ".write": true,
+      ".indexOn": [
+        "prefixo",
+        "vigilante",
+        "data"
+      ]
+    }
   }
 }

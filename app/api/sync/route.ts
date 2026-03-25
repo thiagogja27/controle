@@ -1,6 +1,7 @@
+
 import { NextResponse } from 'next/server';
 import { getFirebaseAdmin } from '@/lib/firebase-admin';
-import admin from 'firebase-admin';
+import { ServerValue } from 'firebase-admin/database';
 
 export const dynamic = 'force-dynamic';
 
@@ -20,7 +21,7 @@ export async function POST(request: Request) {
       const itemRef = adminDb.ref(`${tableName}/${firebaseKeyForUpdate}`);
       await itemRef.update({
         ...data,
-        timestamp_update: admin.database.ServerValue.TIMESTAMP,
+        timestamp_update: ServerValue.TIMESTAMP,
       });
       console.log(`Documento ${firebaseKeyForUpdate} atualizado no Realtime Database.`);
       // Retorna o tempId do outbox como originalId para o SW poder deletá-lo
@@ -29,7 +30,7 @@ export async function POST(request: Request) {
       const collectionRef = adminDb.ref(tableName);
       const newDoc = await collectionRef.push({
         ...data,
-        timestamp_server: admin.database.ServerValue.TIMESTAMP,
+        timestamp_server: ServerValue.TIMESTAMP,
       });
       console.log("Documento criado no Realtime Database com ID: ", newDoc.key);
       // Retorna o tempId do outbox (como originalId) e o novo ID do Firebase

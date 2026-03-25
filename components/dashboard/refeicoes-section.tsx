@@ -114,7 +114,9 @@ export function RefeicoesSection() {
                 return true;
             }
             const today = new Date().toISOString().split('T')[0];
-            return r.data === today;
+            const entryDateIsToday = r.data === today;
+            const exitDateIsToday = r.individuos?.some(ind => ind.dataSaida === today);
+            return entryDateIsToday || exitDateIsToday;
         }
         const entrada = r.data;
         const afterStart = dataInicio ? entrada >= dataInicio : true;
