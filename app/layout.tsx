@@ -1,5 +1,4 @@
-import { GeistSans } from 'geist/font/sans';
-import { GeistMono } from 'geist/font/mono';
+import { Inter } from 'next/font/google';
 import './globals.css'
 import { ClientLayout } from '@/components/client-layout'
 
@@ -9,14 +8,19 @@ export const metadata = {
   description: "Controle Project PWA",
 };
 
+const inter = Inter({
+  subsets: ['latin'],
+  display: 'swap',
+});
+
 export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en" className={`${GeistSans.variable} ${GeistMono.variable}`}>
-      <body className="font-sans antialiased">
+    <html lang="en">
+      <body className={`${inter.className} font-sans antialiased`}>
         <ClientLayout>
           {children}
         </ClientLayout>
