@@ -1,7 +1,7 @@
 'use client'
 
 import { cn } from "@/lib/utils"
-import { LayoutDashboard, Users, Utensils, CreditCard, Package, BarChart, Settings, Map, ShieldCheck } from "lucide-react"
+import { LayoutDashboard, Users, Utensils, CreditCard, Package, BarChart, Settings, Map, ShieldCheck, BookOpenCheck } from "lucide-react"
 
 interface NavigationProps {
   activeSection: string
@@ -57,7 +57,13 @@ const sections = [
     description: "Geração e exportação de relatórios",
     icon: BarChart,
   },
-    {
+  {
+    id: "documentacao",
+    label: "Documentação",
+    description: "Como usar o sistema",
+    icon: BookOpenCheck,
+  },
+  {
     id: "settings",
     label: "Configurações",
     description: "Ajustes e personalizações do sistema",

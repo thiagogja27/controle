@@ -11,7 +11,8 @@ import { TPAsSection } from "@/components/dashboard/tpas-section"
 import { ConsumoSection } from "@/components/dashboard/consumo-section"
 import { ReportsSection } from "@/components/dashboard/reports-section"
 import { SettingsSection } from "@/components/dashboard/settings-section"
-import { MapaTerminalSection } from "@/components/dashboard/mapa-terminal-section" // Importa o novo componente
+import { MapaTerminalSection } from "@/components/dashboard/mapa-terminal-section"
+import { DocumentacaoSection } from "@/components/dashboard/documentacao-section"
 
 export default function Dashboard() {
   const [activeSection, setActiveSection] = useState("dashboard")
@@ -26,10 +27,11 @@ export default function Dashboard() {
     compliance: ComplianceSection,
     refeicoes: RefeicoesSection,
     tpas: TPAsSection,
-    mapa: MapaTerminalSection, // Adiciona a nova seção
+    mapa: MapaTerminalSection,
     consumo: ConsumoSection,
     reports: ReportsSection,
     settings: SettingsSection,
+    documentacao: DocumentacaoSection,
   }), []);
 
   const ActiveComponent = sectionComponents[activeSection] || PainelSection;

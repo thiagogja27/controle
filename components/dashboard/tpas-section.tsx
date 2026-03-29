@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useMemo, forwardRef } from "react"
+import { useState, useEffect, useMemo, forwardRef, useCallback } from "react"
 import { LogIn, LogOut, Plus, Search, Ship, Users, Loader2, FilePenLine, Trash2, MoreVertical, XCircle, ShieldCheck, ShieldAlert, WifiOff, AlertTriangle, LandPlot, Waves } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -88,11 +88,32 @@ export function TPAsSection() {
   const [isSaving, setIsSaving] = useState(false)
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false)
   const [selectedTPA, setSelectedTPA] = useState<TPA | null>(null)
+  const [isReEntryMode, setIsReEntryMode] = useState(false);
   const [formState, setFormState] = useState(initialFormState)
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   const [complianceAlert, setComplianceAlert] = useState<OcorrenciaCompliance | null>(null);
   const [isCriticalAlertOpen, setIsCriticalAlertOpen] = useState(false);
+
+  const activeTpaDocuments = useMemo(() => {
+    const activeDocs = new Set<string>();
+    registros.forEach(r => {
+        if (r && r.status === "presente" && r.documento) {
+            activeDocs.add(r.documento.replace(/\D/g, ''));
+        }
+    });
+    return activeDocs;
+  }, [registros]);
+
+  const allTpaDocuments = useMemo(() => {
+      const docs = new Set<string>();
+      registros.forEach(r => {
+          if (r && r.documento) {
+              docs.add(r.documento.replace(/\D/g, ''));
+          }
+      });
+      return docs;
+  }, [registros]);
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
@@ -106,6 +127,24 @@ export function TPAsSection() {
     if (!formState.hora.trim()) newErrors.hora = "Hora de entrada é obrigatória";
     if (!formState.numeroCip.trim()) newErrors.numeroCip = "Número CIP é obrigatório";
     if (!formState.meioDeAcesso) newErrors.meioDeAcesso = "O meio de acesso é obrigatório";
+
+    const unmaskedDoc = formState.documento.replace(/\D/g, '');
+    if (!formState.documento.trim()) {
+        newErrors.documento = "Documento (CPF) é obrigatório.";
+    } else if (unmaskedDoc.length < 11) {
+        newErrors.documento = "Documento (CPF) deve ter 11 dígitos.";
+    } else if (selectedTPA) { // Editing an existing record
+        const originalDoc = (selectedTPA.documento || '').replace(/\D/g, '');
+        if (unmaskedDoc !== originalDoc && activeTpaDocuments.has(unmaskedDoc)) {
+              newErrors.documento = "Já existe um registro de entrada ativo para este CPF.";
+        }
+    } else { // Adding a new record (brand new or re-entry)
+          if (activeTpaDocuments.has(unmaskedDoc)) {
+              newErrors.documento = "Já existe um registro de entrada ativo para este CPF.";
+          } else if (!isReEntryMode && allTpaDocuments.has(unmaskedDoc)) {
+            newErrors.documento = "CPF já cadastrado. Para registrar nova entrada, use a função 'Nova Entrada'.";
+        }
+    }
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -143,6 +182,7 @@ export function TPAsSection() {
         meioDeAcesso: tpa.meioDeAcesso || "terra",
     });
     checkCompliance(tpa.documento);
+    setIsReEntryMode(true);
     setIsFormOpen(true);
   };
 
@@ -252,6 +292,7 @@ export function TPAsSection() {
         data: now.toISOString().split("T")[0],
         hora: now.toTimeString().slice(0, 5) 
     });
+    setIsReEntryMode(false);
     setIsFormOpen(true)
   }
 
@@ -492,11 +533,11 @@ export function TPAsSection() {
 
 
       {/* Add/Edit Dialog */}
-      <Dialog open={isFormOpen} onOpenChange={(isOpen) => { if(!isOpen) { setFormState(initialFormState); setErrors({}); setComplianceAlert(null); } setIsFormOpen(isOpen); }}>
+      <Dialog open={isFormOpen} onOpenChange={(isOpen) => { if(!isOpen) { setFormState(initialFormState); setErrors({}); setComplianceAlert(null); setIsReEntryMode(false); } setIsFormOpen(isOpen); }}>
         <DialogContent className="max-w-lg w-full mx-4 sm:mx-auto">
             <DialogHeader>
                 <DialogTitle className="flex items-center gap-2">
-                {selectedTPA ? "Editar Registro TPA" : "Registrar Entrada TPA"}
+                {selectedTPA ? "Editar Registro TPA" : isReEntryMode ? "Nova Entrada para TPA" : "Registrar Entrada TPA"}
                 {!isOnline && <span className="inline-flex items-center gap-1.5 rounded-full bg-yellow-100 px-2 py-0.5 text-xs font-medium text-yellow-800"><WifiOff className="h-3 w-3"/>Offline</span>}
                 </DialogTitle>
             </DialogHeader>

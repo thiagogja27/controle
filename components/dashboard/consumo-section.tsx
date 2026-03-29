@@ -94,6 +94,7 @@ export function ConsumoSection() {
   const [isSaving, setIsSaving] = useState(false)
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false)
   const [selectedConsumo, setSelectedConsumo] = useState<ConsumoBordo | null>(null)
+  const [isReEntryMode, setIsReEntryMode] = useState(false);
   const [formState, setFormState] = useState(initialFormState)
   const [formErrors, setFormErrors] = useState<FormErrors>({});
   const [complianceAlerts, setComplianceAlerts] = useState<Record<number, OcorrenciaCompliance | null>>({});
@@ -117,6 +118,30 @@ export function ConsumoSection() {
         setComplianceAlerts(prev => ({ ...prev, [index]: null }));
     }
   }
+
+  const allConsumoDocuments = useMemo(() => {
+      const docs = new Set<string>();
+      consumos.forEach(c => {
+          c.individuos.forEach(i => {
+              if (i.documento) {
+                  docs.add(i.documento.replace(/\D/g, ''));
+              }
+          });
+      });
+      return docs;
+  }, [consumos]);
+
+  const activeConsumoDocuments = useMemo(() => {
+      const docs = new Set<string>();
+      consumos.forEach(c => {
+          c.individuos.forEach(i => {
+              if (i.status === 'presente' && i.documento) {
+                  docs.add(i.documento.replace(/\D/g, ''));
+              }
+          });
+      });
+      return docs;
+  }, [consumos]);
 
   const handleReEntry = (consumo: ConsumoBordo, individuo: Individuo) => {
     setSelectedConsumo(null);
@@ -148,6 +173,7 @@ export function ConsumoSection() {
         }],
     });
     checkCompliance(individuo.documento, 0);
+    setIsReEntryMode(true);
     setIsFormOpen(true);
   };
 
@@ -291,7 +317,8 @@ export function ConsumoSection() {
           telefone: "",
           categoriaCnh: "",
         }],
-    }); 
+    });
+    setIsReEntryMode(false);
     setIsFormOpen(true)
   }
 
@@ -350,10 +377,36 @@ export function ConsumoSection() {
     if (!formState.empresa.trim()) errors.empresa = "Empresa é obrigatória.";
     if (!formState.vigilante.trim()) errors.vigilante = "Vigilante é obrigatório.";
 
+    const currentDocsInForm = new Set<string>();
+
     formState.individuos.forEach((ind, index) => {
         if (!ind.nome.trim()) errors[`individuo-${index}-nome`] = "Nome do indivíduo é obrigatório.";
-        if (!ind.documento.trim() || ind.documento.length < 14) errors[`individuo-${index}-documento`] = "Documento (CPF) é obrigatório.";
         if (ind.dataSaida && !/^\d{2}\/\d{2}\/\d{4}$/.test(ind.dataSaida)) errors[`individuo-${index}-dataSaida`] = "Data de saída inválida (DD/MM/AAAA).";
+
+        // CPF/Document validation
+        const unmaskedDoc = (ind.documento || '').replace(/\D/g, '');
+        if (!unmaskedDoc) {
+            errors[`individuo-${index}-documento`] = "Documento (CPF) é obrigatório.";
+        } else if (unmaskedDoc.length < 11) {
+            errors[`individuo-${index}-documento`] = "Documento (CPF) deve ter 11 dígitos.";
+        } else if (currentDocsInForm.has(unmaskedDoc)) {
+            errors[`individuo-${index}-documento`] = "CPF duplicado neste mesmo formulário.";
+        } else {
+            currentDocsInForm.add(unmaskedDoc);
+            if (selectedConsumo) { // Editing an existing consumption record
+                const originalIndividuo = selectedConsumo.individuos.find(origInd => origInd.id === ind.id);
+                const originalDoc = originalIndividuo ? originalIndividuo.documento.replace(/\D/g, '') : '';
+                if (unmaskedDoc !== originalDoc && activeConsumoDocuments.has(unmaskedDoc)) {
+                     errors[`individuo-${index}-documento`] = "Já existe um registro de entrada ativo para este CPF.";
+                }
+            } else { // Adding a new consumption record (which can be a re-entry)
+                if (activeConsumoDocuments.has(unmaskedDoc)) {
+                    errors[`individuo-${index}-documento`] = "Já existe um registro de entrada ativo para este CPF.";
+                } else if (!isReEntryMode && allConsumoDocuments.has(unmaskedDoc)) {
+                    errors[`individuo-${index}-documento`] = "CPF já cadastrado. Use 'Nova Entrada' para registrar um indivíduo existente.";
+                }
+            }
+        }
 
         if (ind.diversos) {
             const requiredFields: Partial<Record<keyof Individuo, string>> = {
@@ -612,12 +665,11 @@ export function ConsumoSection() {
         </Card>
 
       {/* Add/Edit Dialog */}
-      <Dialog open={isFormOpen} onOpenChange={(isOpen) => { if(!isOpen) { setFormState(initialFormState); setComplianceAlerts({}) }; setIsFormOpen(isOpen); }}>
+      <Dialog open={isFormOpen} onOpenChange={(isOpen) => { if(!isOpen) { setFormState(initialFormState); setComplianceAlerts({}); setIsReEntryMode(false); }; setIsFormOpen(isOpen); }}>
         <DialogContent className="max-w-2xl w-full mx-4 sm:mx-auto">
             <DialogHeader>
-                <DialogTitle className="flex items-center gap-2">
-                {selectedConsumo ? "Editar Registro" : "Registrar Consumo de Bordo"}
-                {!isOnline && <span className="inline-flex items-center gap-1.5 rounded-full bg-yellow-100 px-2 py-0.5 text-xs font-medium text-yellow-800"><WifiOff className="h-3 w-3"/>Offline</span>}
+                 <DialogTitle className="flex items-center gap-2">
+                    {selectedConsumo ? "Editar Registro" : isReEntryMode ? "Nova Entrada para Indivíduo" : "Registrar Consumo de Bordo"}
                 </DialogTitle>
             </DialogHeader>
           <div className="max-h-[80vh] overflow-y-auto p-1">
@@ -625,7 +677,7 @@ export function ConsumoSection() {
               <div className="rounded-lg border bg-secondary/30 p-4 space-y-3">
                  <div className="flex items-center justify-between">
                     <Label className={cn(formErrors.individuos && "text-destructive")}>Indivíduos</Label>
-                    <Button type="button" variant="outline" size="sm" onClick={addIndividuo}><Plus className="mr-1 h-3 w-3" />Adicionar</Button>
+                    <Button type="button" variant="outline" size="sm" onClick={addIndividuo} disabled={isReEntryMode}><Plus className="mr-1 h-3 w-3" />Adicionar</Button>
                 </div>
                 {formErrors.individuos && <p className="text-red-500 text-xs mt-2">{formErrors.individuos}</p>}
                 <div className="space-y-4">
@@ -709,7 +761,7 @@ export function ConsumoSection() {
                             </div>
                         )}
                       </div>
-                      {formState.individuos.length > 1 && 
+                      {formState.individuos.length > 1 && !isReEntryMode &&
                         <Button type="button" variant="ghost" size="icon" onClick={() => removeIndividuo(index)} className="shrink-0 text-destructive hover:text-destructive mt-2"><X className="h-4 w-4" /></Button>}
                     </div>
                   ))}

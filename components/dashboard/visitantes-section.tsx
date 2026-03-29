@@ -1,4 +1,3 @@
-
       'use client'
       
       import { useState, useEffect, forwardRef, useMemo } from "react"
@@ -141,6 +140,7 @@
         const [isSaving, setIsSaving] = useState(false)
         const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false)
         const [selectedVisitante, setSelectedVisitante] = useState<Visitante | null>(null)
+        const [isReEntryMode, setIsReEntryMode] = useState(false); // State to track re-entry mode
         
         const [formState, setFormState] = useState<Omit<Visitante, "id" | "status">>(initialFormState)
         const [persons, setPersons] = useState<Person[]>([]);
@@ -253,12 +253,13 @@
           setPersons([person]);
       
           checkCompliance(documento, 0); // Check compliance for the first (and only) person
-      
+          setIsReEntryMode(true); // Set re-entry mode to true
           setIsFormOpen(true);
         };
       
         useEffect(() => {
           if (isFormOpen && selectedVisitante) {
+            setIsReEntryMode(false);
             const isOutro = !destinos.includes(selectedVisitante.destino);
             setFormState({
               ...selectedVisitante,
@@ -285,6 +286,7 @@
             setFormErrors({ common: {}, persons: [] });
             setComplianceAlert(null);
             setPersonComplianceAlerts([]);
+            setIsReEntryMode(false); // Always reset on close
           }
         }, [isFormOpen, selectedVisitante]);
       
@@ -305,6 +307,16 @@
                 }
             });
             return activeDocs;
+        }, [visitantes]);
+
+        const allVisitorDocuments = useMemo(() => {
+            const docs = new Set<string>();
+            visitantes.forEach(v => {
+                if (v.documento) {
+                    docs.add(v.documento.replace(/\D/g, ''));
+                }
+            });
+            return docs;
         }, [visitantes]);
 
         const filteredVisitantes = useMemo(() => {
@@ -384,7 +396,6 @@
         const handleCheckboxChange = (id: string, checked: boolean) => {
           setFormState(prev => ({ ...prev, [id]: checked }))
           if (id === 'diversos' && !checked) {
-            // Clear errors for all fields inside 'diversos' when it's unchecked
             const diverseFields = ['rg', 'validadeRg', 'cnh', 'validadeCnh', 'categoriaCnh', 'dataNascimento', 'telefone'];
             const newErrors = { ...formErrors.common };
             diverseFields.forEach(field => delete newErrors[field as keyof FormErrors]);
@@ -458,6 +469,7 @@
           setPersons([{...initialPersonState, tempId: uuidv4()}]);
           setOutroDestino("");
           setFormErrors({ common: {}, persons: [] });
+          setIsReEntryMode(false); // Set re-entry mode to false
           setIsFormOpen(true);
         }
       
@@ -470,6 +482,7 @@
           setPersons([]);
           setFormErrors({ common: {}, persons: [] });
           checkCompliance(visitante.documento);
+          setIsReEntryMode(false);
           setIsFormOpen(true)
         }
       
@@ -541,7 +554,9 @@
                 if (!person.documento.trim() || unmaskedDoc.length < 11) {
                     personErrors.documento = "Documento (CPF) é obrigatório e deve ter 11 dígitos.";
                 } else if (activeVisitorDocuments.has(unmaskedDoc)) {
-                     personErrors.documento = "Já existe um registro de entrada ativo para este documento.";
+                    personErrors.documento = "Já existe um registro de entrada ativo para este documento.";
+                } else if (!isReEntryMode && allVisitorDocuments.has(unmaskedDoc)) {
+                    personErrors.documento = "CPF já cadastrado. Para registrar nova visita, use 'Nova Entrada' no histórico.";
                 }
       
                 if (person.diversos) {
@@ -898,7 +913,7 @@
               <DialogContent className="max-w-4xl w-full mx-4 sm:mx-auto">
                   <DialogHeader>
                       <DialogTitle className="flex items-center gap-2">
-                      {selectedVisitante ? "Editar Visitante" : "Registrar Novo(s) Visitante(s)"}
+                      {selectedVisitante ? "Editar Visitante" : isReEntryMode ? "Nova Entrada para Visitante Existente" : "Registrar Novo(s) Visitante(s)"}
                       {!isOnline && <span className="inline-flex items-center gap-1.5 rounded-full bg-yellow-100 px-2 py-0.5 text-xs font-medium text-yellow-800"><WifiOff className="h-3 w-3"/>Offline</span>}
                       </DialogTitle>
                   </DialogHeader>
@@ -1203,7 +1218,7 @@
                                {v.status === "presente" ? (
                                  <Button size="sm" variant="outline" onClick={() => handleRegistrarSaida(v.id)} className="flex items-center gap-2"><Clock className="h-4 w-4" /><span>Sair</span></Button>
                                ) : (
-                                 <Button size="sm" variant="outline" onClick={() => handleReEntry(v)} className="flex items-center gap-2" disabled={activeVisitorDocuments.has((v.documento || '').replace(/\D/g, ''))}><LogIn className="h-4 w-4" /><span>Nova Entrada</span></Button>
+                                 <Button size="sm" variant="outline" onClick={() => handleReEntry(v)} className="flex items-center gap-2" disabled={activeVisitorDocuments.has((v.documento || '').replace(/\D/g, ''))}>Nova Entrada</Button>
                                )}
                                <Button size="icon" variant="ghost" onClick={() => handleEdit(v)} disabled={!isOnline}><FilePenLine className="h-4 w-4" /></Button>
                                <Button size="icon" variant="ghost" onClick={() => handleDelete(v)} className="text-destructive hover:text-destructive/90" disabled={!isOnline}><Trash2 className="h-4 w-4" /></Button>
@@ -1221,4 +1236,3 @@
          </TooltipProvider>
        )
      }
-     
