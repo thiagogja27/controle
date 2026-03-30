@@ -686,7 +686,7 @@ export function ConsumoSection() {
                     <div key={ind.id || index} className="grid grid-cols-[1fr_auto] gap-3 items-start border-t pt-4 first:border-t-0 first:pt-0">
                       <div className="space-y-3">
                         {complianceAlerts[index] && (
-                            <Alert variant={complianceAlerts[index]?.isCritical ? "destructive" : "warning"}>
+                            <Alert variant={complianceAlerts[index]?.isCritical ? "destructive" : "destructive"}>
                                 <ShieldAlert className="h-4 w-4" />
                                 <AlertTitle>{complianceAlerts[index]?.isCritical ? "Registro Bloqueado" : "Alerta de Compliance"}</AlertTitle>
                                 <AlertDescription>

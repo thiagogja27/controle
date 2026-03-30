@@ -865,7 +865,7 @@ export function VisitantesSection() {
             <>
             {/* EDIT MODE FORM (Single person) */}
             {complianceAlerts[selectedVisitante.id] && (
-                <Alert variant={complianceAlerts[selectedVisitante.id]?.isCritical ? "destructive" : "warning"} className="mt-4">
+                <Alert variant={complianceAlerts[selectedVisitante.id]?.isCritical ? "destructive" : "destructive"} className="mt-4">
                     <ShieldAlert className="h-4 w-4" />
                     <AlertTitle>{complianceAlerts[selectedVisitante.id]?.isCritical ? "Registro Bloqueado" : "Alerta de Compliance"}</AlertTitle>
                     <AlertDescription>{complianceAlerts[selectedVisitante.id]?.motivo}</AlertDescription>
@@ -944,7 +944,7 @@ export function VisitantesSection() {
                {persons.map((person, index) => (
                    <div key={person.tempId} className="border rounded-lg p-4 mb-4 relative">
                        {complianceAlerts[person.tempId] && (
-                            <Alert variant={complianceAlerts[person.tempId]?.isCritical ? "destructive" : "warning"} className="mb-4">
+                            <Alert variant={complianceAlerts[person.tempId]?.isCritical ? "destructive" : "destructive"} className="mb-4">
                                 <ShieldAlert className="h-4 w-4" />
                                 <AlertTitle>{complianceAlerts[person.tempId]?.isCritical ? "Registro Bloqueado" : "Alerta de Compliance"}</AlertTitle>
                                 <AlertDescription>{complianceAlerts[person.tempId]?.motivo}</AlertDescription>

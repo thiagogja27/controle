@@ -511,7 +511,7 @@ export function TPAsSection() {
             </DialogHeader>
           
           {complianceAlert && (
-            <Alert variant={complianceAlert.isCritical ? "destructive" : "warning"} className="mt-4">
+            <Alert variant={complianceAlert.isCritical ? "destructive" : "destructive"} className="mt-4">
               <ShieldAlert className="h-4 w-4" />
               <AlertTitle>{complianceAlert.isCritical ? "Registro Bloqueado" : "Alerta de Compliance"}</AlertTitle>
               <AlertDescription>{complianceAlert.motivo}</AlertDescription>
