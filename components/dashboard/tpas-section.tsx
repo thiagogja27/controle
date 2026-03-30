@@ -31,6 +31,7 @@ ForwardedInput.displayName = 'ForwardedInput';
 
 const initialFormState: Omit<Tpa, "id" | "status"> = {
   nome: "",
+  empresa: "",
   funcao: "",
   documento: "",
   observacao: "",
@@ -281,59 +282,59 @@ export function TPAsSection() {
 
   const handleSave = async () => {
     if (!validateForm()) {
-        toast.warning("Por favor, preencha todos os campos obrigatórios marcados em vermelho.");
-        return;
-    };
+      toast.warning("Por favor, preencha todos os campos obrigatórios marcados em vermelho.");
+      return;
+    }
 
-    setIsSaving(true)
+    setIsSaving(true);
 
-    let dataToSave: Omit<Tpa, "id" | "status"> & { status: string } = { ...formState, status: "ativo" };
-
+    const status: "ativo" | "inativo" = "ativo";
+    const dataToSave = { ...formState, status };
 
     if (!isOnline) {
-        if (selectedTPA) {
-            toast.error("Não é possível editar registros existentes offline.");
-            setIsSaving(false);
-            return;
-        }
-        try {
-            const tempId = uuidv4();
-            await addToOutbox({ 
-                id: tempId, 
-                tableName: 'tpa', 
-                data: dataToSave,
-                action: 'create'
-            });
-
-            if ('serviceWorker' in navigator && 'SyncManager' in window) {
-                navigator.serviceWorker.ready.then(sw => sw.sync.register('sync-new-items'));
-            }
-
-            toast.success("Salvo com sucesso no navegador! O registro será sincronizado assim que a conexão for restaurada.");
-            setIsFormOpen(false);
-        } catch (error) {
-            console.error("Erro ao salvar TPA offline:", error);
-            toast.error("Falha ao salvar o registro localmente.");
-        } finally {
-            setIsSaving(false);
-        }
+      if (selectedTPA) {
+        toast.error("Não é possível editar registros existentes offline.");
+        setIsSaving(false);
         return;
+      }
+      try {
+        const tempId = uuidv4();
+        await addToOutbox({
+          id: tempId,
+          tableName: 'tpa',
+          data: dataToSave,
+          action: 'create'
+        });
+
+        if ('serviceWorker' in navigator && 'SyncManager' in window) {
+          navigator.serviceWorker.ready.then(sw => sw.sync.register('sync-new-items'));
+        }
+
+        toast.success("Salvo com sucesso no navegador! O registro será sincronizado assim que a conexão for restaurada.");
+        setIsFormOpen(false);
+      } catch (error) {
+        console.error("Erro ao salvar TPA offline:", error);
+        toast.error("Falha ao salvar o registro localmente.");
+      } finally {
+        setIsSaving(false);
+      }
+      return;
     }
 
     try {
       if (selectedTPA) {
-        await updateItem(selectedTPA.id, dataToSave)
-        toast.success("Registro de TPA atualizado com sucesso!")
+        await updateItem(selectedTPA.id, dataToSave);
+        toast.success("Registro de TPA atualizado com sucesso!");
       } else {
-        await addItem(dataToSave)
-        toast.success("TPA registrado com sucesso!")
+        await addItem(dataToSave);
+        toast.success("TPA registrado com sucesso!");
       }
-      setIsFormOpen(false)
+      setIsFormOpen(false);
     } catch (error) {
-      console.error("Erro ao salvar TPA:", error)
-      toast.error("Ocorreu um erro ao salvar o registro.")
+      console.error("Erro ao salvar TPA:", error);
+      toast.error("Ocorreu um erro ao salvar o registro.");
     } finally {
-      setIsSaving(false)
+      setIsSaving(false);
     }
   }
 

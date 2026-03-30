@@ -210,7 +210,7 @@ export function PainelSection() {
     
     const allPresentIndividuals = useMemo(() => {
         const presentVisitantes = visitantes.filter(v => v.status === 'presente').map(v => ({ id: v.id, nome: v.nome, type: 'Visitante', destino: (v.terminal || '').toUpperCase(), details: [{ label: 'Empresa', value: v.empresa }, { label: 'Documento', value: v.documento }] }));
-        const presentTPAs = tpas.filter(t => t.status === 'presente').map(t => ({ id: t.id, nome: t.nome, type: 'TPA', destino: 'TEG', details: [{ label: 'Função', value: t.funcao }, { label: 'Documento', value: t.documento }] }));
+        const presentTPAs = tpas.filter(t => t.status === 'ativo').map(t => ({ id: t.id, nome: t.nome, type: 'TPA', destino: 'TEG', details: [{ label: 'Função', value: t.funcao }, { label: 'Documento', value: t.documento }] }));
         // @ts-ignore
         const presentConsumos = rawConsumos.flatMap(c => (c.individuos || []).filter(i => i.status === 'presente').map(i => ({ id: i.id, nome: i.nome, type: 'Consumo de Bordo', destino: (c.terminal || '').toUpperCase(), details: [{ label: 'Empresa', value: c.empresa }, { label: 'Veículo', value: `${c.veiculo} (${c.placa})` }, { label: 'Produto', value: c.produto }] })));
         return [...presentVisitantes, ...presentTPAs, ...presentConsumos];
@@ -222,7 +222,7 @@ export function PainelSection() {
     const totalTEAG = presentesTEAG.length;
     const totalVisitantesPresentes = visitantes.filter(v => v.status === 'presente').length;
     const totalPoliciaisPresentes = refeicoes.flatMap(r => r.individuos).filter(i => i.status === 'presente').length;
-    const totalTPAsPresentes = tpas.filter(t => t.status === 'presente').length;
+    const totalTPAsPresentes = tpas.filter(t => t.status === 'ativo').length;
 
     const consumoPorEmpresa = useMemo(() => {
          // @ts-ignore

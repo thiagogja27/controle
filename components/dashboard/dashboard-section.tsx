@@ -14,9 +14,9 @@ import {
     BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, 
     PieChart, Pie, Cell, Legend
 } from 'recharts'
-import { type RefeicaoPolicial, type OldRefeicaoPolicial } from './refeicoes-section'
+import { type OldRefeicaoPolicial } from './refeicoes-section'
 import { cn } from "@/lib/utils"
-import { type Visitante, type Individuo } from '@/lib/store'
+import { type Visitante, type Individuo, type RefeicaoPolicial, type IndividuoRefeicao, type Tpa } from '@/lib/store'
 
 const COLORS = ['#3b82f6', '#10b981', '#f97316', '#8b5cf6', '#ec4899'];
 
@@ -77,8 +77,7 @@ export function DashboardSection() {
           nome: oldRecord.nome || 'N/A',
           status: oldRecord.status || "presente",
           dataSaida: oldRecord.dataSaida || "",
-          horaSaida: oldRecord.horaSaida || "",
-          documento: oldRecord.documento || "",
+          horaSaida: oldRecord.horaSaida || ""
         }]
       } as RefeicaoPolicial
     })
@@ -100,7 +99,7 @@ export function DashboardSection() {
         }));
 
     const presentTPAs = tpas
-        .filter(t => t.status === 'presente')
+        .filter(t => t.status === 'ativo')
         .map(t => ({
             id: t.id,
             nome: t.nome,
@@ -133,8 +132,8 @@ export function DashboardSection() {
     const presentRefeicoes = refeicoes
         .flatMap(r => 
             (r.individuos || [])
-                .filter((i: Individuo) => i.status === 'presente')
-                .map((i: Individuo) => ({ 
+                .filter((i: IndividuoRefeicao) => i.status === 'presente')
+                .map((i: IndividuoRefeicao) => ({ 
                     id: i.id, 
                     nome: i.nome, 
                     type: 'Refeição Policial', 
@@ -178,13 +177,9 @@ export function DashboardSection() {
 
   const recentActivity = useMemo(() => {
     const allActivities: any[] = [
-      // @ts-ignore
-      ...visitantes.map(v => ({ ...v, type: 'Visitante', date: new Date(`${v.dataEntrada}T${v.horaEntrada}`) })),
-      // @ts-ignore
+      ...visitantes.map(v => ({ ...v, type: 'Visitante', date: new Date(v.dataEntrada) })),
       ...refeicoes.map(r => ({ ...r, type: 'Refeição Policial', date: new Date(`${r.data}T${r.hora}`) })),
-      // @ts-ignore
-      ...tpas.map(t => ({ ...t, type: 'TPA', date: new Date(`${t.data}T${t.hora}`) })),
-      // @ts-ignore
+      ...tpas.map(t => ({ ...t, type: 'TPA', date: new Date(t.dataEmissao) })),
       ...consumos.map(c => ({ ...c, type: 'Consumo de Bordo', date: new Date(`${c.data}T${c.hora}`) })),
     ].filter(a => a.date && !isNaN(a.date.getTime()));
     return allActivities.sort((a, b) => b.date.getTime() - a.date.getTime()).slice(0, 5);
@@ -282,10 +277,8 @@ export function DashboardSection() {
                                 <div className="flex-grow">
                                     <p className="font-semibold">
                                         {activity.type === 'Visitante' ? activity.nome :
-                                        // @ts-ignore
                                         activity.type === 'Refeição Policial' ? `${(activity as any).individuos.length} policial(s)` :
                                         activity.type === 'TPA' ? activity.nome :
-                                        // @ts-ignore
                                         activity.type === 'Consumo de Bordo' ? `${(activity as any).individuos.length} pessoa(s) no veículo ${(activity as any).placa}` : ''}
                                     </p>
                                     <p className="text-sm text-muted-foreground flex flex-wrap items-center gap-x-2 gap-y-1">

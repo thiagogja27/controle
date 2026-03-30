@@ -67,50 +67,15 @@ export const useNotificationStore = create<NotificationsState>()(
     }),
     {
       name: 'notifications-storage',
-      storage: createJSONStorage(() => ({
-        getItem: (name) => {
-          const str = localStorage.getItem(name);
-          if (!str) return null;
-          try {
-            const { state, version } = JSON.parse(str);
-            // Ensure notifications exist and is an array before mapping
-            if (state && Array.isArray(state.notifications)) {
-              return {
-                state: {
-                  ...state,
-                  notifications: state.notifications.map((n: any) => ({ ...n, timestamp: new Date(n.timestamp) }))
-                },
-                version
-              };
-            }
-            return { state, version };
-          } catch (e) {
-            console.error("Error reading notifications from storage", e);
-            return null; // Returning null will cause zustand to use the initial state
+      storage: createJSONStorage(() => localStorage, {
+        // Custom reviver to restore Date objects
+        reviver: (key, value) => {
+          if (key === 'timestamp' && typeof value === 'string') {
+            return new Date(value);
           }
+          return value;
         },
-        setItem: (name, newValue) => {
-          try {
-            // The error indicates newValue.state can be undefined.
-            if (!newValue.state || !Array.isArray(newValue.state.notifications)) {
-              localStorage.setItem(name, JSON.stringify(newValue));
-              return;
-            }
-
-            const str = JSON.stringify({
-              state: {
-                  ...newValue.state,
-                  notifications: newValue.state.notifications.map((n: any) => ({...n, timestamp: n.timestamp.toISOString()}))
-              },
-              version: newValue.version
-            });
-            localStorage.setItem(name, str);
-          } catch (e) {
-            console.error("Error writing notifications to storage", e);
-          }
-        },
-        removeItem: (name) => localStorage.removeItem(name),
-      }))
+      }),
     }
   )
 );

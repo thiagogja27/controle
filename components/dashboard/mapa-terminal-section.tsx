@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { type Navio, type Individuo } from "@/lib/store";
+import { type Navio, type Individuo, type IndividuoRefeicao } from "@/lib/store";
 import { toast } from "sonner"
 
 const destinoCoordenadas: Record<string, { top: string; left: string; color: string }> = {
@@ -146,7 +146,7 @@ export function MapaTerminalSection() {
       }));
 
     const tpasPresentes = tpas
-      .filter(t => t.status === "presente")
+      .filter(t => t.status === "ativo")
       .map(t => {
         let local;
         if (t.funcao === "Vigia") { local = "Portaria"; }
@@ -163,8 +163,7 @@ export function MapaTerminalSection() {
           nome: t.nome,
           empresa: t.funcao,
           credencial: t.credencial,
-          dataEntrada: t.data,
-          horaEntrada: t.hora,
+          dataEntrada: t.dataEmissao,
           type: 'TPA',
           local: local,
         };
@@ -172,8 +171,8 @@ export function MapaTerminalSection() {
 
     const refeicoesPresentes = refeicoes.flatMap(refeicao =>
       (refeicao.individuos || [])
-        .filter((individuo: Individuo) => individuo.status === "presente")
-        .map((individuo: Individuo) => ({
+        .filter((individuo: IndividuoRefeicao) => individuo.status === "presente")
+        .map((individuo: IndividuoRefeicao) => ({
           nome: individuo.nome,
           // @ts-ignore
           empresa: refeicao.categoria === 'pm' ? 'Polícia Militar' : 'Polícia Civil',

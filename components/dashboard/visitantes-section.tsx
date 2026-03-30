@@ -35,6 +35,8 @@ const initialFormState: Omit<Visitante, "id" | "status"> = {
   empresa: "",
   motivo: "",
   destino: "",
+  terminal: "teg",
+  vigilanteEntrada: "",
   dataEntrada: "",
   horaEntrada: "",
   dataSaida: "",
