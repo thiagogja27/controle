@@ -84,17 +84,20 @@ export function DashboardSection() {
  const allPresentIndividuals = useMemo(() => {
     const presentVisitantes = visitantes
         .filter(v => v.status === 'presente')
-        .map(v => ({
-            id: v.id,
-            nome: v.nome,
-            type: 'Visitante',
-            destino: v.destino.toUpperCase(),
-            details: [
-                { label: 'Empresa', value: v.empresa },
-                { label: 'Documento', value: v.documento },
-                { label: 'Motivo', value: v.motivo },
-            ]
-        }));
+        .map(v => {
+            const dest = (v.destino || 'OUTROS').toUpperCase();
+            return {
+                id: v.id,
+                nome: v.nome,
+                type: 'Visitante',
+                destino: dest.includes('TEG') ? 'TEG' : dest.includes('TEAG') ? 'TEAG' : dest,
+                details: [
+                    { label: 'Empresa', value: v.empresa },
+                    { label: 'Documento', value: v.documento },
+                    { label: 'Motivo', value: v.motivo },
+                ]
+            };
+        });
 
     const presentTPAs = tpas
         .filter(t => t.status === 'presente')
