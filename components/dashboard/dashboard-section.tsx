@@ -337,7 +337,7 @@ export function DashboardSection() {
                     <DialogClose asChild>
                         <Button type="button" variant="secondary">
                             Fechar
-                        </Button
+                        </Button>
                     </DialogClose>
                 </DialogFooter>
             </DialogContent>
