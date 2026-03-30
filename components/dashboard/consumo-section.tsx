@@ -65,6 +65,9 @@ const credencialConfig = {
     verde: { text: "Permissão de acesso ao navio", icon: ShieldCheck, className: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200" },
     vermelho: { text: "Permissão de acesso ao pier", icon: ShieldAlert, className: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200" },
     azul: { text: "Acesso restrito à área administrativa", icon: null, className: "" },
+    sif: { text: "SIF", icon: null, className: "" },
+    mog: { text: "MOG", icon: null, className: "" },
+    mof: { text: "MOF", icon: null, className: "" },
 };
 
 type FormErrors = Record<string, string>;
@@ -556,7 +559,7 @@ export function ConsumoSection() {
     const now = new Date();
     const saidaData = { 
         status: "saiu" as const, 
-        dataSaida: now.toISOString().split('T')[0], 
+        dataSaida: now.toISOString().split("T")[0], 
         horaSaida: now.toTimeString().slice(0, 5) 
     };
 
@@ -614,10 +617,11 @@ export function ConsumoSection() {
     return <div className="flex items-center justify-center py-12"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
   }
 
-  const CredencialBadge = ({ credencial }: { credencial?: "azul" | "vermelho" | "verde" }) => {
-    if (!credencial || !["verde", "vermelho"].includes(credencial)) return null;
-
+  const CredencialBadge = ({ credencial }: { credencial?: Individuo['credencial'] }) => {
+    if (!credencial || !credencialConfig[credencial]) return null;
     const config = credencialConfig[credencial];
+    if (!config || !config.text) return null;
+
     const Icon = config.icon
 
     return (
@@ -1007,7 +1011,7 @@ export function ConsumoSection() {
                         ) : (
                             filteredConsumos.map(consumo => (
                                 consumo.individuos.map((individuo, individuoIndex) => (
-                                <tr key={individuo.id} className={cn("hover:bg-muted/50", individuo.credencial && credencialConfig[individuo.credencial]?.className.replace(/text-\S+/, '').replace(/dark:text-\S+/, ''))}>
+                                <tr key={individuo.id} className={cn("hover:bg-muted/50", individuo.credencial && (individuo.credencial in credencialConfig) && credencialConfig[individuo.credencial as keyof typeof credencialConfig]?.className.replace(/text-\S+/, '').replace(/dark:text-\S+/, ''))}>
                                     <td className="px-4 py-3 font-medium">
                                         <div className="flex items-center gap-2">
                                             {individuo.nome}

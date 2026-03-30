@@ -21,9 +21,9 @@ import { useSettingsStore } from "@/lib/settings-store"
 // --- Helper Functions & Hooks ---
 const COLORS = ['#3b82f6', '#10b981', '#f97316', '#8b5cf6', '#ec4899'];
 
-const calculateDurationInHours = (dataEntrada: string, horaEntrada: string): number => {
-    if (!dataEntrada || !horaEntrada) return 0;
-    const entryDateTime = new Date(`${dataEntrada}T${horaEntrada}`);
+const calculateDurationInHours = (isoDateTime: string): number => {
+    if (!isoDateTime) return 0;
+    const entryDateTime = new Date(isoDateTime);
     const now = new Date();
     const diff = now.getTime() - entryDateTime.getTime();
     return diff / (1000 * 60 * 60);
@@ -171,7 +171,7 @@ export function PainelSection() {
     const visitantesPresentes = useMemo(() => visitantes.filter(v => v.status === "presente"), [visitantes]);
     const permanenciaExcedida = useMemo(() => 
         visitantesPresentes
-            .map(v => ({ ...v, duration: calculateDurationInHours(v.dataEntrada, v.horaEntrada) }))
+            .map(v => ({ ...v, duration: calculateDurationInHours(v.dataEntrada) }))
             .filter(v => v.duration > maxPermanenceHours)
             .sort((a, b) => b.duration - a.duration)
     , [visitantesPresentes, maxPermanenceHours]);
@@ -186,7 +186,7 @@ export function PainelSection() {
 
     const visitantesPorEmpresaHoje = useMemo(() => {
         const today = new Date().toISOString().split('T')[0];
-        const counts = visitantes.filter(v => v.dataEntrada === today).reduce((acc, v) => {
+        const counts = visitantes.filter(v => v.dataEntrada.startsWith(today)).reduce((acc, v) => {
             acc[v.empresa] = (acc[v.empresa] || 0) + 1;
             return acc;
         }, {} as Record<string, number>);
@@ -195,21 +195,24 @@ export function PainelSection() {
 
     const fluxoVisitantesPorHora = useMemo(() => {
         const today = new Date().toISOString().split('T')[0];
-        const counts = visitantes.filter(v => v.dataEntrada === today).reduce((acc, v) => {
-            if (!v.horaEntrada) return acc;
-            const hour = parseInt(v.horaEntrada.split(':')[0], 10);
-            const hourLabel = `${String(hour).padStart(2, '0')}:00`;
-            acc[hourLabel] = (acc[hourLabel] || 0) + 1;
+        const counts = visitantes.filter(v => v.dataEntrada.startsWith(today)).reduce((acc, v) => {
+            try {
+                const hour = new Date(v.dataEntrada).getHours();
+                const hourLabel = `${String(hour).padStart(2, '0')}:00`;
+                acc[hourLabel] = (acc[hourLabel] || 0) + 1;
+            } catch (e) {
+                console.error("Data de entrada inválida:", v.dataEntrada, e);
+            }
             return acc;
         }, {} as Record<string, number>);
         return Object.entries(counts).map(([name, value]) => ({ name, value })).sort((a, b) => a.name.localeCompare(b.name));
     }, [visitantes]);
     
     const allPresentIndividuals = useMemo(() => {
-        const presentVisitantes = visitantes.filter(v => v.status === 'presente').map(v => ({ id: v.id, nome: v.nome, type: 'Visitante', destino: v.destino.toUpperCase(), details: [{ label: 'Empresa', value: v.empresa }, { label: 'Documento', value: v.documento }, { label: 'Motivo', value: v.motivo }] }));
-        const presentTPAs = tpas.filter(t => t.status === 'presente').map(t => ({ id: t.id, nome: t.nome, type: 'TPA', destino: t.pier.toUpperCase(), details: [{ label: 'Função', value: t.funcao }, { label: 'Documento', value: t.documento }, { label: 'Navio', value: t.navio }] }));
+        const presentVisitantes = visitantes.filter(v => v.status === 'presente').map(v => ({ id: v.id, nome: v.nome, type: 'Visitante', destino: (v.terminal || '').toUpperCase(), details: [{ label: 'Empresa', value: v.empresa }, { label: 'Documento', value: v.documento }] }));
+        const presentTPAs = tpas.filter(t => t.status === 'presente').map(t => ({ id: t.id, nome: t.nome, type: 'TPA', destino: 'TEG', details: [{ label: 'Função', value: t.funcao }, { label: 'Documento', value: t.documento }] }));
         // @ts-ignore
-        const presentConsumos = rawConsumos.flatMap(c => (c.individuos || []).filter(i => i.status === 'presente').map(i => ({ id: i.id, nome: i.nome, type: 'Consumo de Bordo', destino: c.terminal.toUpperCase(), details: [{ label: 'Empresa', value: c.empresa }, { label: 'Veículo', value: `${c.veiculo} (${c.placa})` }, { label: 'Produto', value: c.produto }] })));
+        const presentConsumos = rawConsumos.flatMap(c => (c.individuos || []).filter(i => i.status === 'presente').map(i => ({ id: i.id, nome: i.nome, type: 'Consumo de Bordo', destino: (c.terminal || '').toUpperCase(), details: [{ label: 'Empresa', value: c.empresa }, { label: 'Veículo', value: `${c.veiculo} (${c.placa})` }, { label: 'Produto', value: c.produto }] })));
         return [...presentVisitantes, ...presentTPAs, ...presentConsumos];
     }, [visitantes, tpas, rawConsumos]);
 
@@ -228,16 +231,16 @@ export function PainelSection() {
     }, [rawConsumos]);
 
     const visitantesPorDestino = useMemo(() => {
-        const counts = visitantes.reduce((acc, curr) => { const destino = curr.destino || 'Não especificado'; acc[destino] = (acc[destino] || 0) + 1; return acc; }, {} as { [key: string]: number });
+        const counts = visitantes.reduce((acc, curr) => { const destino = curr.terminal || 'Não especificado'; acc[destino] = (acc[destino] || 0) + 1; return acc; }, {} as { [key: string]: number });
         return Object.entries(counts).map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value);
     }, [visitantes]);
 
      const unifiedFeed = useMemo(() => {
-        const visitantesFeed = visitantes.map(v => ({ type: 'Visitante', icon: Users, description: `${v.nome} (${v.empresa}) entrou.`, time: new Date(`${v.dataEntrada}T${v.horaEntrada}`), color: "text-blue-500" }));
+        const visitantesFeed = visitantes.map(v => ({ type: 'Visitante', icon: Users, description: `${v.nome} (${v.empresa}) entrou.`, time: new Date(v.dataEntrada), color: "text-blue-500" }));
         const refeicoesFeed = refeicoes.flatMap((r: any) => (r.individuos || []).map((i: any) => ({ type: 'Refeição', icon: Shield, description: `${i.nome} (Policial) registrou refeição.`, time: new Date(`${r.data}T${r.hora}`), color: "text-green-500" })));
         // @ts-ignore
         const consumosFeed = rawConsumos.flatMap((c: any) => (c.individuos || []).map((i: any) => ({ type: 'Consumo', icon: Ship, description: `${i.nome} acessou o navio ${c.navio}.`, time: new Date(`${c.data}T${c.hora}`), color: "text-purple-500" })));
-        const tpasFeed = tpas.map(t => ({ type: 'TPA', icon: FileText, description: `${t.nome} (TPA) registrou entrada.`, time: new Date(`${t.data}T${t.hora}`), color: "text-orange-500" }));
+        const tpasFeed = tpas.map(t => ({ type: 'TPA', icon: FileText, description: `${t.nome} (TPA) registrou entrada.`, time: new Date(`${t.dataEmissao}T12:00:00`), color: "text-orange-500" }));
         return [...visitantesFeed, ...refeicoesFeed, ...consumosFeed, ...tpasFeed]
             .filter(item => !isNaN(item.time.getTime()))
             .sort((a, b) => b.time.getTime() - a.time.getTime())
@@ -284,11 +287,11 @@ export function PainelSection() {
                 </Card>
                 <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">Visitantes de Hoje</CardTitle><Users className="h-4 w-4 text-muted-foreground" /></CardHeader>
-                    <CardContent><div className="text-2xl font-bold">{visitantes.filter(v => v.dataEntrada === new Date().toISOString().split('T')[0]).length}</div><p className="text-xs text-muted-foreground">Novos registros no dia.</p></CardContent>
+                    <CardContent><div className="text-2xl font-bold">{visitantes.filter(v => v.dataEntrada.startsWith(new Date().toISOString().split('T')[0])).length}</div><p className="text-xs text-muted-foreground">Novos registros no dia.</p></CardContent>
                 </Card>
                 <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">Empresas de Hoje</CardTitle><Building2 className="h-4 w-4 text-muted-foreground" /></CardHeader>
-                    <CardContent><div className="text-2xl font-bold">{[...new Set(visitantes.filter(v => v.dataEntrada === new Date().toISOString().split('T')[0]).map(v => v.empresa))].length}</div><p className="text-xs text-muted-foreground">Empresas únicas no dia.</p></CardContent>
+                    <CardContent><div className="text-2xl font-bold">{[...new Set(visitantes.filter(v => v.dataEntrada.startsWith(new Date().toISOString().split('T')[0])).map(v => v.empresa))].length}</div><p className="text-xs text-muted-foreground">Empresas únicas no dia.</p></CardContent>
                 </Card>
             </div>
 
@@ -428,7 +431,7 @@ export function PainelSection() {
                                         </div>
                                         <div className="text-right">
                                             <p className="font-bold text-destructive">{formatDuration(visitor.duration)}</p>
-                                            <p className="text-xs text-muted-foreground">Entrada: {visitor.horaEntrada}</p>
+                                            <p className="text-xs text-muted-foreground">Entrada: {new Date(visitor.dataEntrada).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</p>
                                         </div>
                                     </div>
                                 </li>

@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react"
 import { db } from "@/lib/firebase"
 import { ref, push, set, update, onValue, remove } from "firebase/database"
-import type { Visitante, RefeicaoPolicial, TPA, ConsumoBordo, Navio } from "@/lib/store"
+import type { Visitante, Tpa, ConsumoBordo, Navio, RefeicaoPolicial } from "@/lib/store"
 
 // Generic hook for Firebase Realtime Database
 function useFirebaseCollection<T extends { id: string }>(collectionPath: string) {
@@ -135,7 +135,7 @@ export function useRefeicoes() {
 }
 
 export function useTPAs() {
-  return useFirebaseCollection<TPA>("tpas")
+  return useFirebaseCollection<Tpa>("tpas")
 }
 
 export function useConsumos() {

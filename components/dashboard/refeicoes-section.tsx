@@ -12,30 +12,27 @@ import { v4 as uuidv4 } from 'uuid';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogClose } from "@/components/ui/dialog"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
-import { type RefeicaoPolicial as RefeicaoPolicialType, type IndividuoRefeicao } from "@/lib/store"
+import { type RefeicaoPolicial, type IndividuoRefeicao } from "@/lib/store"
 import { useRefeicoes } from "@/hooks/use-firebase"
 import { useOnlineStatus } from "@/hooks/use-online-status"
 import { addToOutbox } from "@/utils/db"
 import { cn } from "@/lib/utils"
 
-// ... (o resto do código permanece o mesmo até a função RefeicoesSection)
 
 const categoriaConfig = {
   pm: { label: "PM", icon: Shield, color: "text-blue-400", bg: "bg-blue-400/10" },
-  civil: { label: "Civil", icon: Users, color: "text-amber-400", bg: "bg-amber-400/10" },
+  pr: { label: "PR", icon: Shield, color: "text-green-400", bg: "bg-green-400/10" },
+  pc: { label: "PC", icon: Users, color: "text-amber-400", bg: "bg-amber-400/10" },
 }
 
-const initialFormState: Omit<RefeicaoPolicialType, "id"> = {
+const initialFormState: Omit<RefeicaoPolicial, "id"> = {
   individuos: [{ id: `new-${Date.now()}`, nome: "", status: "presente", dataSaida: "", horaSaida: "" }],
-  prefixo: "",
   categoria: "pm",
-  vigilante: "",
   data: "",
   hora: "",
 }
 
-export type OldRefeicaoPolicial = Omit<RefeicaoPolicialType, 'individuos'> & { nome?: string; status?: 'presente' | 'saiu', dataSaida?: string, horaSaida?: string, data?: any };
-export type RefeicaoPolicial = RefeicaoPolicialType;
+export type OldRefeicaoPolicial = Omit<RefeicaoPolicial, 'individuos'> & { nome?: string; status?: 'presente' | 'saiu', dataSaida?: string, horaSaida?: string, data?: any };
 
 export function RefeicoesSection() {
   const { data: rawRefeicoes, loading, addItem, updateItem, deleteItem } = useRefeicoes()
@@ -95,7 +92,7 @@ export function RefeicoesSection() {
     if (isFormOpen && selectedRefeicao) {
         setFormState({
           ...selectedRefeicao,
-          individuos: selectedRefeicao.individuos.map(ind => ({ ...ind, dataSaida: ind.dataSaida || "", horaSaida: ind.horaSaida || "" })),
+          individuos: selectedRefeicao.individuos.map((ind: IndividuoRefeicao) => ({ ...ind, dataSaida: ind.dataSaida || "", horaSaida: ind.horaSaida || "" })),
         })
     }
   }, [isFormOpen, selectedRefeicao])
@@ -103,9 +100,8 @@ export function RefeicoesSection() {
   const filteredRefeicoes = refeicoes.filter(r => {
     const searchLower = search.toLowerCase().trim();
     const textMatch = !searchLower || (
-      (r.prefixo && r.prefixo.toLowerCase().includes(searchLower)) ||
-      (r.vigilante && r.vigilante.toLowerCase().includes(searchLower)) ||
-      r.individuos?.some(i => i.nome.toLowerCase().includes(searchLower))
+      (r.categoria && r.categoria.toLowerCase().includes(searchLower)) ||
+      r.individuos?.some((i: IndividuoRefeicao) => i.nome.toLowerCase().includes(searchLower))
     );
 
     const dateMatch = (() => {
@@ -115,7 +111,7 @@ export function RefeicoesSection() {
             }
             const today = new Date().toISOString().split('T')[0];
             const entryDateIsToday = r.data === today;
-            const exitDateIsToday = r.individuos?.some(ind => ind.dataSaida === today);
+            const exitDateIsToday = r.individuos?.some((ind: IndividuoRefeicao) => ind.dataSaida === today);
             return entryDateIsToday || exitDateIsToday;
         }
         const entrada = r.data;
@@ -127,16 +123,17 @@ export function RefeicoesSection() {
     return textMatch && dateMatch;
   });
 
-  const allIndividuos = filteredRefeicoes.flatMap(r => r.individuos?.map(i => ({ ...i, categoria: r.categoria })) || [])
+  const allIndividuos = filteredRefeicoes.flatMap(r => r.individuos?.map((i: IndividuoRefeicao) => ({ ...i, categoria: r.categoria })) || [])
   const totalPM = allIndividuos.filter(i => i.categoria === "pm").length
-  const totalCivil = allIndividuos.filter(i => i.categoria === "civil").length
+  const totalPC = allIndividuos.filter(i => i.categoria === "pc").length
+  const totalPR = allIndividuos.filter(i => i.categoria === "pr").length
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { id, value } = e.target
     setFormState(prev => ({ ...prev, [id]: value }))
   }
 
-  const handleCategoryChange = (categoria: "pm" | "civil") => {
+  const handleCategoryChange = (categoria: "pm" | "pc" | "pr") => {
     setFormState(prev => ({ ...prev, categoria }))
   }
   
@@ -155,7 +152,7 @@ export function RefeicoesSection() {
 
   const removeIndividuo = (index: number) => {
     if (formState.individuos.length > 1) {
-      setFormState(prev => ({ ...prev, individuos: prev.individuos.filter((_, i) => i !== index) }))
+      setFormState(prev => ({ ...prev, individuos: prev.individuos.filter((_: IndividuoRefeicao, i: number) => i !== index) }))
     }
   }
 
@@ -209,8 +206,8 @@ export function RefeicoesSection() {
     setIsSaving(true);
 
     const individuosToSave: IndividuoRefeicao[] = formState.individuos
-        .filter(ind => ind.nome.trim() !== "")
-        .map((ind): IndividuoRefeicao => {
+        .filter((ind: IndividuoRefeicao) => ind.nome.trim() !== "")
+        .map((ind: IndividuoRefeicao): IndividuoRefeicao => {
             const status: "presente" | "saiu" = (ind.horaSaida && ind.dataSaida) ? 'saiu' : 'presente';
             if (status === "presente") {
                 return {
@@ -227,8 +224,8 @@ export function RefeicoesSection() {
             }
         });
 
-    if (individuosToSave.length === 0 || !formState.vigilante.trim()) {
-        toast.warning("Preencha o nome do policial e do vigilante.")
+    if (individuosToSave.length === 0) {
+        toast.warning("Preencha o nome do policial.")
         setIsSaving(false);
         return;
     }
@@ -283,7 +280,7 @@ export function RefeicoesSection() {
         } else {
             const entry: Omit<RefeicaoPolicial, "id"> = {
                 ...dataToSave,
-                individuos: dataToSave.individuos.map(ind => ({
+                individuos: dataToSave.individuos.map((ind: IndividuoRefeicao) => ({
                     ...ind,
                     id: ind.id.startsWith('new-') ? `ind-${new Date().getTime()}-${Math.random().toString(36).substring(2, 9)}` : ind.id
                 })),
@@ -313,8 +310,7 @@ export function RefeicoesSection() {
 
     try {
       if (!isOnline) {
-        // Find existing individuals and update the specific one
-        const updatedIndividuos = refeicao.individuos.map(ind =>
+        const updatedIndividuos = refeicao.individuos.map((ind: IndividuoRefeicao) =>
           ind.id === individuoId ? { ...ind, ...saidaData } : ind
         );
 
@@ -333,7 +329,7 @@ export function RefeicoesSection() {
         return;
       }
 
-      const updatedIndividuos = refeicao.individuos.map(ind =>
+      const updatedIndividuos = refeicao.individuos.map((ind: IndividuoRefeicao) =>
         ind.id === individuoId ? { ...ind, ...saidaData } : ind
       );
       await updateItem(refeicaoId, { individuos: updatedIndividuos });
@@ -378,9 +374,7 @@ export function RefeicoesSection() {
   }
 
   const isFormValid = 
-    formState.individuos.some(i => i.nome.trim() !== "") &&
-    formState.prefixo.trim() !== "" && 
-    formState.vigilante.trim() !== "" &&
+    formState.individuos.some((i: IndividuoRefeicao) => i.nome.trim() !== "") &&
     formState.data.trim() !== "" && 
     formState.hora.trim() !== "";
 
@@ -393,11 +387,12 @@ export function RefeicoesSection() {
   return (
     <TooltipProvider>
     <div className="space-y-4 md:space-y-6">
-      {/* ... (código do header e stats inalterado) ... */}
-       <div className="grid gap-4 sm:grid-cols-2">
-        {(["pm", "civil"] as const).map(cat => {
-          const { label, icon: Icon, color, bg } = categoriaConfig[cat]
-          const count = cat === "pm" ? totalPM : totalCivil
+       <div className="grid gap-4 sm:grid-cols-3">
+        {(["pm", "pc", "pr"] as const).map(cat => {
+          const config = categoriaConfig[cat];
+          if (!config) return null;
+          const { label, icon: Icon, color, bg } = config;
+          const count = cat === "pm" ? totalPM : cat === "pc" ? totalPC : totalPR;
           return (
             <Card key={cat}><CardContent className="flex items-center gap-4 p-4"><div className={cn("flex h-12 w-12 items-center justify-center rounded-lg", bg)}><Icon className={cn("h-6 w-6", color)} /></div><div><p className="text-2xl font-bold">{count}</p><p className="text-sm text-muted-foreground">Total {label}</p></div></CardContent></Card>
           )
@@ -440,14 +435,13 @@ export function RefeicoesSection() {
           </DialogHeader>
            <div className="max-h-[80vh] overflow-y-auto p-1">
                 <div className="grid gap-5 py-4">
-                    {/* ... (conteúdo do formulário inalterado) ... */}
                      <div className="rounded-lg border bg-secondary/30 p-4 space-y-3">
                         <div className="flex items-center justify-between">
                             <Label>Policiais</Label>
                             <Button type="button" variant="outline" size="sm" onClick={addIndividuo} disabled={!!selectedRefeicao}><Plus className="mr-1 h-3 w-3" />Adicionar</Button>
                         </div>
                         <div className="space-y-3">
-                            {formState.individuos.map((ind, index) => (
+                            {formState.individuos.map((ind: IndividuoRefeicao, index: number) => (
                                 <div key={ind.id || index} className="grid grid-cols-[1fr_auto] items-end gap-2">
                                     <Input placeholder={`Nome do policial ${index + 1}`} value={ind.nome} onChange={e => handleIndividuoChange(index, "nome", e.target.value)} />
                                     {formState.individuos.length > 1 && !selectedRefeicao && <Button type="button" variant="ghost" size="icon" onClick={() => removeIndividuo(index)} className="shrink-0 text-destructive hover:text-destructive"><X className="h-4 w-4" /></Button>}
@@ -456,18 +450,16 @@ export function RefeicoesSection() {
                         </div>
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div className="grid gap-2"><Label htmlFor="prefixo">Prefixo</Label><Input id="prefixo" placeholder="Ex: VTR 1234, Cia..." value={formState.prefixo} onChange={handleInputChange} /></div>
-                        <div className="grid gap-2"><Label htmlFor="vigilante">Vigilante</Label><Input id="vigilante" placeholder="Nome do vigilante" value={formState.vigilante} onChange={handleInputChange} /></div>
                         <div className="grid gap-2"><Label htmlFor="data">Data Entrada</Label><Input id="data" type="date" value={formState.data} onChange={handleInputChange} /></div>
                         <div className="grid gap-2"><Label htmlFor="hora">Hora Entrada</Label><Input id="hora" type="time" value={formState.hora} onChange={handleInputChange} /></div>
-                        <div className="grid gap-3 sm:col-span-2"><Label>Categoria</Label><div className="grid grid-cols-2 gap-3"><div className="flex items-center gap-3 rounded-lg border border-border bg-secondary/30 p-3"><Checkbox id="cat-pm" checked={formState.categoria === "pm"} onCheckedChange={() => handleCategoryChange("pm")} /><Label htmlFor="cat-pm" className="flex cursor-pointer items-center gap-2 font-normal"><Shield className="h-4 w-4 text-blue-400" />PM</Label></div><div className="flex items-center gap-3 rounded-lg border border-border bg-secondary/30 p-3"><Checkbox id="cat-civil" checked={formState.categoria === "civil"} onCheckedChange={() => handleCategoryChange("civil")} /><Label htmlFor="cat-civil" className="flex cursor-pointer items-center gap-2 font-normal"><Users className="h-4 w-4 text-amber-400" />Civil</Label></div></div></div>
+                        <div className="grid gap-3 sm:col-span-2"><Label>Categoria</Label><div className="grid grid-cols-3 gap-3"><div className="flex items-center gap-3 rounded-lg border border-border bg-secondary/30 p-3"><Checkbox id="cat-pm" checked={formState.categoria === "pm"} onCheckedChange={() => handleCategoryChange("pm")} /><Label htmlFor="cat-pm" className="flex cursor-pointer items-center gap-2 font-normal"><Shield className="h-4 w-4 text-blue-400" />PM</Label></div><div className="flex items-center gap-3 rounded-lg border border-border bg-secondary/30 p-3"><Checkbox id="cat-pc" checked={formState.categoria === "pc"} onCheckedChange={() => handleCategoryChange("pc")} /><Label htmlFor="cat-pc" className="flex cursor-pointer items-center gap-2 font-normal"><Users className="h-4 w-4 text-amber-400" />PC</Label></div><div className="flex items-center gap-3 rounded-lg border border-border bg-secondary/30 p-3"><Checkbox id="cat-pr" checked={formState.categoria === "pr"} onCheckedChange={() => handleCategoryChange("pr")} /><Label htmlFor="cat-pr" className="flex cursor-pointer items-center gap-2 font-normal"><Shield className="h-4 w-4 text-green-400" />PR</Label></div></div></div>
                     </div>
                     
                     {selectedRefeicao && (
                          <div className="rounded-lg border bg-secondary/30 p-4 mt-2">
                             <Label className="mb-3 block">Controle de Saída dos Policiais</Label>
                             <div className="space-y-4">
-                            {formState.individuos.map((ind, index) => (
+                            {formState.individuos.map((ind: IndividuoRefeicao, index: number) => (
                                 <div key={ind.id} className="grid grid-cols-1 sm:grid-cols-3 gap-2 items-end">
                                 <div className="sm:col-span-1">
                                     <Label htmlFor={`nome-saida-${index}`} className="text-xs text-muted-foreground">Nome</Label>
@@ -519,7 +511,6 @@ export function RefeicoesSection() {
       <Card>
         <CardHeader><CardTitle>Histórico de Refeições</CardTitle></CardHeader>
         <CardContent>
-          {/* ... (tabela e layout de cartões inalterados) ... */}
            <div className="grid grid-cols-1 md:col-span-2 gap-4 lg:hidden">
                  {filteredRefeicoes.length === 0 ? (
                     <p className="py-8 text-center text-muted-foreground col-span-full">Nenhum registro encontrado para os filtros aplicados.</p>
@@ -528,8 +519,7 @@ export function RefeicoesSection() {
                          <div key={`${refeicao.id}-${index}`} className="rounded-lg border bg-card p-4 space-y-3 flex flex-col">
                            <div className="flex justify-between items-start">
                                 <div>
-                                    <p className="font-semibold">{refeicao.prefixo} <span className={cn("font-normal", refeicao.categoria === 'pm' ? categoriaConfig.pm.color : categoriaConfig.civil.color)}>({refeicao.categoria.toUpperCase()})</span></p>
-                                    <p className="text-sm text-muted-foreground">Por: {refeicao.vigilante}</p>
+                                    <p className="font-semibold">{refeicao.categoria.toUpperCase()}</p>
                                 </div>
                                  <div className="flex flex-col items-end gap-1">
                                     <p className="text-sm text-muted-foreground">{formatDateTime(refeicao.data, refeicao.hora)}</p>
@@ -538,7 +528,7 @@ export function RefeicoesSection() {
                             </div>
 
                              <div className="border-t pt-3 space-y-3 flex-grow">
-                                {refeicao.individuos?.map((individuo, i) => (
+                                {refeicao.individuos?.map((individuo: IndividuoRefeicao, i: number) => (
                                     <div key={`${individuo.id}-${i}`} className="border-b pb-3 last:border-b-0 last:pb-0">
                                         <div className="flex justify-between items-center">
                                             <p>{individuo.nome}</p>
@@ -576,9 +566,7 @@ export function RefeicoesSection() {
                         <th className="px-4 py-3 font-medium">Status</th>
                         <th className="px-4 py-3 font-medium">Entrada</th>
                         <th className="px-4 py-3 font-medium">Saída</th>
-                        <th className="px-4 py-3 font-medium">Prefixo</th>
                         <th className="px-4 py-3 font-medium">Categoria</th>
-                        <th className="px-4 py-3 font-medium">Vigilante</th>
                         <th className="px-4 py-3 font-medium text-right">Ações</th>
                         </tr>
                     </thead>
@@ -587,7 +575,7 @@ export function RefeicoesSection() {
                         <tr><td colSpan={8} className="py-8 text-center text-muted-foreground">Nenhum registro encontrado para os filtros aplicados.</td></tr>
                         ) : (
                         filteredRefeicoes.flatMap((refeicao, refeicaoIndex) =>
-                            refeicao.individuos?.map((individuo, individuoIndex) => (
+                            refeicao.individuos?.map((individuo: IndividuoRefeicao, individuoIndex: number) => (
                             <tr key={`${refeicao.id}-${individuo.id}-${refeicaoIndex}-${individuoIndex}`} className="hover:bg-muted/50">
                                 <td className="px-4 py-3 font-medium">
                                     <div className="flex items-center gap-2">
@@ -607,9 +595,7 @@ export function RefeicoesSection() {
                                         </div>
                                     ) : '-'}
                                 </td>
-                                <td className="px-4 py-3 text-muted-foreground">{refeicao.prefixo}</td>
-                                <td className="px-4 py-3"><span className={cn("font-semibold", refeicao.categoria === 'pm' ? categoriaConfig.pm.color : categoriaConfig.civil.color)}>{refeicao.categoria.toUpperCase()}</span></td>
-                                <td className="px-4 py-3 text-muted-foreground">{refeicao.vigilante}</td>
+                                <td className="px-4 py-3"><span className={cn("font-semibold", refeicao.categoria === 'pm' ? categoriaConfig.pm.color : categoriaConfig.pc.color)}>{refeicao.categoria.toUpperCase()}</span></td>
                                 <td className="px-4 py-3 text-right">
                                     <div className="flex items-center justify-end">
                                         <DropdownMenu>

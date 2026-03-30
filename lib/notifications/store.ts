@@ -67,23 +67,50 @@ export const useNotificationStore = create<NotificationsState>()(
     }),
     {
       name: 'notifications-storage',
-      storage: createJSONStorage(() => localStorage),
-      // Custom serialization to handle Date objects
-      serialize: (state) => {
-        return JSON.stringify({
-          ...state,
-          state: {
-            ...state.state,
-            notifications: state.state.notifications.map(n => ({ ...n, timestamp: n.timestamp.toISOString() }))
+      storage: createJSONStorage(() => ({
+        getItem: (name) => {
+          const str = localStorage.getItem(name);
+          if (!str) return null;
+          try {
+            const { state, version } = JSON.parse(str);
+            // Ensure notifications exist and is an array before mapping
+            if (state && Array.isArray(state.notifications)) {
+              return {
+                state: {
+                  ...state,
+                  notifications: state.notifications.map((n: any) => ({ ...n, timestamp: new Date(n.timestamp) }))
+                },
+                version
+              };
+            }
+            return { state, version };
+          } catch (e) {
+            console.error("Error reading notifications from storage", e);
+            return null; // Returning null will cause zustand to use the initial state
           }
-        });
-      },
-      // Custom deserialization to handle Date objects
-      deserialize: (str) => {
-        const parsed = JSON.parse(str);
-        parsed.state.notifications = parsed.state.notifications.map((n: any) => ({ ...n, timestamp: new Date(n.timestamp) }));
-        return parsed;
-      }
+        },
+        setItem: (name, newValue) => {
+          try {
+            // The error indicates newValue.state can be undefined.
+            if (!newValue.state || !Array.isArray(newValue.state.notifications)) {
+              localStorage.setItem(name, JSON.stringify(newValue));
+              return;
+            }
+
+            const str = JSON.stringify({
+              state: {
+                  ...newValue.state,
+                  notifications: newValue.state.notifications.map((n: any) => ({...n, timestamp: n.timestamp.toISOString()}))
+              },
+              version: newValue.version
+            });
+            localStorage.setItem(name, str);
+          } catch (e) {
+            console.error("Error writing notifications to storage", e);
+          }
+        },
+        removeItem: (name) => localStorage.removeItem(name),
+      }))
     }
   )
 );
@@ -91,6 +118,6 @@ export const useNotificationStore = create<NotificationsState>()(
 // Function to update the unread count on initial load
 export const hydrateUnreadCount = () => {
   useNotificationStore.setState((state) => ({
-    unreadCount: state.notifications.filter(n => !n.isRead).length
+    unreadCount: state.notifications.filter((n: Notification) => !n.isRead).length
   }));
 };

@@ -42,7 +42,7 @@ const initialFormState: Omit<Visitante, "id" | "status"> = {
   credencial: "azul",
   notaFiscal: "",
   placa: "",
-  observacoes: "",
+  observacao: "",
   diversos: false,
   rg: "",
   cnh: "",
@@ -185,8 +185,8 @@ export function VisitantesSection() {
         horaSaida: "",
     };
     
-    if (!destinos.includes(visitante.destino)) {
-        setOutroDestino(visitante.destino);
+    if (!destinos.includes(visitante.destino || "")) {
+        setOutroDestino(visitante.destino || "");
         newFormState.destino = "Outros";
     } else {
         setOutroDestino("");
@@ -217,14 +217,14 @@ export function VisitantesSection() {
   useEffect(() => {
     if (isFormOpen && selectedVisitante) {
       setIsReEntryMode(false);
-      const isOutro = !destinos.includes(selectedVisitante.destino);
+      const isOutro = !destinos.includes(selectedVisitante.destino || "");
       setFormState({
         ...selectedVisitante,
         destino: isOutro ? "Outros" : selectedVisitante.destino,
         credencial: selectedVisitante.credencial || "azul",
         notaFiscal: selectedVisitante.notaFiscal || "",
         placa: selectedVisitante.placa || "",
-        observacoes: selectedVisitante.observacoes || "",
+        observacao: selectedVisitante.observacao || "",
         diversos: selectedVisitante.diversos || false,
         rg: selectedVisitante.rg || "",
         cnh: selectedVisitante.cnh || "",
@@ -239,7 +239,7 @@ export function VisitantesSection() {
         horaSaida: selectedVisitante.horaSaida || "",
       });
       handleComplianceCheck(selectedVisitante.documento, selectedVisitante.id);
-      setOutroDestino(isOutro ? selectedVisitante.destino : "");
+      setOutroDestino(isOutro ? selectedVisitante.destino || "" : "");
     } else if (!isFormOpen) {
       setFormErrors({ common: {}, persons: [] });
       setComplianceAlerts({});
@@ -480,8 +480,8 @@ export function VisitantesSection() {
 
     // Validate common fields
     if (!formState.empresa.trim()) commonErrors.empresa = "Empresa é obrigatória.";
-    if (!formState.motivo.trim()) commonErrors.motivo = "Motivo da visita é obrigatório.";
-    if (!formState.destino.trim()) commonErrors.destino = "Destino é obrigatório.";
+    if (!formState.motivo?.trim()) commonErrors.motivo = "Motivo da visita é obrigatório.";
+    if (!formState.destino?.trim()) commonErrors.destino = "Destino é obrigatório.";
     if (formState.destino === "Outros" && !outroDestino.trim()) {
         commonErrors.outroDestino = "Especifique o destino se 'Outros'.";
     }
@@ -616,7 +616,7 @@ export function VisitantesSection() {
                         if (date < today) commonErrors[field as keyof FormErrors] = "Documento vencido.";
                     }
                     if (field === 'dataNascimento') {
-                        if (date >= today) commonErrors[field as keyof FormErrors] = "Data de nascimento deve ser no passado.";
+                        if (date >= today) commonErrors[field as keyof PersonFormErrors] = "Data de nascimento deve ser no passado.";
                     }
                 }
             }
@@ -637,7 +637,7 @@ export function VisitantesSection() {
     const finalDestino = formState.destino === "Outros" ? outroDestino : formState.destino;
     
     if (selectedVisitante) { // Handle update
-        const dataToSave: Omit<Visitante, "id"> = { 
+        const dataToSave: Partial<Visitante> = { 
             ...formState,
             dataEntrada: toIsoDate(formState.dataEntrada),
             dataSaida: toIsoDate(formState.dataSaida),
@@ -797,10 +797,10 @@ export function VisitantesSection() {
     return <div className="flex items-center justify-center py-12"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
   }
 
-  const CredencialBadge = ({ credencial }: { credencial?: "azul" | "vermelho" | "verde" }) => {
+  const CredencialBadge = ({ credencial }: { credencial?: Visitante['credencial'] }) => {
     if (!credencial || !["verde", "vermelho"].includes(credencial)) return null;
 
-    const config = credencialConfig[credencial];
+    const config = credencialConfig[credencial as keyof typeof credencialConfig];
     const Icon = config.icon
 
     return (
@@ -933,7 +933,7 @@ export function VisitantesSection() {
               <div className="grid gap-2"><Label htmlFor="horaSaida">Hora Saída</Label><Input id="horaSaida" type="time" value={formState.horaSaida} onChange={handleInputChange} /></div>
               <div className="grid gap-2"><Label htmlFor="notaFiscal">Nota Fiscal</Label><Input id="notaFiscal" value={formState.notaFiscal} onChange={handleInputChange} /></div>
               <div className="grid gap-2"><Label htmlFor="placa">Placa</Label><IMaskInput mask={[{ mask: 'aaa-0000' }, { mask: 'aaa0a00' }]} id="placa" value={formState.placa} onAccept={(value) => handleMaskedInputChange("placa", value as string)} prepare={(str) => str.toUpperCase()} as={ForwardedInput} className={cn(formErrors.common.placa && "border-red-500")} />{formErrors.common.placa && <p className="text-red-500 text-xs">{formErrors.common.placa}</p>}</div>
-              <div className="grid gap-2 sm:col-span-2"><Label htmlFor="observacoes">Observações</Label><Textarea id="observacoes" value={formState.observacoes} onChange={handleInputChange} /></div>
+              <div className="grid gap-2 sm:col-span-2"><Label htmlFor="observacao">Observações</Label><Textarea id="observacao" value={formState.observacao} onChange={handleInputChange} /></div>
            </div>
            </>
          ) : (
@@ -1015,7 +1015,7 @@ export function VisitantesSection() {
                <div className="grid gap-2"><Label htmlFor="horaEntrada">Hora Entrada</Label><Input id="horaEntrada" type="time" value={formState.horaEntrada} onChange={handleInputChange} /></div>
                <div className="grid gap-2"><Label htmlFor="notaFiscal">Nota Fiscal</Label><Input id="notaFiscal" value={formState.notaFiscal || ""} onChange={handleInputChange} /></div>
                <div className="grid gap-2"><Label htmlFor="placa">Placa</Label><IMaskInput mask={[{ mask: 'aaa-0000' }, { mask: 'aaa0a00' }]} id="placa" placeholder="N/A se não houver" value={formState.placa || ""} onAccept={(value) => handleMaskedInputChange("placa", value as string)} prepare={(str) => str.toUpperCase()} as={ForwardedInput} className={cn(formErrors.common.placa && "border-red-500")} />{formErrors.common.placa && <p className="text-red-500 text-xs">{formErrors.common.placa}</p>}</div>
-               <div className="grid gap-2 sm:col-span-2"><Label htmlFor="observacoes">Observações</Label><Textarea id="observacoes" value={formState.observacoes || ""} onChange={handleInputChange} /></div>
+               <div className="grid gap-2 sm:col-span-2"><Label htmlFor="observacao">Observações</Label><Textarea id="observacao" value={formState.observacao || ""} onChange={handleInputChange} /></div>
            </div>
            </>
          )}
@@ -1085,7 +1085,7 @@ export function VisitantesSection() {
                                {v.notaFiscal && <div className="flex flex-col"><span className="text-muted-foreground">Nota Fiscal</span><span>{v.notaFiscal}</span></div>}
                                {v.diversos && <div className="flex flex-col"><span className="text-muted-foreground">Diversos</span><span>Sim</span></div>}
                             </div>
-                            {v.observacoes && <div className="border-t pt-3 text-sm flex-grow"><p className="text-muted-foreground">Observações</p><p>{v.observacoes}</p></div>}
+                            {v.observacao && <div className="border-t pt-3 text-sm flex-grow"><p className="text-muted-foreground">Observações</p><p>{v.observacao}</p></div>}
                             <div className="border-t pt-3 flex items-center justify-end gap-2">
                                {v.status === "presente" ? (
                                    <Button size="sm" variant="outline" onClick={() => handleRegistrarSaida(v.id)}>Sair</Button>
@@ -1128,7 +1128,7 @@ export function VisitantesSection() {
                  <tr><td colSpan={13} className="py-8 text-center text-muted-foreground">Nenhum visitante encontrado para os filtros aplicados.</td></tr>
                ) : (
                  filteredVisitantes.map(v => (
-                   <tr key={v.id} className={cn(v.credencial && credencialConfig[v.credencial]?.className.replace(/text-\S+/, '').replace(/dark:text-\S+/, ''))}>
+                   <tr key={v.id} className={cn(v.credencial && (v.credencial in credencialConfig) && credencialConfig[v.credencial as keyof typeof credencialConfig]?.className.replace(/text-\S+/, '').replace(/dark:text-\S+/, ''))}>
                      <td className="px-4 py-3">
                        <div className="font-medium flex items-center gap-2">
                            {v.nome || '-'}
@@ -1147,7 +1147,7 @@ export function VisitantesSection() {
                      <td className="px-4 py-3">{v.destino || '-'}</td>
                      <td className="px-4 py-3">{v.placa || '-'}</td>
                      <td className="px-4 py-3">{v.notaFiscal || '-'}</td>
-                     <td className="px-4 py-3 max-w-[200px] truncate" title={v.observacoes}>{v.observacoes || '-'}</td>
+                     <td className="px-4 py-3 max-w-[200px] truncate" title={v.observacao}>{v.observacao || '-'}</td>
 
                      <td className="px-4 py-3">{v.diversos ? 'Sim' : 'Não'}</td>
                      <td className="px-4 py-3">

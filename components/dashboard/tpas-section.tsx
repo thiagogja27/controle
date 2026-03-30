@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
-import { type TPA, type OcorrenciaCompliance } from "@/lib/store"
+import { type Tpa, type OcorrenciaCompliance } from "@/lib/store"
 import { useTPAs } from "@/hooks/use-firebase"
 import { useComplianceCheck } from "@/hooks/use-compliance-check"
 import { useOnlineStatus } from "@/hooks/use-online-status"
@@ -29,23 +29,14 @@ const ForwardedInput: any = forwardRef<HTMLInputElement, any>((props, ref) => {
 });
 ForwardedInput.displayName = 'ForwardedInput';
 
-const initialFormState: Omit<TPA, "id" | "status"> = {
+const initialFormState: Omit<Tpa, "id" | "status"> = {
   nome: "",
   funcao: "",
   documento: "",
-  placa: "",
-  destino: "",
-  navio: "",
-  pier: "teg",
   observacao: "",
-  vigilante: "",
-  data: "",
-  hora: "",
-  dataSaida: "",
-  horaSaida: "",
-  credencial: "azul",
-  numeroCip: "",
-  meioDeAcesso: "terra",
+  dataEmissao: "",
+  dataValidade: "",
+  tipo: "isps",
 }
 
 const funcoes = [
@@ -87,7 +78,7 @@ export function TPAsSection() {
   const [isFormOpen, setIsFormOpen] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false)
-  const [selectedTPA, setSelectedTPA] = useState<TPA | null>(null)
+  const [selectedTPA, setSelectedTPA] = useState<Tpa | null>(null)
   const [isReEntryMode, setIsReEntryMode] = useState(false);
   const [formState, setFormState] = useState(initialFormState)
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -97,7 +88,7 @@ export function TPAsSection() {
   const activeTpaDocuments = useMemo(() => {
     const activeDocs = new Set<string>();
     registros.forEach(r => {
-        if (r && r.status === "presente" && r.documento) {
+        if (r && r.status === "ativo" && r.documento) {
             activeDocs.add(r.documento.replace(/\D/g, ''));
         }
     });
@@ -123,14 +114,10 @@ export function TPAsSection() {
     const newErrors: Record<string, string> = {};
     if (!formState.nome.trim()) newErrors.nome = "Nome é obrigatório";
     if (!formState.funcao.trim()) newErrors.funcao = "Função é obrigatória";
-    if (!formState.destino.trim()) newErrors.destino = "Destino é obrigatório";
-    if (!formState.navio.trim()) newErrors.navio = "Navio é obrigatório";
-    if (!formState.pier.trim()) newErrors.pier = "Píer é obrigatório";
-    if (!formState.vigilante.trim()) newErrors.vigilante = "Vigilante é obrigatório";
-    if (!formState.data.trim()) newErrors.data = "Data de entrada é obrigatória";
-    if (!formState.hora.trim()) newErrors.hora = "Hora de entrada é obrigatória";
-    if (!formState.numeroCip.trim()) newErrors.numeroCip = "Número CIP é obrigatório";
-    if (!formState.meioDeAcesso) newErrors.meioDeAcesso = "O meio de acesso é obrigatório";
+    if (!formState.dataEmissao.trim()) newErrors.dataEmissao = "Data de emissão é obrigatória";
+    if (!formState.dataValidade.trim()) newErrors.dataValidade = "Data de validade é obrigatória";
+    if (!formState.tipo.trim()) newErrors.tipo = "Tipo é obrigatório";
+    
 
     const unmaskedDoc = formState.documento.replace(/\D/g, '');
     const complianceResult = checkCompliance(formState.documento);
@@ -158,7 +145,7 @@ export function TPAsSection() {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleReEntry = (tpa: TPA) => {
+  const handleReEntry = (tpa: Tpa) => {
     setSelectedTPA(null);
     setErrors({});
     const now = new Date();
@@ -167,14 +154,9 @@ export function TPAsSection() {
 
     setFormState({
         ...restOfTPA,
-        placa: tpa.placa || '',
-        data: now.toISOString().split("T")[0],
-        hora: now.toTimeString().slice(0, 5),
-        dataSaida: "",
-        horaSaida: "",
+        dataEmissao: now.toISOString().split("T")[0],
+        dataValidade: "",
         credencial: tpa.credencial || "azul",
-        numeroCip: tpa.numeroCip || "",
-        meioDeAcesso: tpa.meioDeAcesso || "terra",
     });
     handleComplianceCheck(tpa.documento);
     setIsReEntryMode(true);
@@ -185,12 +167,7 @@ export function TPAsSection() {
     if (isFormOpen && selectedTPA) {
         setFormState({
           ...selectedTPA,
-          placa: selectedTPA.placa || '',
           credencial: selectedTPA.credencial || "azul",
-          dataSaida: selectedTPA.dataSaida || "",
-          horaSaida: selectedTPA.horaSaida || "",
-          numeroCip: selectedTPA.numeroCip || "",
-          meioDeAcesso: selectedTPA.meioDeAcesso || "terra",
         });
         handleComplianceCheck(selectedTPA.documento);
     }
@@ -203,8 +180,7 @@ export function TPAsSection() {
     const textMatch = !searchLower || (
       (r.nome || '').toLowerCase().includes(searchLower) ||
       (r.documento || '').toLowerCase().includes(searchLower) ||
-      (r.placa || '').toLowerCase().includes(searchLower) ||
-      (r.navio || '').toLowerCase().includes(searchLower)
+      (r.funcao || '').toLowerCase().includes(searchLower)
     );
 
     const dateMatch = (() => {
@@ -213,44 +189,20 @@ export function TPAsSection() {
           return true;
         }
         const today = new Date().toISOString().split('T')[0];
-        return r.data === today;
+        return r.dataEmissao === today;
       }
-      if (!r.data) {
+      if (!r.dataEmissao) {
         return false;
       }
-      const afterStart = dataInicio ? r.data >= dataInicio : true;
-      const beforeEnd = dataFim ? r.data <= dataFim : true;
+      const afterStart = dataInicio ? r.dataEmissao >= dataInicio : true;
+      const beforeEnd = dataFim ? r.dataEmissao <= dataFim : true;
       return afterStart && beforeEnd;
     })();
 
-    const shiftMatch = (() => {
-      if (activeShift === "todos") {
-        return true;
-      }
-      if (!r.horaSaida) {
-        return false;
-      }
-      const hora = r.horaSaida;
-      switch (activeShift) {
-        case "07-13":
-          return hora >= "07:00" && hora < "13:00";
-        case "13-19":
-          return hora >= "13:00" && hora < "19:00";
-        case "19-01":
-          return hora >= "19:00" || hora < "01:00";
-        case "01-07":
-            return hora >= "01:00" && hora < "07:00";
-        default:
-          return true;
-      }
-    })();
-
-    return textMatch && dateMatch && shiftMatch;
+    return textMatch && dateMatch;
   }), [registros, search, dataInicio, dataFim, activeShift]);
 
-  const totalPresentes = registros.filter(r => r && r.status === "presente").length
-  const totalTeg = registros.filter(r => r && r.pier === "teg").length
-  const totalTeag = registros.filter(r => r && r.pier === "teag").length
+  const totalPresentes = registros.filter(r => r && r.status === "ativo").length
   const totalRegistros = registros.filter(r => !!r).length;
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -285,14 +237,13 @@ export function TPAsSection() {
     const now = new Date();
     setFormState({ 
         ...initialFormState,
-        data: now.toISOString().split("T")[0],
-        hora: now.toTimeString().slice(0, 5) 
+        dataEmissao: now.toISOString().split("T")[0],
     });
     setIsReEntryMode(false);
     setIsFormOpen(true)
   }
 
-  const handleEdit = (tpa: TPA) => {
+  const handleEdit = (tpa: Tpa) => {
     if (!isOnline) {
         toast.error("A edição está desabilitada em modo offline.");
         return;
@@ -303,7 +254,7 @@ export function TPAsSection() {
     setIsFormOpen(true)
   }
 
-  const handleDelete = (tpa: TPA) => {
+  const handleDelete = (tpa: Tpa) => {
     if (!isOnline) {
         toast.error("A exclusão está desabilitada em modo offline.");
         return;
@@ -336,13 +287,8 @@ export function TPAsSection() {
 
     setIsSaving(true)
 
-    const status = (formState.horaSaida && formState.dataSaida) ? "saiu" : "presente"
-    let dataToSave: Omit<TPA, "id"> = { ...formState, status };
+    let dataToSave: Omit<Tpa, "id" | "status"> & { status: string } = { ...formState, status: "ativo" };
 
-    if (status === "presente") {
-      dataToSave.horaSaida = "";
-      dataToSave.dataSaida = "";
-    }
 
     if (!isOnline) {
         if (selectedTPA) {
@@ -354,7 +300,7 @@ export function TPAsSection() {
             const tempId = uuidv4();
             await addToOutbox({ 
                 id: tempId, 
-                tableName: 'tpas', 
+                tableName: 'tpa', 
                 data: dataToSave,
                 action: 'create'
             });
@@ -391,44 +337,6 @@ export function TPAsSection() {
     }
   }
 
-  const handleSaida = async (id: string) => {
-    const now = new Date();
-    const saidaData = {
-      status: "saiu" as const,
-      dataSaida: now.toISOString().split("T")[0],
-      horaSaida: now.toTimeString().slice(0, 5),
-    };
-
-    try {
-      if (!isOnline) {
-        await addToOutbox({ 
-          id: uuidv4(), 
-          tableName: 'tpas', 
-          action: 'update',
-          originalId: id,
-          data: saidaData 
-        });
-
-        if ('serviceWorker' in navigator && 'SyncManager' in window) {
-            navigator.serviceWorker.ready.then(sw => sw.sync.register('sync-new-items'));
-        }
-        toast.success("Saída salva com sucesso no navegador! Será sincronizada quando a conexão for restaurada.");
-        return;
-      }
-
-      await updateItem(id, saidaData);
-      toast.success("Saída registrada com sucesso!");
-    } catch (error) {
-      console.error("Erro ao registrar saída:", error);
-      toast.error("Erro ao registrar a saída.");
-    }
-  }
-
-  const formatDateTime = (data: string | undefined, hora: string) => {
-    if (!data || !hora) return ""
-    return `${formatDate(data)} ${hora}`
-  }
-
   const saveButtonDisabled = isSaving || (!isOnline && !!selectedTPA);
 
   if (loading) {
@@ -456,8 +364,6 @@ export function TPAsSection() {
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Card><CardContent className="flex items-center gap-4 p-4"><div className="flex h-11 w-11 items-center justify-center rounded-lg bg-primary/10"><Users className="h-5 w-5 text-primary" /></div><div><p className="text-2xl font-bold">{totalRegistros}</p><p className="text-sm text-muted-foreground">Total de Registros</p></div></CardContent></Card>
         <Card><CardContent className="flex items-center gap-4 p-4"><div className="flex h-11 w-11 items-center justify-center rounded-lg bg-primary/10"><Ship className="h-5 w-5 text-primary" /></div><div><p className="text-2xl font-bold text-primary">{totalPresentes}</p><p className="text-sm text-muted-foreground">A Bordo</p></div></CardContent></Card>
-        <Card><CardContent className="flex items-center gap-4 p-4"><div className="flex h-11 w-11 items-center justify-center rounded-lg bg-secondary"><span className="text-xs font-bold text-muted-foreground">TEG</span></div><div><p className="text-2xl font-bold">{totalTeg}</p><p className="text-sm text-muted-foreground">Pier TEG</p></div></CardContent></Card>
-        <Card><CardContent className="flex items-center gap-4 p-4"><div className="flex h-11 w-11 items-center justify-center rounded-lg bg-secondary"><span className="text-xs font-bold text-muted-foreground">TEAG</span></div><div><p className="text-2xl font-bold">{totalTeag}</p><p className="text-sm text-muted-foreground">Pier TEAG</p></div></CardContent></Card>
       </div>
 
         <Card>
@@ -520,14 +426,6 @@ export function TPAsSection() {
 
           <div className="max-h-[70vh] overflow-y-auto p-1 mt-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 py-4">
-             <div className="grid gap-2 sm:col-span-2">
-                <Label className={cn({ 'text-red-500': errors.meioDeAcesso })}>Meio de Acesso</Label>
-                <ToggleGroup type="single" value={formState.meioDeAcesso} onValueChange={(value) => handleSelectChange("meioDeAcesso", value)} className="grid grid-cols-2 gap-2">
-                    <ToggleGroupItem value="terra" className="flex flex-col h-16"><LandPlot className="h-5 w-5 mb-1"/><span>Via Terra</span></ToggleGroupItem>
-                    <ToggleGroupItem value="mar" className="flex flex-col h-16"><Waves className="h-5 w-5 mb-1"/><span>Via Mar</span></ToggleGroupItem>
-                </ToggleGroup>
-                {errors.meioDeAcesso && <p className="text-xs text-red-500">{errors.meioDeAcesso}</p>}
-              </div>
               <div className="grid gap-2">
                 <Label htmlFor="nome">Nome</Label>
                 <Input id="nome" placeholder="Nome completo" value={formState.nome} onChange={handleInputChange} className={cn({ 'border-red-500': errors.nome })} />
@@ -557,70 +455,23 @@ export function TPAsSection() {
                 />
                 {errors.documento && <p className="text-xs text-red-500">{errors.documento}</p>}
               </div>
-               <div className="grid gap-2">
-                <Label htmlFor="placa">Placa do Veículo</Label>
-                <IMaskInput
-                  mask={[{ mask: 'aaa-0000' }, { mask: 'aaa0a00' }]}
-                  id="placa"
-                  value={formState.placa || ''}
-                  onAccept={(value) => handleMaskedInputChange('placa', value as string)}
-                  prepare={(str) => str.toUpperCase()}
-                  as={ForwardedInput}
-                  placeholder="ABC-1234 ou ABC1D23"
-                />
-              </div>
-              
               <div className="grid gap-2">
-                <Label htmlFor="credencial">Credencial de Acesso</Label>
-                <Select value={formState.credencial || 'azul'} onValueChange={(value) => handleSelectChange("credencial", value)}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="azul">Azul (Administrativo)</SelectItem>
-                    <SelectItem value="vermelho">Vermelho (Pier)</SelectItem>
-                    <SelectItem value="verde">Verde (Navio)</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="grid gap-2">
-                <Label htmlFor="numeroCip">Número CIP</Label>
-                <Input id="numeroCip" placeholder="Número CIP" value={formState.numeroCip} onChange={handleInputChange} className={cn({ 'border-red-500': errors.numeroCip })} />
-                {errors.numeroCip && <p className="text-xs text-red-500">{errors.numeroCip}</p>}
+                <Label htmlFor="dataEmissao">Data Emissão</Label>
+                <Input id="dataEmissao" type="date" value={formState.dataEmissao} onChange={handleInputChange} className={cn({ 'border-red-500': errors.dataEmissao })} />
+                {errors.dataEmissao && <p className="text-xs text-red-500">{errors.dataEmissao}</p>}
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="destino">Destino</Label>
-                <Input id="destino" placeholder="Ex: Convés Principal" value={formState.destino} onChange={handleInputChange} className={cn({ 'border-red-500': errors.destino })} />
-                {errors.destino && <p className="text-xs text-red-500">{errors.destino}</p>}
+                <Label htmlFor="dataValidade">Data Validade</Label>
+                <Input id="dataValidade" type="date" value={formState.dataValidade} onChange={handleInputChange} className={cn({ 'border-red-500': errors.dataValidade })} />
+                {errors.dataValidade && <p className="text-xs text-red-500">{errors.dataValidade}</p>}
               </div>
-              <div className="grid gap-2">
-                <Label htmlFor="navio">Navio</Label>
-                <Input id="navio" placeholder="Nome do navio" value={formState.navio} onChange={handleInputChange} className={cn({ 'border-red-500': errors.navio })} />
-                {errors.navio && <p className="text-xs text-red-500">{errors.navio}</p>}
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="pier">Pier</Label>
-                <Select value={formState.pier} onValueChange={v => handleSelectChange("pier", v)}>
-                    <SelectTrigger id="pier" className={cn({ 'border-red-500': errors.pier })}><SelectValue /></SelectTrigger>
-                    <SelectContent><SelectItem value="teg">TEG</SelectItem><SelectItem value="teag">TEAG</SelectItem></SelectContent>
-                </Select>
-                 {errors.pier && <p className="text-xs text-red-500">{errors.pier}</p>}
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="data">Data Entrada</Label>
-                <Input id="data" type="date" value={formState.data} onChange={handleInputChange} className={cn({ 'border-red-500': errors.data })} />
-                {errors.data && <p className="text-xs text-red-500">{errors.data}</p>}
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="hora">Hora Entrada</Label>
-                <Input id="hora" type="time" value={formState.hora} onChange={handleInputChange} className={cn({ 'border-red-500': errors.hora })} />
-                {errors.hora && <p className="text-xs text-red-500">{errors.hora}</p>}
-              </div>
-              <div className="grid gap-2"><Label htmlFor="dataSaida">Data Saída</Label><Input id="dataSaida" type="date" value={formState.dataSaida || ""} onChange={handleInputChange} /></div>
-              <div className="grid gap-2"><Label htmlFor="horaSaida">Hora Saída</Label><Input id="horaSaida" type="time" value={formState.horaSaida || ""} onChange={handleInputChange} /></div>
               <div className="grid gap-2 sm:col-span-2">
-                <Label htmlFor="vigilante">Vigilante</Label>
-                <Input id="vigilante" placeholder="Nome do vigilante responsável" value={formState.vigilante} onChange={handleInputChange} className={cn({ 'border-red-500': errors.vigilante })} />
-                {errors.vigilante && <p className="text-xs text-red-500">{errors.vigilante}</p>}
+                <Label htmlFor="tipo">Tipo</Label>
+                <Select value={formState.tipo} onValueChange={v => handleSelectChange("tipo", v)}>
+                    <SelectTrigger id="tipo" className={cn({ 'border-red-500': errors.tipo })}><SelectValue /></SelectTrigger>
+                    <SelectContent><SelectItem value="isps">ISPS</SelectItem><SelectItem value="nao_isps">Não ISPS</SelectItem></SelectContent>
+                </Select>
+                 {errors.tipo && <p className="text-xs text-red-500">{errors.tipo}</p>}
               </div>
               <div className="grid gap-2 sm:col-span-2"><Label htmlFor="observacao">Observação</Label><Textarea id="observacao" placeholder="Observações adicionais (opcional)" value={formState.observacao} onChange={handleInputChange} rows={3} /></div>
             </div>
@@ -665,26 +516,18 @@ export function TPAsSection() {
                                     <p className="text-sm text-muted-foreground">{r.funcao}</p>
                                 </div>
                                  <div className="flex flex-col items-end gap-1">
-                                    <span className={cn("inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold", r.status === "presente" ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-800")}>{r.status}</span>
+                                    <span className={cn("inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold", r.status === "ativo" ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-800")}>{r.status}</span>
                                     {(r as any).isOffline && <span className="inline-flex items-center rounded-full bg-amber-100 px-2.5 py-0.5 text-[10px] font-medium text-amber-800 animate-pulse"><WifiOff className="mr-1 h-3 w-3" /> Sincronizando...</span>}
                                  </div>
                             </div>
                             <CredencialBadge credencial={r.credencial} />
                             <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm flex-grow">
                                 <div className="flex flex-col"><span className="text-muted-foreground">Documento</span><span>{r.documento}</span></div>
-                                <div className="flex flex-col"><span className="text-muted-foreground">Acesso</span><span className="capitalize">{r.meioDeAcesso}</span></div>
-                                <div className="flex flex-col"><span className="text-muted-foreground">Placa</span><span>{r.placa || '-'}</span></div>
-                                <div className="flex flex-col"><span className="text-muted-foreground">Navio</span><span>{r.navio}</span></div>
-                                <div className="flex flex-col"><span className="text-muted-foreground">Entrada</span><span>{formatDateTime(r.data, r.hora)}</span></div>
-                                <div className="flex flex-col"><span className="text-muted-foreground">Saída</span><span>{r.horaSaida ? formatDateTime(r.dataSaida || r.data, r.horaSaida) : '-'}</span></div>
-                                <div className="flex flex-col"><span className="text-muted-foreground">CIP</span><span>{r.numeroCip || '-'}</span></div>
+                                <div className="flex flex-col"><span className="text-muted-foreground">Emissão</span><span>{formatDate(r.dataEmissao)}</span></div>
+                                <div className="flex flex-col"><span className="text-muted-foreground">Validade</span><span>{formatDate(r.dataValidade)}</span></div>
+                                <div className="flex flex-col"><span className="text-muted-foreground">Tipo</span><span className="capitalize">{r.tipo}</span></div>
                             </div>
                              <div className="border-t pt-3 flex items-center justify-end gap-2">
-                                {r.status === "presente" ? (
-                                    <Button size="sm" variant="outline" onClick={() => handleSaida(r.id)}>Registrar Saída</Button>
-                                ) : (
-                                    <Button size="sm" variant="outline" onClick={() => handleReEntry(r)}>Nova Entrada</Button>
-                                )}
                                 <DropdownMenu>
                                     <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" disabled={!isOnline}><MoreVertical className="h-4 w-4"/></Button></DropdownMenuTrigger>
                                     <DropdownMenuContent align="end">
@@ -701,18 +544,12 @@ export function TPAsSection() {
                  <table className="w-full text-sm">
                     <thead>
                         <tr className="border-b border-border text-left text-xs text-muted-foreground uppercase">
-                            <th className="px-4 py-3 font-medium">Entrada</th>
-                            <th className="px-4 py-3 font-medium">Saída</th>
                             <th className="px-4 py-3 font-medium">Nome</th>
                             <th className="px-4 py-3 font-medium">Função</th>
                             <th className="px-4 py-3 font-medium">Documento</th>
-                            <th className="px-4 py-3 font-medium">CIP</th>
-                            <th className="px-4 py-3 font-medium">Acesso</th>
-                            <th className="px-4 py-3 font-medium">Placa</th>
-                            <th className="px-4 py-3 font-medium">Navio</th>
-                            <th className="px-4 py-3 font-medium">Destino</th>
-                            <th className="px-4 py-3 font-medium">Pier</th>
-                            <th className="px-4 py-3 font-medium">Vigilante</th>
+                            <th className="px-4 py-3 font-medium">Emissão</th>
+                            <th className="px-4 py-3 font-medium">Validade</th>
+                            <th className="px-4 py-3 font-medium">Tipo</th>
                             <th className="px-4 py-3 font-medium">Observações</th>
                             <th className="px-4 py-3 font-medium text-right">Ações</th>
                         </tr>
@@ -722,9 +559,7 @@ export function TPAsSection() {
                             <tr><td colSpan={14} className="py-8 text-center text-muted-foreground">Nenhum registro encontrado para os filtros aplicados.</td></tr>
                         ) : (
                             filtered.map(r => (
-                                <tr key={r.id} className={cn("hover:bg-muted/50", r.credencial && credencialConfig[r.credencial]?.className.replace(/text-\S+/, '').replace(/dark:text-\S+/, ''))}>
-                                    <td className="px-4 py-3 whitespace-nowrap tabular-nums text-muted-foreground">{formatDateTime(r.data, r.hora)}</td>
-                                    <td className="px-4 py-3 whitespace-nowrap tabular-nums text-muted-foreground">{r.horaSaida ? formatDateTime(r.dataSaida || r.data, r.horaSaida) : "-"}</td>
+                                <tr key={r.id} className={cn("hover:bg-muted/50", r.credencial && (r.credencial in credencialConfig) && credencialConfig[r.credencial as keyof typeof credencialConfig]?.className.replace(/text-\S+/, '').replace(/dark:text-\S+/, ''))}>
                                     <td className="px-4 py-3 font-medium whitespace-nowrap text-foreground">
                                         <div className="flex items-center gap-2">
                                             {r.nome}
@@ -734,21 +569,12 @@ export function TPAsSection() {
                                     </td>
                                     <td className="px-4 py-3 text-muted-foreground">{r.funcao}</td>
                                     <td className="px-4 py-3 tabular-nums text-muted-foreground">{r.documento}</td>
-                                    <td className="px-4 py-3 tabular-nums text-muted-foreground">{r.numeroCip || '-'}</td>
-                                    <td className="px-4 py-3 capitalize text-muted-foreground"><div className="flex items-center gap-2"><IconeAcesso meio={r.meioDeAcesso} /> {r.meioDeAcesso}</div></td>
-                                    <td className="px-4 py-3 tabular-nums text-muted-foreground">{r.placa || '-'}</td>
-                                    <td className="px-4 py-3 whitespace-nowrap text-foreground">{r.navio}</td>
-                                    <td className="px-4 py-3 text-muted-foreground">{r.destino}</td>
-                                    <td className="px-4 py-3"><span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ${r.pier === "teg" ? "bg-primary/10 text-primary" : "bg-info/10 text-info"}`}>{r.pier.toUpperCase()}</span></td>
-                                    <td className="px-4 py-3 whitespace-nowrap text-foreground">{r.vigilante}</td>
+                                    <td className="px-4 py-3 text-muted-foreground">{formatDate(r.dataEmissao)}</td>
+                                    <td className="px-4 py-3 text-muted-foreground">{formatDate(r.dataValidade)}</td>
+                                    <td className="px-4 py-3"><span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ${r.tipo === "isps" ? "bg-primary/10 text-primary" : "bg-info/10 text-info"}`}>{r.tipo.toUpperCase()}</span></td>
                                     <td className="px-4 py-3 text-muted-foreground max-w-xs truncate">{r.observacao}</td>
                                     <td className="px-4 py-3">
                                         <div className="flex items-center justify-end gap-2">
-                                            {r.status === "presente" ? (
-                                                <Button size="sm" variant="outline" onClick={() => handleSaida(r.id)}><LogOut className="mr-2 h-3 w-3" />Registrar Saída</Button>
-                                            ) : (
-                                                <Button size="sm" variant="outline" onClick={() => handleReEntry(r)}><LogIn className="mr-2 h-3 w-3" />Nova Entrada</Button>
-                                            )}
                                             <Button size="icon" variant="ghost" onClick={() => handleEdit(r)} disabled={!isOnline}><FilePenLine className="h-4 w-4" /></Button>
                                             <Button size="icon" variant="ghost" onClick={() => handleDelete(r)} className="text-destructive hover:text-destructive/90" disabled={!isOnline}><Trash2 className="h-4 w-4" /></Button>
                                         </div>

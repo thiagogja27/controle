@@ -9,7 +9,7 @@ export interface Individuo {
   status: 'presente' | 'saiu'
   dataSaida?: string // ISO date string (YYYY-MM-DD)
   horaSaida?: string // HH:MM
-  credencial?: 'azul' | 'vermelho' | 'verde'
+  credencial?: 'azul' | 'vermelho' | 'verde' | 'sif' | 'mog' | 'mof'
   diversos?: boolean
   rg?: string
   cnh?: string
@@ -18,6 +18,13 @@ export interface Individuo {
   validadeCnh?: string // ISO date string
   telefone?: string
   categoriaCnh?: string
+  empresa?: string
+  funcao?: string
+  tipo?: string
+  dataValidade?: string
+  dataEmissao?: string
+  observacao?: string
+  navio?: string
 }
 
 export interface ConsumoBordo {
@@ -45,10 +52,24 @@ export interface Visitante {
   dataSaida?: string; // ISO date-time string
   status: 'presente' | 'saiu';
   terminal: 'teg' | 'teag';
-  credencial?: 'sif' | 'mog' | 'mof';
+  credencial?: 'azul' | 'vermelho' | 'verde' | 'sif' | 'mog' | 'mof';
   observacao?: string;
   vigilanteEntrada: string;
   vigilanteSaida?: string;
+  rg?: string;
+  cnh?: string;
+  dataNascimento?: string;
+  validadeRg?: string;
+  validadeCnh?: string;
+  telefone?: string;
+  categoriaCnh?: string;
+  diversos?: boolean;
+  destino?: string;
+  motivo?: string;
+  placa?: string;
+  notaFiscal?: string;
+  horaEntrada?: string;
+  horaSaida?: string;
 }
 
 export interface Tpa {
@@ -62,6 +83,7 @@ export interface Tpa {
     dataEmissao: string; // ISO Date String
     observacao?: string;
     status: 'ativo' | 'inativo';
+    credencial?: 'azul' | 'vermelho' | 'verde'
 }
 
 export interface OcorrenciaCompliance {
@@ -87,6 +109,22 @@ export interface Navio {
   berco: string;
 }
 
+export interface IndividuoRefeicao {
+  id: string;
+  nome: string;
+  status: 'presente' | 'saiu';
+  dataSaida?: string;
+  horaSaida?: string;
+}
+
+export interface RefeicaoPolicial {
+  id: string;
+  categoria: 'pm' | 'pr' | 'pc';
+  data: string;
+  hora: string;
+  individuos: IndividuoRefeicao[];
+}
+
 
 // --- Zustand Store para UI State ---
 interface AppState {
@@ -104,7 +142,7 @@ export const useStore = create<AppState>((set) => ({
 // --- Zustand Store para Outbox (Offline Data) ---
 export interface OutboxItem {
   id: string; // UUID para o item da outbox
-  tableName: 'consumos' | 'visitantes' | 'tpa' | 'compliance' | 'navios';
+  tableName: 'consumos' | 'visitantes' | 'tpa' | 'compliance' | 'navios' | 'refeicoes';
   action: 'create' | 'update' | 'delete';
   data: any;
   originalId?: string; // ID original do documento para 'update' e 'delete'
