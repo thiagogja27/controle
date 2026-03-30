@@ -16,6 +16,7 @@ import {
 } from 'recharts'
 import { type RefeicaoPolicial, type OldRefeicaoPolicial } from './refeicoes-section'
 import { cn } from "@/lib/utils"
+import { type Visitante } from '@/lib/store'
 
 const COLORS = ['#3b82f6', '#10b981', '#f97316', '#8b5cf6', '#ec4899'];
 
@@ -82,22 +83,19 @@ export function DashboardSection() {
   }, [rawRefeicoes])
 
  const allPresentIndividuals = useMemo(() => {
-    const presentVisitantes = visitantes
+    const presentVisitantes = (visitantes as Visitante[])
         .filter(v => v.status === 'presente')
-        .map(v => {
-            const dest = (v.destino || 'OUTROS').toUpperCase();
-            return {
-                id: v.id,
-                nome: v.nome,
-                type: 'Visitante',
-                destino: dest.includes('TEG') ? 'TEG' : dest.includes('TEAG') ? 'TEAG' : dest,
-                details: [
-                    { label: 'Empresa', value: v.empresa },
-                    { label: 'Documento', value: v.documento },
-                    { label: 'Motivo', value: v.motivo },
-                ]
-            };
-        });
+        .map(v => ({
+            id: v.id,
+            nome: v.nome,
+            type: 'Visitante',
+            destino: v.terminal.toUpperCase(),
+            details: [
+                { label: 'Empresa', value: v.empresa },
+                { label: 'Documento', value: v.documento },
+                { label: 'Observação', value: v.observacao },
+            ]
+        }));
 
     const presentTPAs = tpas
         .filter(t => t.status === 'presente')
@@ -167,10 +165,10 @@ export function DashboardSection() {
     return Object.entries(counts).map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value);
   }, [consumos])
 
-  const visitantesPorDestino = useMemo(() => {
-    const counts = visitantes.reduce((acc, curr) => {
-        const destino = curr.destino || 'Não especificado';
-        acc[destino] = (acc[destino] || 0) + 1;
+  const visitantesPorTerminal = useMemo(() => {
+    const counts = (visitantes as Visitante[]).reduce((acc, curr) => {
+        const terminal = curr.terminal || 'Não especificado';
+        acc[terminal] = (acc[terminal] || 0) + 1;
         return acc;
     }, {} as { [key: string]: number });
     return Object.entries(counts).map(([name, value]) => ({ name, value })).sort((a,b) => b.value - a.value);
@@ -178,7 +176,7 @@ export function DashboardSection() {
 
   const recentActivity = useMemo(() => {
     const allActivities: any[] = [
-      ...visitantes.map(v => ({ ...v, type: 'Visitante', date: new Date(`${v.dataEntrada}T${v.horaEntrada}`) })),
+      ...visitantes.map(v => ({ ...v, type: 'Visitante', date: new Date(`${v.dataEntrada}T${(v as any).horaEntrada || '00:00'}`) })),
       ...refeicoes.map(r => ({ ...r, type: 'Refeição Policial', date: new Date(`${r.data}T${r.hora}`) })),
       ...tpas.map(t => ({ ...t, type: 'TPA', date: new Date(`${t.data}T${t.hora}`) })),
       ...consumos.map(c => ({ ...c, type: 'Consumo de Bordo', date: new Date(`${c.data}T${c.hora}`) })),
@@ -235,12 +233,12 @@ export function DashboardSection() {
                 </CardContent>
             </Card>
              <Card className="lg:col-span-2">
-                <CardHeader><CardTitle>Visitantes por Destino</CardTitle></CardHeader>
+                <CardHeader><CardTitle>Visitantes por Terminal</CardTitle></CardHeader>
                 <CardContent>
                      <ResponsiveContainer width="100%" height={300}>
                         <PieChart>
                             <Pie 
-                                data={visitantesPorDestino} 
+                                data={visitantesPorTerminal} 
                                 dataKey="value" 
                                 nameKey="name" 
                                 cx="50%" 
@@ -251,7 +249,7 @@ export function DashboardSection() {
                                 labelLine={false}
                                 label={false}
                             >
-                                {visitantesPorDestino.map((entry, index) => (
+                                {visitantesPorTerminal.map((entry, index) => (
                                     <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} strokeWidth={0} />
                                 ))}
                             </Pie>
@@ -331,7 +329,7 @@ export function DashboardSection() {
                     <DialogClose asChild>
                         <Button type="button" variant="secondary">
                             Fechar
-                        </Button>
+                        </Button
                     </DialogClose>
                 </DialogFooter>
             </DialogContent>
