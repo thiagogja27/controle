@@ -1,40 +1,71 @@
 import admin from 'firebase-admin';
 
-let adminDb: admin.database.Database;
+// --- Interface para o cache global ---
+interface FirebaseAdminCache {
+  app?: admin.app.App;
+  db?: admin.database.Database;
+}
 
-function initializeAdmin() {
-  if (admin.apps.length > 0) {
-    return admin.app();
+// --- Cache Global ---
+// O "global as any" é uma forma de criar uma variável global em TypeScript
+// que persiste entre as invocações de funções serverless no Next.js.
+const globalCache: { firebaseAdmin: FirebaseAdminCache } = global as any;
+
+/**
+ * Obtém a instância do app do Firebase Admin, inicializando-a apenas se não existir.
+ * Este padrão (Singleton) evita inicializações múltiplas e erros em ambientes serverless.
+ * @returns {admin.app.App} A instância do app do Firebase Admin.
+ */
+function initializeAdminApp(): admin.app.App {
+  if (globalCache.firebaseAdmin && globalCache.firebaseAdmin.app) {
+    return globalCache.firebaseAdmin.app;
   }
 
   const privateKey = process.env.FIREBASE_PRIVATE_KEY;
-
   if (!privateKey) {
-    throw new Error('FIREBASE_PRIVATE_KEY environment variable is not set or empty.');
+    throw new Error('A variável de ambiente FIREBASE_PRIVATE_KEY não está definida.');
   }
 
   const serviceAccount = {
-    projectId: process.env.FIREBASE_PROJECT_ID,
-    clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-    // Vercel's environment variable UI often replaces newlines with the literal string "\\n".
-    // We need to replace them back with actual newline characters `\n` for the Firebase SDK to parse the key correctly.
+    projectId: process.env.FIREBASE_PROJECT_ID!,
+    clientEmail: process.env.FIREBASE_CLIENT_EMAIL!,
     privateKey: privateKey.replace(/\\n/g, '\n'),
   };
 
-  if (!serviceAccount.projectId || !serviceAccount.clientEmail) {
-    throw new Error('Incomplete Firebase Admin credentials in environment variables.');
-  }
-
-  return admin.initializeApp({
+  const app = admin.initializeApp({
     credential: admin.credential.cert(serviceAccount),
     databaseURL: "https://controle-diversos-default-rtdb.firebaseio.com",
   });
+
+  // Cacheia a instância do app
+  if (!globalCache.firebaseAdmin) {
+    globalCache.firebaseAdmin = {};
+  }
+  globalCache.firebaseAdmin.app = app;
+
+  return app;
 }
 
-export const getFirebaseAdmin = () => {
-  if (!adminDb) {
-    initializeAdmin();
-    adminDb = admin.database();
+/**
+ * Obtém a instância do Firebase Realtime Database.
+ * Utiliza um padrão Singleton para garantir que a conexão seja reutilizada entre as invocações.
+ * @returns {admin.database.Database} A instância do Realtime Database.
+ */
+export const getFirebaseAdmin = (): admin.database.Database => {
+  if (globalCache.firebaseAdmin && globalCache.firebaseAdmin.db) {
+    return globalCache.firebaseAdmin.db;
   }
-  return adminDb;
+
+  // Garante que o app está inicializado antes de pegar o DB
+  initializeAdminApp();
+  
+  const db = admin.database();
+
+  // Cacheia a instância do DB
+  if (!globalCache.firebaseAdmin) {
+    globalCache.firebaseAdmin = {};
+  }
+  globalCache.firebaseAdmin.db = db;
+  
+  return db;
 };

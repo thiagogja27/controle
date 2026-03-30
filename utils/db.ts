@@ -1,7 +1,6 @@
 import { openDB, DBSchema } from 'idb';
 
 // This code runs in the browser AND the service worker.
-// We need to dispatch an event ONLY in the browser context.
 const isBrowser = typeof window !== 'undefined' && typeof window.document !== 'undefined';
 
 export interface OutboxRecord {
@@ -22,8 +21,6 @@ interface MyDB extends DBSchema {
 let dbPromise: Promise<any> | null = null;
 
 function getDB() {
-  // O Service Worker não tem 'window', mas tem 'self.indexedDB'
-  // O Node.js (build) não tem nenhum dos dois.
   if (typeof indexedDB === 'undefined' && typeof self === 'undefined') return null;
   
   if (!dbPromise) {
@@ -40,7 +37,7 @@ export async function addToOutbox(record: OutboxRecord) {
   const db = await getDB();
   if (!db) return;
   await db.put('outbox', record);
-  // Dispatch custom event to notify hooks/components (Browser only)
+  // Notify client-side code that the outbox has changed
   if (isBrowser) {
     window.dispatchEvent(new CustomEvent('outbox-updated'));
   }
@@ -52,13 +49,12 @@ export async function getOutbox(): Promise<OutboxRecord[]> {
   return db.getAll('outbox');
 }
 
+// This function ONLY deletes from the database. It does not dispatch events.
+// The caller is responsible for notifying the UI if needed.
 export async function deleteFromOutbox(id: string) {
   const db = await getDB();
   if (!db) return;
   await db.delete('outbox', id);
-  if (isBrowser) {
-    window.dispatchEvent(new CustomEvent('outbox-updated'));
-  }
 }
 
 export async function clearOutbox() {
@@ -67,4 +63,7 @@ export async function clearOutbox() {
   const tx = db.transaction('outbox', 'readwrite');
   await tx.store.clear();
   await tx.done;
+  if (isBrowser) {
+    window.dispatchEvent(new CustomEvent('outbox-updated'));
+  }
 }

@@ -5,8 +5,7 @@ import { getOutbox, deleteFromOutbox, type OutboxRecord } from '@/utils/db';
 declare const self: ServiceWorkerGlobalScope;
 
 // --- Trava de Sincronização (Mutex) ---
-// Garante que a função handleSync() não seja executada multiplas vezes em paralelo,
-// o que poderia levar a duplicações de dados.
+// Garante que a função handleSync() não seja executada multiplas vezes em paralelo.
 let isSyncing = false;
 
 self.addEventListener("install", (event) => {
@@ -34,6 +33,9 @@ async function handleSync() {
 
   isSyncing = true;
   console.log("Service Worker: Iniciando sincronização serializada...");
+  notifyClients({ type: 'SYNC_START' });
+
+  let failedItems = 0;
 
   try {
     const outboxItems = await getOutbox();
@@ -44,7 +46,6 @@ async function handleSync() {
 
     console.log(`Service Worker: ${outboxItems.length} item(s) encontrados no outbox.`);
 
-    // Processa os itens um por um, de forma sequencial (transacional)
     for (const item of outboxItems) {
       try {
         console.log(`Service Worker: Processando item ${item.id}...`);
@@ -57,21 +58,16 @@ async function handleSync() {
         const result = await response.json();
 
         if (response.ok && result.success) {
-          // SUCESSO: O item foi salvo no DB. Agora podemos removê-lo do outbox.
-          await deleteFromOutbox(result.originalId);
-          console.log(`Service Worker: Item ${result.originalId} sincronizado e removido do outbox.`);
-          
-          // Notifica a interface para remover o item temporário da UI
-          notifyClients(result);
-
+          await deleteFromOutbox(item.id);
+          console.log(`Service Worker: Item ${item.id} sincronizado e removido.`);
+          notifyClients({ type: 'SYNC_SUCCESS', payload: { ...result, deletedId: item.id } });
         } else {
-          // FALHA: A API reportou um erro. O item permanecerá no outbox para uma tentativa futura.
+          failedItems++;
           console.error(`Service Worker: Falha ao sincronizar item ${item.id}. Status: ${response.status}. Mensagem: ${result.message}`);
         }
       } catch (error) {
-        // FALHA DE REDE: O fetch falhou. O item permanecerá no outbox.
-        console.error(`Service Worker: Erro de rede ao processar item ${item.id}. O item permanece no outbox.`, error);
-        // Como a conexão pode ter caído, paramos o loop atual e esperamos um novo evento "sync".
+        failedItems++;
+        console.error(`Service Worker: Erro de rede ao processar item ${item.id}.`, error);
         break; 
       }
     }
@@ -81,19 +77,17 @@ async function handleSync() {
   } catch (error) {
     console.error("Service Worker: Erro catastrófico durante a busca no outbox.", error);
   } finally {
-    isSyncing = false; // Libera a trava para a próxima sincronização
+    isSyncing = false; 
+    console.log(`Service Worker: Sincronização finalizada. Itens com falha: ${failedItems}`);
+    notifyClients({ type: 'SYNC_COMPLETE', payload: { failedCount: failedItems } });
   }
 }
 
-/**
- * Envia uma mensagem para todas as abas/clientes abertos da aplicação.
- * @param {any} data - O objeto de dados a ser enviado.
- */
-function notifyClients(data: any) {
+function notifyClients(message: object) {
   self.clients.matchAll({ includeUncontrolled: true, type: 'window' }).then(clients => {
     if (clients && clients.length) {
       clients.forEach(client => {
-        client.postMessage({ type: 'SYNC_SUCCESS', payload: data });
+        client.postMessage(message);
       });
     }
   });
