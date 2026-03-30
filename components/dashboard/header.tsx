@@ -1,6 +1,6 @@
 'use client'
 
-import { Bell, Settings, User, LogOut } from "lucide-react"
+import { Settings, User, LogOut } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
@@ -15,6 +15,7 @@ import { useRouter } from 'next/navigation'
 import { ThemeToggle } from "@/components/theme-toggle"
 import { useEffect, useState } from "react"
 import Image from "next/image"
+import { NotificationsDropdown } from './notifications-dropdown'
 
 export function Header() {
   const { user, logout } = useAuth()
@@ -49,12 +50,7 @@ export function Header() {
       
       <div className="flex flex-1 items-center justify-end gap-2">
         <ThemeToggle />
-        <Button variant="ghost" size="icon-sm" className="relative rounded-full">
-          <Bell className="h-[1.2rem] w-[1.2rem]" />
-          <span className="absolute -right-0.5 -top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[10px] font-medium text-primary-foreground">
-            3
-          </span>
-        </Button>
+        <NotificationsDropdown />
                 
         {isClient && 
             <DropdownMenu>

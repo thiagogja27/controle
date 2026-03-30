@@ -14,7 +14,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { type ConsumoBordo, type Individuo, type OcorrenciaCompliance } from "@/lib/store"
 import { useConsumos } from "@/hooks/use-firebase"
-import { useOcorrenciasCompliance } from "@/hooks/use-compliance"
+import { useComplianceCheck } from "@/hooks/use-compliance-check"
 import { useOnlineStatus } from "@/hooks/use-online-status"
 import { addToOutbox } from "@/utils/db"
 import { v4 as uuidv4 } from 'uuid'
@@ -83,7 +83,7 @@ const toIsoDate = (brDate: string = ''): string => {
 
 export function ConsumoSection() {
   const { data: consumos, loading, addItem, updateItem, deleteItem } = useConsumos()
-  const { data: ocorrencias } = useOcorrenciasCompliance();
+  const { checkCompliance } = useComplianceCheck();
   const isOnline = useOnlineStatus();
 
   const [search, setSearch] = useState("")
@@ -109,15 +109,10 @@ export function ConsumoSection() {
         }
     };
 
-  const checkCompliance = (documento: string, index: number) => {
-    const unmaskedDoc = documento.replace(/\D/g, '');
-    if (unmaskedDoc.length > 0) {
-        const foundOcorrencia = ocorrencias.find(o => o.documentoIndividuo.replace(/\D/g, '') === unmaskedDoc);
-        setComplianceAlerts(prev => ({ ...prev, [index]: foundOcorrencia || null }));
-    } else {
-        setComplianceAlerts(prev => ({ ...prev, [index]: null }));
-    }
-  }
+  const handleComplianceCheck = (documento: string, index: number) => {
+    const result = checkCompliance(documento);
+    setComplianceAlerts(prev => ({ ...prev, [index]: result.ocorrencia || null }));
+  };
 
   const allConsumoDocuments = useMemo(() => {
       const docs = new Set<string>();
@@ -172,7 +167,7 @@ export function ConsumoSection() {
             categoriaCnh: individuo.categoriaCnh || "",
         }],
     });
-    checkCompliance(individuo.documento, 0);
+    handleComplianceCheck(individuo.documento, 0);
     setIsReEntryMode(true);
     setIsFormOpen(true);
   };
@@ -199,7 +194,7 @@ export function ConsumoSection() {
             categoriaCnh: ind.categoriaCnh || "",
           })),
         })
-        selectedConsumo.individuos.forEach((ind, index) => checkCompliance(ind.documento || "", index));
+        selectedConsumo.individuos.forEach((ind, index) => handleComplianceCheck(ind.documento || "", index));
     } else if (!isFormOpen) {
         setFormErrors({});
     }
@@ -270,7 +265,7 @@ export function ConsumoSection() {
     setFormState(prev => ({ ...prev, individuos: newIndividuos }));
     clearError(`individuo-${index}-${field}`);
      if (field === 'documento') {
-      checkCompliance(value as string, index);
+      handleComplianceCheck(value as string, index);
     }
   }
 
@@ -387,23 +382,29 @@ export function ConsumoSection() {
         const unmaskedDoc = (ind.documento || '').replace(/\D/g, '');
         if (!unmaskedDoc) {
             errors[`individuo-${index}-documento`] = "Documento (CPF) é obrigatório.";
-        } else if (unmaskedDoc.length < 11) {
-            errors[`individuo-${index}-documento`] = "Documento (CPF) deve ter 11 dígitos.";
-        } else if (currentDocsInForm.has(unmaskedDoc)) {
-            errors[`individuo-${index}-documento`] = "CPF duplicado neste mesmo formulário.";
         } else {
-            currentDocsInForm.add(unmaskedDoc);
-            if (selectedConsumo) { // Editing an existing consumption record
-                const originalIndividuo = selectedConsumo.individuos.find(origInd => origInd.id === ind.id);
-                const originalDoc = originalIndividuo ? originalIndividuo.documento.replace(/\D/g, '') : '';
-                if (unmaskedDoc !== originalDoc && activeConsumoDocuments.has(unmaskedDoc)) {
-                     errors[`individuo-${index}-documento`] = "Já existe um registro de entrada ativo para este CPF.";
-                }
-            } else { // Adding a new consumption record (which can be a re-entry)
-                if (activeConsumoDocuments.has(unmaskedDoc)) {
-                    errors[`individuo-${index}-documento`] = "Já existe um registro de entrada ativo para este CPF.";
-                } else if (!isReEntryMode && allConsumoDocuments.has(unmaskedDoc)) {
-                    errors[`individuo-${index}-documento`] = "CPF já cadastrado. Use 'Nova Entrada' para registrar um indivíduo existente.";
+             // Compliance Check
+            const complianceResult = checkCompliance(ind.documento);
+            if (complianceResult.isCritical) {
+                errors[`individuo-${index}-documento`] = `REGISTRO BLOQUEADO: ${complianceResult.ocorrencia?.motivo}`;
+            } else if (unmaskedDoc.length < 11) {
+                errors[`individuo-${index}-documento`] = "Documento (CPF) deve ter 11 dígitos.";
+            } else if (currentDocsInForm.has(unmaskedDoc)) {
+                errors[`individuo-${index}-documento`] = "CPF duplicado neste mesmo formulário.";
+            } else {
+                currentDocsInForm.add(unmaskedDoc);
+                if (selectedConsumo) { // Editing an existing consumption record
+                    const originalIndividuo = selectedConsumo.individuos.find(origInd => origInd.id === ind.id);
+                    const originalDoc = originalIndividuo ? originalIndividuo.documento.replace(/\D/g, '') : '';
+                    if (unmaskedDoc !== originalDoc && activeConsumoDocuments.has(unmaskedDoc)) {
+                        errors[`individuo-${index}-documento`] = "Já existe um registro de entrada ativo para este CPF.";
+                    }
+                } else { // Adding a new consumption record (which can be a re-entry)
+                    if (activeConsumoDocuments.has(unmaskedDoc)) {
+                        errors[`individuo-${index}-documento`] = "Já existe um registro de entrada ativo para este CPF.";
+                    } else if (!isReEntryMode && allConsumoDocuments.has(unmaskedDoc)) {
+                        errors[`individuo-${index}-documento`] = "CPF já cadastrado. Use 'Nova Entrada' para registrar um indivíduo existente.";
+                    }
                 }
             }
         }
@@ -685,11 +686,11 @@ export function ConsumoSection() {
                     <div key={ind.id || index} className="grid grid-cols-[1fr_auto] gap-3 items-start border-t pt-4 first:border-t-0 first:pt-0">
                       <div className="space-y-3">
                         {complianceAlerts[index] && (
-                            <Alert variant="destructive">
+                            <Alert variant={complianceAlerts[index]?.isCritical ? "destructive" : "warning"}>
                                 <ShieldAlert className="h-4 w-4" />
-                                <AlertTitle>Alerta de Compliance</AlertTitle>
+                                <AlertTitle>{complianceAlerts[index]?.isCritical ? "Registro Bloqueado" : "Alerta de Compliance"}</AlertTitle>
                                 <AlertDescription>
-                                <p>Indivíduo com ocorrência. Consulte a seção de Compliance.</p>
+                                    {complianceAlerts[index]?.motivo}
                                 </AlertDescription>
                             </Alert>
                         )}

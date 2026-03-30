@@ -14,7 +14,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { type TPA, type OcorrenciaCompliance } from "@/lib/store"
 import { useTPAs } from "@/hooks/use-firebase"
-import { useOcorrenciasCompliance } from "@/hooks/use-compliance"
+import { useComplianceCheck } from "@/hooks/use-compliance-check"
 import { useOnlineStatus } from "@/hooks/use-online-status"
 import { addToOutbox } from "@/utils/db"
 import { v4 as uuidv4 } from 'uuid'
@@ -61,7 +61,7 @@ const funcoes = [
 
 const credencialConfig = {
     verde: { text: "Permissão de acesso ao navio", icon: ShieldCheck, className: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200" },
-    vermelho: { text: "Permissão de acesso ao pier", icon: ShieldAlert, className: "bg-red-100 text-red-800 dark:bg-red-900 dark:red-green-200" },
+    vermelho: { text: "Permissão de acesso ao pier", icon: ShieldAlert, className: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200" },
     azul: { text: "Acesso restrito à área administrativa", icon: null, className: "" },
 };
 
@@ -76,7 +76,7 @@ const formatDate = (dateString: string | undefined) => {
 
 export function TPAsSection() {
   const { data: registros, loading, addItem, updateItem, deleteItem } = useTPAs()
-  const { data: ocorrencias } = useOcorrenciasCompliance();
+  const { checkCompliance } = useComplianceCheck();
   const isOnline = useOnlineStatus();
 
   const [search, setSearch] = useState("")
@@ -93,7 +93,6 @@ export function TPAsSection() {
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   const [complianceAlert, setComplianceAlert] = useState<OcorrenciaCompliance | null>(null);
-  const [isCriticalAlertOpen, setIsCriticalAlertOpen] = useState(false);
 
   const activeTpaDocuments = useMemo(() => {
     const activeDocs = new Set<string>();
@@ -115,6 +114,11 @@ export function TPAsSection() {
       return docs;
   }, [registros]);
 
+  const handleComplianceCheck = (documento: string) => {
+      const result = checkCompliance(documento);
+      setComplianceAlert(result.ocorrencia || null);
+  }
+
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
     if (!formState.nome.trim()) newErrors.nome = "Nome é obrigatório";
@@ -129,7 +133,11 @@ export function TPAsSection() {
     if (!formState.meioDeAcesso) newErrors.meioDeAcesso = "O meio de acesso é obrigatório";
 
     const unmaskedDoc = formState.documento.replace(/\D/g, '');
-    if (!formState.documento.trim()) {
+    const complianceResult = checkCompliance(formState.documento);
+
+    if (complianceResult.isCritical) {
+        newErrors.documento = `REGISTRO BLOQUEADO: ${complianceResult.ocorrencia?.motivo}`;
+    } else if (!formState.documento.trim()) {
         newErrors.documento = "Documento (CPF) é obrigatório.";
     } else if (unmaskedDoc.length < 11) {
         newErrors.documento = "Documento (CPF) deve ter 11 dígitos.";
@@ -150,19 +158,6 @@ export function TPAsSection() {
     return Object.keys(newErrors).length === 0;
   };
 
-  const checkCompliance = (documento: string) => {
-    const unmaskedDoc = documento.replace(/\D/g, '');
-    if (unmaskedDoc.length > 0) {
-        const foundOcorrencia = ocorrencias.find(o => o.documentoIndividuo.replace(/\D/g, '') === unmaskedDoc);
-        setComplianceAlert(foundOcorrencia || null);
-        if (foundOcorrencia?.statusAlerta === 'Crítico') {
-            setIsCriticalAlertOpen(true);
-        }
-    } else {
-        setComplianceAlert(null);
-    }
-  }
-
   const handleReEntry = (tpa: TPA) => {
     setSelectedTPA(null);
     setErrors({});
@@ -181,7 +176,7 @@ export function TPAsSection() {
         numeroCip: tpa.numeroCip || "",
         meioDeAcesso: tpa.meioDeAcesso || "terra",
     });
-    checkCompliance(tpa.documento);
+    handleComplianceCheck(tpa.documento);
     setIsReEntryMode(true);
     setIsFormOpen(true);
   };
@@ -196,7 +191,8 @@ export function TPAsSection() {
           horaSaida: selectedTPA.horaSaida || "",
           numeroCip: selectedTPA.numeroCip || "",
           meioDeAcesso: selectedTPA.meioDeAcesso || "terra",
-        })
+        });
+        handleComplianceCheck(selectedTPA.documento);
     }
   }, [selectedTPA, isFormOpen])
 
@@ -268,7 +264,7 @@ export function TPAsSection() {
   const handleMaskedInputChange = (id: string, value: string) => {
     setFormState(prev => ({ ...prev, [id]: value }));
     if (id === 'documento') {
-      checkCompliance(value);
+      handleComplianceCheck(value);
     }
     if (errors[id]) {
         setErrors(prev => ({ ...prev, [id]: '' }));
@@ -303,7 +299,7 @@ export function TPAsSection() {
     }
     setSelectedTPA(tpa)
     setErrors({});
-    checkCompliance(tpa.documento);
+    handleComplianceCheck(tpa.documento);
     setIsFormOpen(true)
   }
 
@@ -333,10 +329,6 @@ export function TPAsSection() {
   }
 
   const handleSave = async () => {
-    if (isCriticalAlertOpen) {
-      toast.error("Não é possível salvar enquanto um alerta de compliance crítico estiver ativo.");
-      return;
-    }
     if (!validateForm()) {
         toast.warning("Por favor, preencha todos os campos obrigatórios marcados em vermelho.");
         return;
@@ -437,7 +429,7 @@ export function TPAsSection() {
     return `${formatDate(data)} ${hora}`
   }
 
-  const saveButtonDisabled = isSaving || (!isOnline && !!selectedTPA) || isCriticalAlertOpen;
+  const saveButtonDisabled = isSaving || (!isOnline && !!selectedTPA);
 
   if (loading) {
     return <div className="flex items-center justify-center py-12"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
@@ -460,30 +452,6 @@ export function TPAsSection() {
   return (
     <TooltipProvider>
     <div className="space-y-4 md:space-y-6">
-        <Dialog open={isCriticalAlertOpen} onOpenChange={setIsCriticalAlertOpen}>
-            <DialogContent className="sm:max-w-md bg-red-50 border-red-200">
-                <DialogHeader className="flex-col items-center text-center">
-                    <AlertTriangle className="h-16 w-16 text-red-500 mb-4" />
-                    <DialogTitle className="text-2xl font-bold text-red-800">ALERTA DE COMPLIANCE CRÍTICO</DialogTitle>
-                </DialogHeader>
-                <div className="my-4 text-center">
-                    <p className="font-semibold text-lg text-gray-800">{complianceAlert?.nomeIndividuo}</p>
-                    <p className="text-sm text-gray-600">CPF: {complianceAlert?.documentoIndividuo}</p>
-                </div>
-                <Alert variant="destructive" className="bg-white">
-                    <ShieldAlert className="h-4 w-4" />
-                    <AlertTitle className="font-bold">Motivo: {complianceAlert?.motivo}</AlertTitle>
-                    <AlertDescription>
-                       Ocorrência registrada em {formatDate(complianceAlert?.dataOcorrencia)}. 
-                       <span className="font-bold">É crucial revisar a seção de Compliance antes de qualquer ação.</span>
-                    </AlertDescription>
-                </Alert>
-                 <DialogFooter className="mt-6 sm:justify-center">
-                    <Button variant="destructive" onClick={() => setIsCriticalAlertOpen(false)}>Entendido</Button>
-                </DialogFooter>
-            </DialogContent>
-        </Dialog>
-
       {/* Stats */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Card><CardContent className="flex items-center gap-4 p-4"><div className="flex h-11 w-11 items-center justify-center rounded-lg bg-primary/10"><Users className="h-5 w-5 text-primary" /></div><div><p className="text-2xl font-bold">{totalRegistros}</p><p className="text-sm text-muted-foreground">Total de Registros</p></div></CardContent></Card>
@@ -542,13 +510,11 @@ export function TPAsSection() {
                 </DialogTitle>
             </DialogHeader>
           
-          {complianceAlert && complianceAlert.statusAlerta !== 'Crítico' && (
-            <Alert variant="destructive" className="mt-4">
+          {complianceAlert && (
+            <Alert variant={complianceAlert.isCritical ? "destructive" : "warning"} className="mt-4">
               <ShieldAlert className="h-4 w-4" />
-              <AlertTitle>Alerta de Compliance</AlertTitle>
-              <AlertDescription>
-                <p>Indivíduo com ocorrência registrada. Por favor, consulte a seção de Compliance para mais detalhes antes de prosseguir com o registro.</p>
-              </AlertDescription>
+              <AlertTitle>{complianceAlert.isCritical ? "Registro Bloqueado" : "Alerta de Compliance"}</AlertTitle>
+              <AlertDescription>{complianceAlert.motivo}</AlertDescription>
             </Alert>
           )}
 

@@ -4,7 +4,6 @@ import { useState, useEffect, forwardRef } from "react"
 import { Plus, Search, Loader2, MoreVertical, Trash2, AlertTriangle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Textarea } from "@/components/ui/textarea"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import {
   Dialog,
@@ -22,9 +21,12 @@ import {
   DropdownMenuTrigger 
 } from "@/components/ui/dropdown-menu"
 import { Label } from "@/components/ui/label"
-import { Switch } from "@/components/ui/switch"
+import { Checkbox } from "@/components/ui/checkbox"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { type OcorrenciaCompliance } from "@/lib/store"
 import { useOcorrenciasCompliance } from "@/hooks/use-compliance"
+import { useAuth } from "@/hooks/use-auth"
+import { toast } from "sonner"
 import { IMaskInput } from 'react-imask';
 
 const ForwardedInput: any = forwardRef<HTMLInputElement, any>((props, ref) => {
@@ -33,17 +35,18 @@ const ForwardedInput: any = forwardRef<HTMLInputElement, any>((props, ref) => {
 });
 ForwardedInput.displayName = 'ForwardedInput';
 
-const initialFormState: Omit<OcorrenciaCompliance, "id" | "autor"> = {
+// Adjusted to match the OcorrenciaCompliance interface from store.ts
+const initialFormState: Omit<OcorrenciaCompliance, "id" | "registradoPor"> = {
   nomeIndividuo: "",
   documentoIndividuo: "",
   dataOcorrencia: "",
   motivo: "",
-  descricao: "",
-  statusAlerta: "Nenhum",
+  isCritical: false,
 }
 
 export function ComplianceSection() {
   const { data: ocorrencias, loading, addItem, updateItem, deleteItem } = useOcorrenciasCompliance()
+  const { user } = useAuth();
   const [search, setSearch] = useState("")
   const [isFormOpen, setIsFormOpen] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
@@ -53,8 +56,16 @@ export function ComplianceSection() {
 
   useEffect(() => {
     if (isFormOpen && selectedOcorrencia) {
-      setFormState(selectedOcorrencia)
+      // Ensure all fields from the selected item are populated, including isCritical
+      setFormState({
+        nomeIndividuo: selectedOcorrencia.nomeIndividuo,
+        documentoIndividuo: selectedOcorrencia.documentoIndividuo,
+        dataOcorrencia: selectedOcorrencia.dataOcorrencia,
+        motivo: selectedOcorrencia.motivo,
+        isCritical: selectedOcorrencia.isCritical || false, // Default to false if undefined
+      })
     } else {
+      // Reset form to its initial state when closing or adding new
       setFormState(initialFormState)
     }
   }, [isFormOpen, selectedOcorrencia])
@@ -64,13 +75,13 @@ export function ComplianceSection() {
     o.documentoIndividuo.includes(search)
   )
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { id, value } = e.target
     setFormState(prev => ({ ...prev, [id]: value }))
   }
 
-  const handleSwitchChange = (checked: boolean) => {
-    setFormState(prev => ({ ...prev, statusAlerta: checked ? "Crítico" : "Nenhum" }))
+  const handleCheckboxChange = (checked: boolean) => {
+    setFormState(prev => ({ ...prev, isCritical: checked }))
   }
 
   const handleMaskedInputChange = (id: string, value: string) => {
@@ -102,38 +113,44 @@ export function ComplianceSection() {
     setIsSaving(true)
     try {
       await deleteItem(selectedOcorrencia.id)
+      toast.success("Ocorrência excluída com sucesso!");
       setIsDeleteConfirmOpen(false)
       setSelectedOcorrencia(null)
     } catch (error) {
       console.error("Erro ao excluir ocorrência:", error)
+      toast.error("Falha ao excluir a ocorrência.")
     } finally {
       setIsSaving(false)
     }
   }
 
   const handleSave = async () => {
-    if (!formState.nomeIndividuo || !formState.documentoIndividuo || !formState.motivo || formState.documentoIndividuo.length < 14) {
-        alert("Por favor, preencha todos os campos obrigatórios: Nome, Documento (válido) e Motivo.");
+    const unmaskedDoc = formState.documentoIndividuo.replace(/\D/g, '');
+    if (!formState.nomeIndividuo || !unmaskedDoc || unmaskedDoc.length < 11 || !formState.motivo) {
+        toast.warning("Por favor, preencha todos os campos obrigatórios: Nome, Documento (CPF válido) e Motivo.");
         return;
     }
 
     setIsSaving(true)
     try {
-        const dataToSave = { 
+        const dataToSave: Omit<OcorrenciaCompliance, 'id'> = {
             ...formState, 
-            autor: "Compliance User" 
+            registradoPor: user?.email || "sistema", // Capture user email
         };
 
         if (selectedOcorrencia) {
             await updateItem(selectedOcorrencia.id, dataToSave);
+            toast.success("Ocorrência atualizada com sucesso!");
         } else {
             await addItem(dataToSave);
+            toast.success("Ocorrência registrada com sucesso!");
         }
 
         setIsFormOpen(false)
         setSelectedOcorrencia(null)
     } catch (error) {
         console.error("Erro ao salvar ocorrência:", error)
+        toast.error("Falha ao salvar a ocorrência.")
     } finally {
         setIsSaving(false)
     }
@@ -145,124 +162,125 @@ export function ComplianceSection() {
 
   const formatDate = (dateString: string) => {
     if (!dateString) return "N/A";
-    const [year, month, day] = dateString.split('-');
+    const [year, month, day] = dateString.split('T')[0].split('-');
     return `${day}/${month}/${year}`;
   }
 
   return (
-    <div className="space-y-6">
-        <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-                <CardTitle>Controle de Compliance</CardTitle>
-                <Button onClick={handleAddNew}><Plus className="mr-2 h-4 w-4" /> Adicionar Ocorrência</Button>
-            </CardHeader>
-            <CardContent>
-                <div className="relative mb-4">
-                    <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                    <Input placeholder="Buscar por nome ou documento..." value={search} onChange={e => setSearch(e.target.value)} className="w-full pl-8" />
+    <TooltipProvider>
+      <div className="space-y-6">
+          <Card>
+              <CardHeader className="flex flex-row items-center justify-between">
+                  <CardTitle>Controle de Compliance</CardTitle>
+                  <Button onClick={handleAddNew}><Plus className="mr-2 h-4 w-4" /> Adicionar Ocorrência</Button>
+              </CardHeader>
+              <CardContent>
+                  <div className="relative mb-4">
+                      <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                      <Input placeholder="Buscar por nome ou documento..." value={search} onChange={e => setSearch(e.target.value)} className="w-full pl-8" />
+                  </div>
+              </CardContent>
+          </Card>
+
+        <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
+          <DialogContent>
+            <DialogHeader><DialogTitle>{selectedOcorrencia ? "Editar Ocorrência" : "Registrar Nova Ocorrência"}</DialogTitle></DialogHeader>
+            <div className="grid gap-4 py-4">
+                <div className="grid gap-2"><Label htmlFor="nomeIndividuo">Nome do Indivíduo</Label><Input id="nomeIndividuo" value={formState.nomeIndividuo} onChange={handleInputChange} /></div>
+                 <div className="grid gap-2">
+                  <Label htmlFor="documentoIndividuo">Documento (CPF)</Label>
+                  <IMaskInput
+                    mask="000.000.000-00"
+                    id="documentoIndividuo"
+                    value={formState.documentoIndividuo}
+                    onAccept={(value) => handleMaskedInputChange('documentoIndividuo', value as string)}
+                    as={ForwardedInput as any}
+                    placeholder="___.___.___-__"
+                  />
                 </div>
-            </CardContent>
+                <div className="grid gap-2"><Label htmlFor="dataOcorrencia">Data da Ocorrência</Label><Input id="dataOcorrencia" type="date" value={formState.dataOcorrencia} onChange={handleInputChange} /></div>
+                <div className="grid gap-2"><Label htmlFor="motivo">Motivo</Label><Input id="motivo" value={formState.motivo} onChange={handleInputChange} /></div>
+                <div className="flex items-center space-x-2 mt-4 pt-4 border-t">
+                  <Checkbox id="isCritical" checked={formState.isCritical} onCheckedChange={handleCheckboxChange} />
+                  <Label htmlFor="isCritical" className="font-bold text-destructive">Marcar como Alerta Crítico (Bloqueia o Registro)</Label>
+                </div>
+            </div>
+            <DialogFooter>
+              <DialogClose asChild><Button variant="outline">Cancelar</Button></DialogClose>
+              <Button onClick={handleSave} disabled={isSaving}>
+                {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                {selectedOcorrencia ? "Salvar Alterações" : "Registrar"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={isDeleteConfirmOpen} onOpenChange={setIsDeleteConfirmOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Confirmar Exclusão</DialogTitle>
+              <DialogDescription>Tem certeza que deseja excluir a ocorrência de "{selectedOcorrencia?.nomeIndividuo}"? Esta ação não pode ser desfeita.</DialogDescription>
+            </DialogHeader>
+            <DialogFooter className="gap-2 sm:justify-end">
+              <Button variant="outline" onClick={() => setIsDeleteConfirmOpen(false)} disabled={isSaving}>Cancelar</Button>
+              <Button variant="destructive" onClick={handleConfirmDelete} disabled={isSaving}>
+                {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}Excluir
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        <Card>
+          <CardHeader><CardTitle>Histórico de Ocorrências</CardTitle></CardHeader>
+          <CardContent>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b text-left text-xs text-muted-foreground uppercase">
+                    <th className="px-4 py-3 font-medium">Indivíduo</th>
+                    <th className="px-4 py-3 font-medium">Documento</th>
+                    <th className="px-4 py-3 font-medium">Data da Ocorrência</th>
+                    <th className="px-4 py-3 font-medium">Motivo</th>
+                    <th className="px-4 py-3 font-medium">Registrado por</th>
+                    <th className="px-4 py-3 font-medium text-right">Ações</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y">
+                  {filteredOcorrencias.length === 0 ? (
+                    <tr><td colSpan={6} className="py-8 text-center text-muted-foreground">Nenhuma ocorrência encontrada.</td></tr>
+                  ) : (
+                    filteredOcorrencias.map(o => (
+                      <tr key={o.id} className={o.isCritical ? 'bg-destructive/10 hover:bg-destructive/20' : 'hover:bg-muted/50'}>
+                        <td className="px-4 py-3 font-medium">
+                          <div className="flex items-center gap-2">
+                              {o.isCritical && <Tooltip><TooltipTrigger><AlertTriangle className="h-4 w-4 text-destructive" /></TooltipTrigger><TooltipContent>Este é um alerta crítico.</TooltipContent></Tooltip>}
+                              {o.nomeIndividuo}
+                          </div>
+                        </td>
+                        <td className="px-4 py-3">{o.documentoIndividuo}</td>
+                        <td className="px-4 py-3">{formatDate(o.dataOcorrencia)}</td>
+                        <td className="px-4 py-3">{o.motivo}</td>
+                        <td className="px-4 py-3 text-muted-foreground">{o.registradoPor}</td>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center justify-end gap-2">
+                             <DropdownMenu>
+                                <DropdownMenuTrigger asChild><Button variant="ghost" size="icon"><MoreVertical className="h-4 w-4"/></Button></DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                    <DropdownMenuItem onClick={() => handleEdit(o)}>Editar</DropdownMenuItem>
+                                    <DropdownMenuItem onClick={() => handleDelete(o)} className="text-destructive">Excluir</DropdownMenuItem>
+                                </DropdownMenuContent>
+                            </DropdownMenu>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </CardContent>
         </Card>
-
-      <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
-        <DialogContent>
-          <DialogHeader><DialogTitle>{selectedOcorrencia ? "Editar Ocorrência" : "Registrar Nova Ocorrência"}</DialogTitle></DialogHeader>
-          <div className="grid gap-4 py-4">
-              <div className="grid gap-2"><Label htmlFor="nomeIndividuo">Nome do Indivíduo</Label><Input id="nomeIndividuo" value={formState.nomeIndividuo} onChange={handleInputChange} /></div>
-               <div className="grid gap-2">
-                <Label htmlFor="documentoIndividuo">Documento (CPF)</Label>
-                <IMaskInput
-                  mask="000.000.000-00"
-                  id="documentoIndividuo"
-                  value={formState.documentoIndividuo}
-                  onAccept={(value) => handleMaskedInputChange('documentoIndividuo', value as string)}
-                  as={ForwardedInput as any}
-                  placeholder="___.___.___-__"
-                />
-              </div>
-              <div className="grid gap-2"><Label htmlFor="dataOcorrencia">Data da Ocorrência</Label><Input id="dataOcorrencia" type="date" value={formState.dataOcorrencia} onChange={handleInputChange} /></div>
-              <div className="grid gap-2"><Label htmlFor="motivo">Motivo</Label><Input id="motivo" value={formState.motivo} onChange={handleInputChange} /></div>
-              <div className="grid gap-2"><Label htmlFor="descricao">Descrição Detalhada</Label><Textarea id="descricao" value={formState.descricao} onChange={handleInputChange} /></div>
-              <div className="flex items-center space-x-2 mt-2">
-                <Switch id="statusAlerta" checked={formState.statusAlerta === "Crítico"} onCheckedChange={handleSwitchChange} />
-                <Label htmlFor="statusAlerta" className="font-bold text-red-600">Marcar como Alerta Crítico</Label>
-              </div>
-          </div>
-          <DialogFooter>
-            <DialogClose asChild><Button variant="outline">Cancelar</Button></DialogClose>
-            <Button onClick={handleSave} disabled={isSaving}>
-              {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {selectedOcorrencia ? "Salvar Alterações" : "Registrar"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={isDeleteConfirmOpen} onOpenChange={setIsDeleteConfirmOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Confirmar Exclusão</DialogTitle>
-            <DialogDescription>Tem certeza que deseja excluir a ocorrência de "{selectedOcorrencia?.nomeIndividuo}"? Esta ação não pode ser desfeita.</DialogDescription>
-          </DialogHeader>
-          <DialogFooter className="gap-2 sm:justify-end">
-            <Button variant="outline" onClick={() => setIsDeleteConfirmOpen(false)} disabled={isSaving}>Cancelar</Button>
-            <Button variant="destructive" onClick={handleConfirmDelete} disabled={isSaving}>
-              {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}Excluir
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Card>
-        <CardHeader><CardTitle>Histórico de Ocorrências</CardTitle></CardHeader>
-        <CardContent>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b text-left text-xs text-muted-foreground uppercase">
-                  <th className="px-4 py-3 font-medium">Indivíduo</th>
-                  <th className="px-4 py-3 font-medium">Documento</th>
-                  <th className="px-4 py-3 font-medium">Data da Ocorrência</th>
-                  <th className="px-4 py-3 font-medium">Motivo</th>
-                  <th className="px-4 py-3 font-medium">Registrado por</th>
-                  <th className="px-4 py-3 font-medium text-right">Ações</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y">
-                {filteredOcorrencias.length === 0 ? (
-                  <tr><td colSpan={6} className="py-8 text-center text-muted-foreground">Nenhuma ocorrência encontrada.</td></tr>
-                ) : (
-                  filteredOcorrencias.map(o => (
-                    <tr key={o.id} className={`${o.statusAlerta === 'Crítico' ? 'bg-red-100/50 dark:bg-red-900/20' : 'hover:bg-muted/50'}`}>
-                      <td className="px-4 py-3 font-medium">
-                        <div className="flex items-center gap-2">
-                            {o.statusAlerta === 'Crítico' && <AlertTriangle className="h-4 w-4 text-red-500" />}
-                            {o.nomeIndividuo}
-                        </div>
-                      </td>
-                      <td className="px-4 py-3">{o.documentoIndividuo}</td>
-                      <td className="px-4 py-3">{formatDate(o.dataOcorrencia)}</td>
-                      <td className="px-4 py-3">{o.motivo}</td>
-                      <td className="px-4 py-3">{o.autor}</td>
-                      <td className="px-4 py-3">
-                        <div className="flex items-center justify-end gap-2">
-                           <DropdownMenu>
-                              <DropdownMenuTrigger asChild><Button variant="ghost" size="icon"><MoreVertical className="h-4 w-4"/></Button></DropdownMenuTrigger>
-                              <DropdownMenuContent align="end">
-                                  <DropdownMenuItem onClick={() => handleEdit(o)}>Editar</DropdownMenuItem>
-                                  <DropdownMenuItem onClick={() => handleDelete(o)} className="text-destructive">Excluir</DropdownMenuItem>
-                              </DropdownMenuContent>
-                          </DropdownMenu>
-                        </div>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        </CardContent>
-      </Card>
-    </div>
+      </div>
+    </TooltipProvider>
   )
 }
