@@ -1,4 +1,4 @@
-"""import { create } from 'zustand'
+import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
 
 // Tipos principais do domínio da aplicação
@@ -74,6 +74,19 @@ export interface OcorrenciaCompliance {
   registradoPor: string; // Email do usuário que registrou
 }
 
+export interface Navio {
+  id: string;
+  nome: string;
+  dataAtracacao: string; // ISO date string
+  horaAtracacao: string; // HH:MM
+  dataDesatracacao?: string; // ISO date string
+  horaDesatracacao?: string; // HH:MM
+  terminal: 'teg' | 'teag';
+  status: 'atracado' | 'desatracado';
+  comprimento: number;
+  berco: string;
+}
+
 
 // --- Zustand Store para UI State ---
 interface AppState {
@@ -91,7 +104,7 @@ export const useStore = create<AppState>((set) => ({
 // --- Zustand Store para Outbox (Offline Data) ---
 export interface OutboxItem {
   id: string; // UUID para o item da outbox
-  tableName: 'consumos' | 'visitantes' | 'tpa' | 'compliance';
+  tableName: 'consumos' | 'visitantes' | 'tpa' | 'compliance' | 'navios';
   action: 'create' | 'update' | 'delete';
   data: any;
   originalId?: string; // ID original do documento para 'update' e 'delete'
@@ -127,4 +140,3 @@ export const useOutboxStore = create<OutboxState>()(
     }
   )
 );
-""
