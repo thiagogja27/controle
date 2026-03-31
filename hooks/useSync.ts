@@ -25,7 +25,7 @@ async function requestSync() {
   if (registration) {
     try {
       await registration.sync.register('sync-new-items');
-      console.log('Etiqueta de sincronização 'sync-new-items' registrada.');
+      console.log("Etiqueta de sincronização 'sync-new-items' registrada.");
     } catch (error) {
       console.error('Falha ao registrar a etiqueta de sincronização:', error);
     }
