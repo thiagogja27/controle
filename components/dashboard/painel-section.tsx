@@ -186,7 +186,7 @@ export function PainelSection() {
 
     const visitantesPorEmpresaHoje = useMemo(() => {
         const today = new Date().toISOString().split('T')[0];
-        const counts = visitantes.filter(v => v.dataEntrada.startsWith(today)).reduce((acc, v) => {
+        const counts = visitantes.filter(v => v.dataEntrada && v.dataEntrada.startsWith(today)).reduce((acc, v) => {
             acc[v.empresa] = (acc[v.empresa] || 0) + 1;
             return acc;
         }, {} as Record<string, number>);
@@ -195,7 +195,7 @@ export function PainelSection() {
 
     const fluxoVisitantesPorHora = useMemo(() => {
         const today = new Date().toISOString().split('T')[0];
-        const counts = visitantes.filter(v => v.dataEntrada.startsWith(today)).reduce((acc, v) => {
+        const counts = visitantes.filter(v => v.dataEntrada && v.dataEntrada.startsWith(today)).reduce((acc, v) => {
             try {
                 const hour = new Date(v.dataEntrada).getHours();
                 const hourLabel = `${String(hour).padStart(2, '0')}:00`;
@@ -287,11 +287,11 @@ export function PainelSection() {
                 </Card>
                 <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">Visitantes de Hoje</CardTitle><Users className="h-4 w-4 text-muted-foreground" /></CardHeader>
-                    <CardContent><div className="text-2xl font-bold">{visitantes.filter(v => v.dataEntrada.startsWith(new Date().toISOString().split('T')[0])).length}</div><p className="text-xs text-muted-foreground">Novos registros no dia.</p></CardContent>
+                    <CardContent><div className="text-2xl font-bold">{visitantes.filter(v => v.dataEntrada && v.dataEntrada.startsWith(new Date().toISOString().split('T')[0])).length}</div><p className="text-xs text-muted-foreground">Novos registros no dia.</p></CardContent>
                 </Card>
                 <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">Empresas de Hoje</CardTitle><Building2 className="h-4 w-4 text-muted-foreground" /></CardHeader>
-                    <CardContent><div className="text-2xl font-bold">{[...new Set(visitantes.filter(v => v.dataEntrada.startsWith(new Date().toISOString().split('T')[0])).map(v => v.empresa))].length}</div><p className="text-xs text-muted-foreground">Empresas únicas no dia.</p></CardContent>
+                    <CardContent><div className="text-2xl font-bold">{[...new Set(visitantes.filter(v => v.dataEntrada && v.dataEntrada.startsWith(new Date().toISOString().split('T')[0])).map(v => v.empresa))].length}</div><p className="text-xs text-muted-foreground">Empresas únicas no dia.</p></CardContent>
                 </Card>
             </div>
 
