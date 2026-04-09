@@ -181,6 +181,7 @@ export function VisitantesSection() {
     const newFormState: Omit<Visitante, "id" | "status"> = {
         ...initialFormState,
         ...commonData,
+        motivo: "",
         dataEntrada: toBrDate(now.toISOString().split("T")[0]),
         horaEntrada: now.toTimeString().slice(0, 5),
         dataSaida: "",
