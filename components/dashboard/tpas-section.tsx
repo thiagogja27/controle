@@ -654,7 +654,7 @@ export function TPAsSection() {
             </div>
             <DialogFooter>
                 <DialogClose asChild><Button variant="outline">Cancelar</Button></DialogClose>
-                <Button onClick={handleSave} disabled={isSaving || (!isOnline && selectedTPA)}>
+                <Button onClick={handleSave} disabled={isSaving || (!isOnline && !!selectedTPA)}>
                     {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                     {selectedTPA ? "Salvar Alterações" : "Registrar"}
                 </Button>

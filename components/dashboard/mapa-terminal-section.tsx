@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { type Navio, type Individuo, type IndividuoRefeicao } from "@/lib/store";
+import { type Navio, type Individuo, type IndividuoRefeicao, type Tpa } from "@/lib/store";
 import { toast } from "sonner"
 
 const destinoCoordenadas: Record<string, { top: string; left: string; color: string }> = {
@@ -140,20 +140,18 @@ export function MapaTerminalSection() {
         empresa: v.empresa,
         credencial: v.credencial,
         dataEntrada: v.dataEntrada,
-        horaEntrada: (v as any).horaEntrada, // Temporary any
+        horaEntrada: v.horaEntrada,
         type: 'Visitante',
-        local: (v as any).destino, // Temporary any
+        local: v.destino,
       }));
 
     const tpasPresentes = tpas
-      .filter(t => t.status === "ativo")
-      .map(t => {
+      .filter((t: Tpa) => t.status === "presente")
+      .map((t: Tpa) => {
         let local;
         if (t.funcao === "Vigia") { local = "Portaria"; }
         else if (t.funcao === "Tripper") { local = "Classificação"; }
-        // @ts-ignore
         else if (t.pier === 'teg') { local = "Pier TEG"; }
-        // @ts-ignore
         else if (t.pier === 'teag') { local = "Pier TEAG"; }
         else if (["Operador de grabe", "Operador de shiploader"].includes(t.funcao)) { local = "Pier TEG"; }
         else if (["Rechego", "Contramestre geral", "Contramestre de porão", "Contramestre do rechego"].includes(t.funcao)) { local = "Pier TEAG"; }
@@ -163,7 +161,8 @@ export function MapaTerminalSection() {
           nome: t.nome,
           empresa: t.funcao,
           credencial: t.credencial,
-          dataEntrada: t.dataEmissao,
+          dataEntrada: t.dataEntrada,
+          horaEntrada: t.horaEntrada,
           type: 'TPA',
           local: local,
         };

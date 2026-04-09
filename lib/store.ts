@@ -1,3 +1,4 @@
+
 import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
 
@@ -74,16 +75,24 @@ export interface Visitante {
 
 export interface Tpa {
     id: string;
-    documento: string; // CPF
     nome: string;
     empresa: string;
     funcao: string;
-    tipo: 'isps' | 'nao_isps';
-    dataValidade: string; // ISO Date String
-    dataEmissao: string; // ISO Date String
+    documento: string; // CPF
+    numeroCip?: string;
+    placa?: string;
+    navio?: string;
+    vigilante?: string;
+    pier: 'teg' | 'teag';
+    meioDeAcesso: 'terra' | 'mar';
+    credencial: 'azul' | 'vermelho' | 'verde';
+    destino: string;
+    dataEntrada: string; // ISO date string (YYYY-MM-DD)
+    horaEntrada: string; // HH:MM
+    dataSaida?: string; // ISO date string (YYYY-MM-DD)
+    horaSaida?: string; // HH:MM
     observacao?: string;
-    status: 'ativo' | 'inativo';
-    credencial?: 'azul' | 'vermelho' | 'verde'
+    status: 'presente' | 'saiu';
 }
 
 export interface OcorrenciaCompliance {

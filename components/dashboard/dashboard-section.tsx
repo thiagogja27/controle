@@ -1,5 +1,3 @@
-'use client'
-
 import { useMemo, useState } from 'react'
 import { Users, Utensils, Ship, FileText, ArrowRight, Clock, Shield, RefreshCw } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -99,7 +97,7 @@ export function DashboardSection() {
         }));
 
     const presentTPAs = tpas
-        .filter(t => t.status === 'ativo')
+        .filter(t => t.status === 'presente')
         .map(t => ({
             id: t.id,
             nome: t.nome,
@@ -179,7 +177,7 @@ export function DashboardSection() {
     const allActivities: any[] = [
       ...visitantes.map(v => ({ ...v, type: 'Visitante', date: new Date(v.dataEntrada) })),
       ...refeicoes.map(r => ({ ...r, type: 'Refeição Policial', date: new Date(`${r.data}T${r.hora}`) })),
-      ...tpas.map(t => ({ ...t, type: 'TPA', date: new Date(t.dataEmissao) })),
+      ...tpas.map(t => ({ ...t, type: 'TPA', date: new Date(t.dataEntrada) })),
       ...consumos.map(c => ({ ...c, type: 'Consumo de Bordo', date: new Date(`${c.data}T${c.hora}`) })),
     ].filter(a => a.date && !isNaN(a.date.getTime()));
     return allActivities.sort((a, b) => b.date.getTime() - a.date.getTime()).slice(0, 5);
