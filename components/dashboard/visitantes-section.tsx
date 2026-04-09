@@ -281,6 +281,7 @@ export function VisitantesSection() {
 
   const filteredVisitantes = useMemo(() => {
     const searchLower = search.toLowerCase().trim();
+    const searchNumbers = search.replace(/\D/g, '');
 
     return visitantes.filter(v => {
         if (!v) return false;
@@ -288,7 +289,7 @@ export function VisitantesSection() {
         const textMatch = !searchLower || (
             (v.nome || '').toLowerCase().includes(searchLower) ||
             (v.empresa || '').toLowerCase().includes(searchLower) ||
-            (v.documento || '').toLowerCase().includes(searchLower) ||
+            (v.documento || '').replace(/\D/g, '').includes(searchNumbers) ||
             (v.placa || '').toLowerCase().includes(searchLower)
         );
 
@@ -309,7 +310,7 @@ export function VisitantesSection() {
 
         return textMatch && dateMatch;
     });
-  }, [visitantes, search, dataInicio, dataFim]);
+}, [visitantes, search, dataInicio, dataFim]);
 
 
   const clearError = (field: string, personIndex?: number) => {
