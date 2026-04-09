@@ -439,8 +439,7 @@ export function TPAsSection() {
                     <SelectValue placeholder="Selecione a função..." />
                   </SelectTrigger>
                   <SelectContent>
-                    {funcoes.map(f => <SelectItem key={f} value={f}>{f}</SelectItem>)}
-                  </SelectContent>
+                    {funcoes.map(f => <SelectItem key={f} value={f}>{f}</SelectItem>)}                  </SelectContent>
                 </Select>
                 {errors.funcao && <p className="text-xs text-red-500">{errors.funcao}</p>}
               </div>
@@ -572,7 +571,7 @@ export function TPAsSection() {
                                     <td className="px-4 py-3 tabular-nums text-muted-foreground">{r.documento}</td>
                                     <td className="px-4 py-3 text-muted-foreground">{formatDate(r.dataEmissao)}</td>
                                     <td className="px-4 py-3 text-muted-foreground">{formatDate(r.dataValidade)}</td>
-                                    <td className="px-4 py-3"><span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ${r.tipo === "isps" ? "bg-primary/10 text-primary" : "bg-info/10 text-info"}`}>{r.tipo.toUpperCase()}</span></td>
+                                    <td className="px-4 py-3"><span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ${r.tipo === "isps" ? "bg-primary/10 text-primary" : "bg-info/10 text-info"}`}>{r.tipo ? r.tipo.toUpperCase() : ''}</span></td>
                                     <td className="px-4 py-3 text-muted-foreground max-w-xs truncate">{r.observacao}</td>
                                     <td className="px-4 py-3">
                                         <div className="flex items-center justify-end gap-2">
