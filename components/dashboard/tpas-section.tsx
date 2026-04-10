@@ -201,18 +201,21 @@ export function TPAsSection() {
   }
 
   const validateForm = () => {
-    const newErrors: Partial<Record<keyof Omit<Tpa, "id" | "status">, string>> = {};
+    const newErrors: Partial<Record<keyof Omit<Tpa, "id" | "status"> | 'outroDestino', string>> = {};
     if (!formState.nome.trim()) newErrors.nome = "Nome é obrigatório";
     if (!formState.funcao.trim()) newErrors.funcao = "Função é obrigatória";
     if (!formState.empresa.trim()) newErrors.empresa = "Empresa é obrigatória";
     if (!formState.dataEntrada.trim()) newErrors.dataEntrada = "Data de entrada é obrigatória";
     if (!formState.horaEntrada.trim()) newErrors.horaEntrada = "Hora de entrada é obrigatória";
+    if (!formState.vigilante.trim()) newErrors.vigilante = "Vigilante é obrigatório";
+    if (!formState.numeroCip.trim()) newErrors.numeroCip = "Número CIP é obrigatório";
     if (formState.destino === "Outros" && !outroDestino.trim()) {
         (newErrors as any).outroDestino = "Especifique o destino se 'Outros'.";
     }
 
     const unmaskedDoc = formState.documento.replace(/\D/g, '');
     const complianceResult = checkCompliance(formState.documento);
+    const isCreateMode = !selectedTPA && !isReEntryMode;
 
     if (complianceResult.isCritical) {
         newErrors.documento = `REGISTRO BLOQUEADO: ${complianceResult.ocorrencia?.motivo}`;
@@ -225,11 +228,11 @@ export function TPAsSection() {
         if (unmaskedDoc !== originalDoc && activeTpaDocuments.has(unmaskedDoc)) {
             newErrors.documento = "Já existe um registro de entrada ativo para este CPF.";
         }
-    } else { // Adding
-          if (activeTpaDocuments.has(unmaskedDoc)) {
-              newErrors.documento = "Já existe um registro de entrada ativo para este CPF.";
-          } else if (!isReEntryMode && allTpaDocuments.has(unmaskedDoc)) {
-            newErrors.documento = "CPF já cadastrado. Para registrar nova entrada, use a função 'Nova Entrada'.";
+    } else { // Creating or Re-entry
+        if (activeTpaDocuments.has(unmaskedDoc)) {
+            newErrors.documento = "Já existe um registro de entrada ativo para este CPF.";
+        } else if (isCreateMode && allTpaDocuments.has(unmaskedDoc)) {
+            newErrors.documento = "CPF já cadastrado. Para registrar uma nova entrada, use a função 'Nova Entrada' na tabela.";
         }
     }
 
@@ -462,20 +465,6 @@ export function TPAsSection() {
     return <div className="flex items-center justify-center py-12"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
   }
 
-  const CredencialBadge = ({ credencial }: { credencial?: Tpa['credencial'] }) => {
-    if (!credencial || !["verde", "vermelho"].includes(credencial)) return null;
-
-    const config = credencialConfig[credencial as keyof typeof credencialConfig];
-    const Icon = config.icon
-
-    return (
-      <div className={cn("mt-2 flex items-center gap-2 rounded-md p-2 text-xs font-semibold", config.className)}>
-        {Icon && <Icon className="h-4 w-4 flex-shrink-0" />}
-        <span>{config.text}</span>
-      </div>
-    );
-  };
-
   return (
     <TooltipProvider>
     <div className="space-y-4 md:space-y-6">
@@ -531,38 +520,38 @@ export function TPAsSection() {
             )}
 
             <div className="max-h-[80vh] overflow-y-auto p-1 mt-4">
-                 <div className="grid grid-cols-1 md:grid-cols-4 gap-x-4 gap-y-5 py-4 items-start">
-                    {/* Row 1: Data, Hora, Nome */}
-                    <div className="grid gap-1.5 md:col-span-1">
+                 <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-5 py-4 items-start">
+                    <div className="grid gap-1.5">
                         <Label htmlFor="dataEntrada">Data</Label>
                         <IMaskInput mask="00/00/0000" id="dataEntrada" value={formState.dataEntrada} onAccept={(v) => handleMaskedInputChange('dataEntrada', v as string)} as={ForwardedInput} className={cn({ 'border-red-500': errors.dataEntrada })} />
                         {errors.dataEntrada && <p className="text-xs text-red-500">{errors.dataEntrada}</p>}
                     </div>
-                    <div className="grid gap-1.5 md:col-span-1">
+                    <div className="grid gap-1.5">
                         <Label htmlFor="horaEntrada">Hora</Label>
                         <Input id="horaEntrada" type="time" value={formState.horaEntrada} onChange={handleInputChange} className={cn({ 'border-red-500': errors.horaEntrada })}/>
                         {errors.horaEntrada && <p className="text-xs text-red-500">{errors.horaEntrada}</p>}
                     </div>
-                    <div className="grid gap-1.5 md:col-span-2">
+                    <div className="grid gap-1.5">
                         <Label htmlFor="nome">Nome</Label>
                         <Input id="nome" value={formState.nome} onChange={handleInputChange} className={cn({ 'border-red-500': errors.nome })} />
                         {errors.nome && <p className="text-xs text-red-500">{errors.nome}</p>}
                     </div>
-
-                    {/* Row 2: Documento and Empresa */}
-                    <div className="grid gap-1.5 md:col-span-2">
+                    <div className="grid gap-1.5">
+                        <Label htmlFor="numeroCip">Número CIP</Label>
+                        <Input id="numeroCip" value={formState.numeroCip} onChange={handleInputChange} className={cn({ 'border-red-500': errors.numeroCip })}/>
+                        {errors.numeroCip && <p className="text-xs text-red-500">{errors.numeroCip}</p>}
+                    </div>
+                    <div className="grid gap-1.5">
                         <Label htmlFor="documento">Documento (CPF)</Label>
-                        <IMaskInput mask="000.000.000-00" id="documento" value={formState.documento} onAccept={(value) => handleMaskedInputChange('documento', value as string)} as={ForwardedInput} className={cn({ 'border-red-500': errors.documento })}/>
+                        <IMaskInput mask="000.000.000-00" id="documento" value={formState.documento} onAccept={(value) => handleMaskedInputChange('documento', value as string)} as={ForwardedInput} className={cn({ 'border-red-500': errors.documento })} disabled={isReEntryMode} />
                         {errors.documento && <p className="text-xs text-red-500">{errors.documento}</p>}
                     </div>
-                    <div className="grid gap-1.5 md:col-span-2">
+                    <div className="grid gap-1.5">
                         <Label htmlFor="empresa">Empresa</Label>
                         <Input id="empresa" value={formState.empresa} onChange={handleInputChange} className={cn({ 'border-red-500': errors.empresa })} />
                         {errors.empresa && <p className="text-xs text-red-500">{errors.empresa}</p>}
                     </div>
-
-                    {/* Row 3: Função and Numero Cip */}
-                    <div className="grid gap-1.5 md:col-span-2">
+                    <div className="grid gap-1.5">
                         <Label htmlFor="funcao">Função</Label>
                         <Select value={formState.funcao} onValueChange={v => handleSelectChange("funcao", v)}>
                             <SelectTrigger id="funcao" className={cn({ 'border-red-500': errors.funcao })}>
@@ -572,81 +561,69 @@ export function TPAsSection() {
                         </Select>
                         {errors.funcao && <p className="text-xs text-red-500">{errors.funcao}</p>}
                     </div>
-                    <div className="grid gap-1.5 md:col-span-2">
-                        <Label htmlFor="numeroCip">Número CIP</Label>
-                        <Input id="numeroCip" value={formState.numeroCip} onChange={handleInputChange}/>
-                    </div>
-
-                    {/* Row 4: Meio de Acesso and Placa */}
-                    <div className="grid gap-1.5 md:col-span-2">
+                    <div className="grid gap-1.5">
                         <Label htmlFor="meioDeAcesso">Meio de Acesso</Label>
                         <Select value={formState.meioDeAcesso} onValueChange={v => handleSelectChange("meioDeAcesso", v)}>
                             <SelectTrigger id="meioDeAcesso"><SelectValue /></SelectTrigger>
                             <SelectContent><SelectItem value="terra">Terra</SelectItem><SelectItem value="mar">Mar</SelectItem></SelectContent>
                         </Select>
                     </div>
-                    <div className="grid gap-1.5 md:col-span-2">
+                    <div className="grid gap-1.5">
                         <Label htmlFor="placa">Placa</Label>
                         <IMaskInput mask={[{ mask: 'aaa-0000' }, { mask: 'aaa0a00' }]} id="placa" value={formState.placa} onAccept={(value) => handleMaskedInputChange("placa", value as string)} prepare={(str: string) => str.toUpperCase()} as={ForwardedInput} />
                     </div>
-
-                    {/* Row 5: Pier and Navio */}
-                    <div className="grid gap-1.5 md:col-span-2">
+                    <div className="grid gap-1.5">
                         <Label htmlFor="pier">Pier</Label>
                         <Select value={formState.pier} onValueChange={v => handleSelectChange("pier", v)}>
                             <SelectTrigger id="pier"><SelectValue /></SelectTrigger>
                             <SelectContent><SelectItem value="teg">TEG</SelectItem><SelectItem value="teag">TEAG</SelectItem></SelectContent>
                         </Select>
                     </div>
-                    <div className="grid gap-1.5 md:col-span-2">
+                    <div className="grid gap-1.5">
                         <Label htmlFor="navio">Navio</Label>
                         <Input id="navio" value={formState.navio} onChange={handleInputChange}/>
                     </div>
-
-                    {/* Row 6: Destino and Vigilante */}
-                    <div className="grid gap-1.5 md:col-span-2">
+                    <div className="grid gap-1.5">
                         <Label htmlFor="destino">Destino</Label>
                         <Select value={formState.destino} onValueChange={(value) => handleSelectChange("destino", value)}>
                             <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
                             <SelectContent>{destinos.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}</SelectContent>
                         </Select>
                     </div>
-                    <div className="grid gap-1.5 md:col-span-2">
+                    <div className="grid gap-1.5">
                         <Label htmlFor="vigilante">Vigilante</Label>
-                        <Input id="vigilante" value={formState.vigilante} onChange={handleInputChange} />
+                        <Input id="vigilante" value={formState.vigilante} onChange={handleInputChange} className={cn({ 'border-red-500': errors.vigilante })}/>
+                        {errors.vigilante && <p className="text-xs text-red-500">{errors.vigilante}</p>}
                     </div>
-
-                    {/* Row 7: Credencial and Data Saída */}
-                    <div className="grid gap-1.5 md:col-span-2">
+                    <div className="grid gap-1.5">
                         <Label htmlFor="credencial">Credencial</Label>
                         <Select value={formState.credencial} onValueChange={v => handleSelectChange("credencial", v)}>
                             <SelectTrigger id="credencial"><SelectValue /></SelectTrigger>
                             <SelectContent><SelectItem value="azul">Azul</SelectItem><SelectItem value="vermelho">Vermelho</SelectItem><SelectItem value="verde">Verde</SelectItem></SelectContent>
                         </Select>
                     </div>
-                    <div className="grid gap-1.5 md:col-span-2">
-                        <Label htmlFor="dataSaida">Data Saída</Label>
-                        <IMaskInput mask="00/00/0000" id="dataSaida" value={formState.dataSaida} onAccept={(v) => handleMaskedInputChange('dataSaida', v as string)} as={ForwardedInput} />
-                    </div>
 
-                    {/* Row 8: Hora Saída */}
-                    <div className="grid gap-1.5 md:col-span-2">
-                        <Label htmlFor="horaSaida">Hora Saída</Label>
-                        <Input id="horaSaida" type="time" value={formState.horaSaida} onChange={handleInputChange} />
-                    </div>
+                    {selectedTPA && (
+                        <>
+                            <div className="grid gap-1.5">
+                                <Label htmlFor="dataSaida">Data Saída</Label>
+                                <IMaskInput mask="00/00/0000" id="dataSaida" value={formState.dataSaida} onAccept={(v) => handleMaskedInputChange('dataSaida', v as string)} as={ForwardedInput} />
+                            </div>
+                            <div className="grid gap-1.5">
+                                <Label htmlFor="horaSaida">Hora Saída</Label>
+                                <Input id="horaSaida" type="time" value={formState.horaSaida} onChange={handleInputChange} />
+                            </div>
+                        </>
+                    )}
                     
-                    {/* Empty cell to balance the grid if needed */}
-                    <div className="md:col-span-2"></div>
-
-                    {/* Full Width Rows: Outro Destino and Observação */}
                     {formState.destino === "Outros" && (
-                        <div className="grid gap-1.5 md:col-span-4">
+                        <div className="grid gap-1.5 md:col-span-2">
                             <Label htmlFor="outroDestino">Especifique o Destino</Label>
                             <Input id="outroDestino" value={outroDestino} onChange={(e) => { setOutroDestino(e.target.value); clearError('outroDestino'); }} className={cn({ 'border-red-500': (errors as any).outroDestino })} />
                             {(errors as any).outroDestino && <p className="text-xs text-red-500">{(errors as any).outroDestino}</p>}
                         </div>
                     )}
-                    <div className="grid gap-1.5 md:col-span-4">
+                    <div className="grid gap-1.5 md:col-span-2">
                         <Label htmlFor="observacao">Observação</Label>
                         <Textarea id="observacao" value={formState.observacao} onChange={handleInputChange} rows={3} />
                     </div>
@@ -679,14 +656,11 @@ export function TPAsSection() {
                         <tr className="border-b border-border text-left text-xs text-muted-foreground uppercase">
                             <th className="px-4 py-3 font-medium">Nome</th>
                             <th className="px-4 py-3 font-medium">Credencial</th>
-                            <th className="px-4 py-3 font-medium">Data Entrada</th>
-                            <th className="px-4 py-3 font-medium">Data Saída</th>
+                             <th className="px-4 py-3 font-medium">Data & Hora</th>
                             <th className="px-4 py-3 font-medium">Destino</th>
                             <th className="px-4 py-3 font-medium">Documento</th>
                             <th className="px-4 py-3 font-medium">Empresa</th>
                             <th className="px-4 py-3 font-medium">Função</th>
-                            <th className="px-4 py-3 font-medium">Hora Entrada</th>
-                            <th className="px-4 py-3 font-medium">Hora Saída</th>
                             <th className="px-4 py-3 font-medium">Meio de Acesso</th>
                             <th className="px-4 py-3 font-medium">Navio</th>
                             <th className="px-4 py-3 font-medium">Número CIP</th>
@@ -698,48 +672,91 @@ export function TPAsSection() {
                             <th className="px-4 py-3 font-medium text-right">Ações</th>
                         </tr>
                     </thead>
-                    <tbody className="divide-y divide-border/50">
+                    <tbody className="divide-y-0">
                         {filtered.length === 0 ? (
                             <tr><td colSpan={19} className="py-8 text-center text-muted-foreground">Nenhum registro encontrado.</td></tr>
                         ) : (
-                            filtered.map(r => (
-                                <tr key={r.id} className={cn("hover:bg-muted/50")}>
-                                    <td className="px-4 py-3 font-medium whitespace-nowrap text-foreground">
-                                        <div className="flex items-center gap-2">
-                                            {r.nome}
-                                            {(r as any).isOffline && <Tooltip><TooltipTrigger><WifiOff className="h-3 w-3 text-amber-500 animate-pulse" /></TooltipTrigger><TooltipContent>Aguardando sincronização</TooltipContent></Tooltip>}
-                                        </div>
-                                    </td>
-                                    <td className="px-4 py-3 text-muted-foreground">{r.credencial}</td>
-                                    <td className="px-4 py-3 text-muted-foreground">{formatDate(r.dataEntrada)}</td>
-                                    <td className="px-4 py-3 text-muted-foreground">{r.dataSaida ? formatDate(r.dataSaida) : "-"}</td>
-                                    <td className="px-4 py-3 text-muted-foreground">{r.destino}</td>
-                                    <td className="px-4 py-3 tabular-nums text-muted-foreground">{r.documento}</td>
-                                    <td className="px-4 py-3 text-muted-foreground">{r.empresa}</td>
-                                    <td className="px-4 py-3 text-muted-foreground">{r.funcao}</td>
-                                    <td className="px-4 py-3 text-muted-foreground">{r.horaEntrada}</td>
-                                    <td className="px-4 py-3 text-muted-foreground">{r.horaSaida || "-"}</td>
-                                    <td className="px-4 py-3 text-muted-foreground">{r.meioDeAcesso}</td>
-                                    <td className="px-4 py-3 text-muted-foreground">{r.navio}</td>
-                                    <td className="px-4 py-3 text-muted-foreground">{r.numeroCip}</td>
-                                    <td className="px-4 py-3 text-muted-foreground truncate max-w-xs">{r.observacao}</td>
-                                    <td className="px-4 py-3 text-muted-foreground">{r.pier}</td>
-                                    <td className="px-4 py-3 text-muted-foreground">{r.placa}</td>
-                                    <td className="px-4 py-3"><span className={cn("inline-flex items-center rounded-full px-2 py-1 text-xs font-semibold", r.status === "presente" ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-800")}>{r.status}</span></td>
-                                    <td className="px-4 py-3 text-muted-foreground">{r.vigilante}</td>
-                                    <td className="px-4 py-3">
-                                        <div className="flex items-center justify-end gap-1">
-                                            {r.status === "presente" ? (
-                                               <Button size="sm" variant="outline" onClick={() => handleRegistrarSaida(r.id)}><Clock className="h-4 w-4 mr-2"/>Sair</Button>
-                                            ) : (
-                                               <Button size="sm" variant="outline" onClick={() => handleReEntry(r)} disabled={activeTpaDocuments.has((r.documento || '').replace(/\D/g, ''))}>Nova Entrada</Button>
-                                            )}
-                                            <Button size="icon" variant="ghost" onClick={() => handleEdit(r)} disabled={!isOnline}><FilePenLine className="h-4 w-4" /></Button>
-                                            <Button size="icon" variant="ghost" onClick={() => handleDelete(r)} className="text-destructive hover:text-destructive/90" disabled={!isOnline}><Trash2 className="h-4 w-4" /></Button>
-                                        </div>
-                                    </td>
-                                </tr>
-                            ))
+                            filtered.map(r => {
+                                const isColoredRow = ['verde', 'vermelho'].includes(r.credencial || '');
+                                const isGreen = r.credencial === 'verde';
+                                const isRed = r.credencial === 'vermelho';
+                                const mutedColor = isGreen ? 'text-green-200' : isRed ? 'text-red-200' : 'text-muted-foreground';
+                                const hoverClass = isGreen ? 'hover:bg-green-700' : isRed ? 'hover:bg-red-700' : 'hover:bg-muted/50';
+
+                                return (
+                                    <tr key={r.id} className={cn('border-b', hoverClass, {
+                                        'bg-green-800 text-white': isGreen,
+                                        'bg-red-800 text-white': isRed,
+                                        'border-green-700': isGreen,
+                                        'border-red-700': isRed,
+                                        'border-border': !isColoredRow,
+                                    })}>
+                                        <td className="px-4 py-3 font-medium align-top">
+                                            <div className="flex flex-col gap-1">
+                                                <div className="flex items-center gap-2">
+                                                    <span className="font-semibold">{r.nome}</span>
+                                                    {(r as any).isOffline && (
+                                                        <Tooltip>
+                                                            <TooltipTrigger><WifiOff className={cn("h-4 w-4", isColoredRow ? "text-amber-300" : "text-amber-500")} /></TooltipTrigger>
+                                                            <TooltipContent>Registro offline, aguardando sincronização.</TooltipContent>
+                                                        </Tooltip>
+                                                    )}
+                                                </div>
+                                                {(isGreen || isRed) && (
+                                                    <div className={cn("flex items-center gap-1.5 text-xs", mutedColor)}>
+                                                        {isGreen && <ShieldCheck className="h-4 w-4" />}
+                                                        {isRed && <ShieldAlert className="h-4 w-4" />}
+                                                        <span>{credencialConfig[r.credencial!].text}</span>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </td>
+                                        <td className={cn("px-4 py-3 capitalize align-top", { "font-semibold text-green-300": isGreen, "font-semibold text-red-300": isRed, "text-muted-foreground": !isColoredRow })}>{r.credencial}</td>
+                                        <td className={cn("px-4 py-3 align-top whitespace-nowrap", mutedColor)}>
+                                            <div><span className="font-semibold">Ent:</span> {formatDate(r.dataEntrada)} {r.horaEntrada}</div>
+                                            <div><span className="font-semibold">Saí:</span> {r.dataSaida && r.horaSaida ? `${formatDate(r.dataSaida)} ${r.horaSaida}` : '-'}</div>
+                                        </td>
+                                        <td className={cn("px-4 py-3 align-top", mutedColor)}>{r.destino}</td>
+                                        <td className={cn("px-4 py-3 tabular-nums align-top", mutedColor)}>{r.documento}</td>
+                                        <td className={cn("px-4 py-3 align-top", mutedColor)}>{r.empresa}</td>
+                                        <td className={cn("px-4 py-3 align-top", mutedColor)}>{r.funcao}</td>
+                                        <td className={cn("px-4 py-3 align-top", mutedColor)}>{r.meioDeAcesso}</td>
+                                        <td className={cn("px-4 py-3 align-top", mutedColor)}>{r.navio}</td>
+                                        <td className={cn("px-4 py-3 align-top", mutedColor)}>{r.numeroCip}</td>
+                                        <td className={cn("px-4 py-3 truncate max-w-xs align-top", mutedColor)}>{r.observacao}</td>
+                                        <td className={cn("px-4 py-3 align-top", mutedColor)}>{r.pier}</td>
+                                        <td className={cn("px-4 py-3 align-top", mutedColor)}>{r.placa}</td>
+                                        <td className="px-4 py-3 align-top">
+                                             <span className={cn("inline-flex items-center rounded-full px-2 py-1 text-xs font-semibold", {
+                                                "bg-white/20 text-white": isColoredRow && r.status === "presente",
+                                                "bg-black/20 text-gray-300": isColoredRow && r.status !== "presente",
+                                                "bg-green-100 text-green-800": !isColoredRow && r.status === "presente",
+                                                "bg-gray-100 text-gray-800": !isColoredRow && r.status !== "presente",
+                                            })}>{r.status}</span>
+                                        </td>
+                                        <td className={cn("px-4 py-3 align-top", mutedColor)}>{r.vigilante}</td>
+                                        <td className="px-4 py-3 align-top">
+                                            <div className="flex items-center justify-end gap-1">
+                                                {r.status === "presente" ? (
+                                                   <Button size="sm" variant="outline" onClick={() => handleRegistrarSaida(r.id)} className={cn({'bg-white/10 border-gray-400 hover:bg-white/20 text-white': isColoredRow,})}>
+                                                       <Clock className="h-4 w-4 mr-2"/>Sair
+                                                   </Button>
+                                                ) : (
+                                                   <Button size="sm" variant="outline" onClick={() => handleReEntry(r)} disabled={activeTpaDocuments.has((r.documento || '').replace(/\D/g, ''))} className={cn({'bg-white/10 border-gray-400 hover:bg-white/20 text-white': isColoredRow,})}>
+                                                       Nova Entrada
+                                                   </Button>
+                                                )}
+                                                <Button size="icon" variant="ghost" onClick={() => handleEdit(r)} disabled={!isOnline} className={cn({'hover:bg-white/20': isColoredRow})}>
+                                                    <FilePenLine className="h-4 w-4" />
+                                                </Button>
+                                                <Button size="icon" variant="ghost" onClick={() => handleDelete(r)} disabled={!isOnline} className={cn('hover:bg-white/20', {'text-white hover:text-red-300': isColoredRow, 'text-destructive': !isColoredRow})}>
+                                                    <Trash2 className="h-4 w-4" />
+                                                </Button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                )
+                            })
                         )}
                     </tbody>
                 </table>
