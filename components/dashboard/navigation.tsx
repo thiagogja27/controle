@@ -1,7 +1,7 @@
 'use client'
 
 import { cn } from "@/lib/utils"
-import { LayoutDashboard, Users, Utensils, CreditCard, Package, BarChart, Settings, Map, ShieldCheck, BookOpenCheck } from "lucide-react"
+import { LayoutDashboard, Users, Utensils, CreditCard, Package, BarChart, Settings, Map, ShieldCheck, BookOpenCheck, Car } from "lucide-react"
 
 interface NavigationProps {
   activeSection: string
@@ -26,6 +26,12 @@ const sections = [
     label: "Compliance",
     description: "Registro de ocorrências",
     icon: ShieldCheck,
+  },
+  {
+    id: "parking",
+    label: "Estacionamento",
+    description: "Controle de vagas",
+    icon: Car,
   },
   {
     id: "tpas",

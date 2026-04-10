@@ -13,6 +13,7 @@ import { ReportsSection } from "@/components/dashboard/reports-section"
 import { SettingsSection } from "@/components/dashboard/settings-section"
 import { MapaTerminalSection } from "@/components/dashboard/mapa-terminal-section"
 import { DocumentacaoSection } from "@/components/dashboard/documentacao-section"
+import { ParkingSection } from "@/components/dashboard/parking-section" // Importa a nova seção
 
 export default function Dashboard() {
   const [activeSection, setActiveSection] = useState("dashboard")
@@ -32,6 +33,7 @@ export default function Dashboard() {
     reports: ReportsSection,
     settings: SettingsSection,
     documentacao: DocumentacaoSection,
+    parking: ParkingSection, // Adiciona a nova seção aqui
   }), []);
 
   const ActiveComponent = sectionComponents[activeSection] || PainelSection;

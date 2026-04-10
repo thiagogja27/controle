@@ -17,6 +17,7 @@ import { type Visitante, type OcorrenciaCompliance } from "@/lib/store"
 import { useVisitantes, useNavios } from "@/hooks/use-firebase"
 import { useComplianceCheck } from "@/hooks/use-compliance-check"
 import { useOnlineStatus } from "@/hooks/use-online-status"
+import { useParking } from "@/hooks/use-parking" // Importa o hook de estacionamento
 import { addToOutbox } from "@/utils/db"
 import { v4 as uuidv4 } from "uuid";
 import { toast } from "sonner"
@@ -44,6 +45,7 @@ const initialFormState: Omit<Visitante, "id" | "status"> = {
   credencial: "azul",
   notaFiscal: "",
   placa: "",
+  usaEstacionamento: false,
   observacao: "",
   diversos: false,
   rg: "",
@@ -131,6 +133,7 @@ export function VisitantesSection() {
   const { data: visitantes, loading, addItem, updateItem, deleteItem } = useVisitantes()
   const { checkCompliance } = useComplianceCheck();
   const { data: navios, loading: loadingNavios } = useNavios();
+  const { occupySpace, freeSpace } = useParking(); // Usa o hook de estacionamento
   const isOnline = useOnlineStatus();
 
   const [search, setSearch] = useState("")
@@ -227,6 +230,7 @@ export function VisitantesSection() {
         credencial: selectedVisitante.credencial || "azul",
         notaFiscal: selectedVisitante.notaFiscal || "",
         placa: selectedVisitante.placa || "",
+        usaEstacionamento: selectedVisitante.usaEstacionamento || false,
         observacao: selectedVisitante.observacao || "",
         diversos: selectedVisitante.diversos || false,
         rg: selectedVisitante.rg || "",
@@ -490,10 +494,8 @@ export function VisitantesSection() {
         commonErrors.outroDestino = "Especifique o destino se 'Outros'.";
     }
 
-    const isDiversos = selectedVisitante ? formState.diversos : persons.some(p => p.diversos);
-
-    if (isDiversos && !(formState.placa?.trim())) {
-      commonErrors.placa = "Placa é obrigatória pois 'Diversos' foi selecionado.";
+    if (formState.usaEstacionamento && !formState.placa?.trim()) {
+        commonErrors.placa = "A placa do veículo é obrigatória se o estacionamento for utilizado.";
     }
 
     const commonDateFields: Array<keyof Omit<Visitante, "id" | "status">> = ['dataEntrada', 'dataSaida'];
@@ -664,6 +666,21 @@ export function VisitantesSection() {
 
         try {
             await updateItem(selectedVisitante.id, dataToSave);
+            
+            const oldPlate = selectedVisitante.placa || "";
+            const newPlate = dataToSave.placa || "";
+            const wasUsingParking = selectedVisitante.usaEstacionamento && oldPlate;
+            const isUsingParking = dataToSave.usaEstacionamento && newPlate;
+
+            if (wasUsingParking && (!isUsingParking || oldPlate !== newPlate)) {
+                await freeSpace(oldPlate);
+                toast.info(`Vaga liberada para a placa ${oldPlate}.`);
+            }
+            if (isUsingParking && (!wasUsingParking || oldPlate !== newPlate)) {
+                await occupySpace(newPlate, selectedVisitante.id);
+                toast.info(`Vaga alocada para a placa ${newPlate}.`);
+            }
+
             toast.success("Visitante atualizado com sucesso!");
             setIsFormOpen(false);
             setSelectedVisitante(null);
@@ -746,7 +763,14 @@ export function VisitantesSection() {
         });
 
         try {
-            await Promise.all(savePromises);
+            const newVisitorIds = await Promise.all(savePromises);
+
+            if (formState.usaEstacionamento && formState.placa && newVisitorIds && newVisitorIds.length > 0) {
+                const firstVisitorId = newVisitorIds[0];
+                await occupySpace(formState.placa, firstVisitorId);
+                toast.info(`Vaga de estacionamento alocada para a placa ${formState.placa}.`);
+            }
+
             toast.success(`${persons.length} visitante(s) registrado(s) com sucesso!`);
             setIsFormOpen(false);
             setPersons([]);
@@ -761,6 +785,7 @@ export function VisitantesSection() {
   };
 
  const handleRegistrarSaida = async (visitanteId: string) => {
+    const visitor = visitantes.find(v => v.id === visitanteId);
     const now = new Date();
     const saidaData = {
         status: "saiu" as const,
@@ -787,6 +812,12 @@ export function VisitantesSection() {
 
         await updateItem(visitanteId, saidaData);
         toast.success("Saída registrada com sucesso!");
+        
+        if (visitor && visitor.placa && visitor.usaEstacionamento) {
+            await freeSpace(visitor.placa);
+            toast.info(`Vaga liberada para a placa ${visitor.placa}.`);
+        }
+
     } catch (error) {
         console.error("Erro ao registrar saída:", error);
         toast.error("Erro ao registrar a saída.");
@@ -937,6 +968,10 @@ export function VisitantesSection() {
               <div className="grid gap-2"><Label htmlFor="horaSaida">Hora Saída</Label><Input id="horaSaida" type="time" value={formState.horaSaida} onChange={handleInputChange} /></div>
               <div className="grid gap-2"><Label htmlFor="notaFiscal">Nota Fiscal</Label><Input id="notaFiscal" value={formState.notaFiscal} onChange={handleInputChange} /></div>
               <div className="grid gap-2"><Label htmlFor="placa">Placa</Label><IMaskInput mask={[{ mask: 'aaa-0000' }, { mask: 'aaa0a00' }]} id="placa" value={formState.placa} onAccept={(value) => handleMaskedInputChange("placa", value as string)} prepare={(str) => str.toUpperCase()} as={ForwardedInput} className={cn(formErrors.common.placa && "border-red-500")} />{formErrors.common.placa && <p className="text-red-500 text-xs">{formErrors.common.placa}</p>}</div>
+              <div className="flex items-center space-x-2 sm:col-span-2">
+                  <Checkbox id="usaEstacionamento" checked={formState.usaEstacionamento} onCheckedChange={(checked) => handleCheckboxChange("usaEstacionamento", checked as boolean)} />
+                  <Label htmlFor="usaEstacionamento">Usa Estacionamento?</Label>
+              </div>
               <div className="grid gap-2 sm:col-span-2"><Label htmlFor="observacao">Observações</Label><Textarea id="observacao" value={formState.observacao} onChange={handleInputChange} /></div>
            </div>
            </>
@@ -1019,6 +1054,10 @@ export function VisitantesSection() {
                <div className="grid gap-2"><Label htmlFor="horaEntrada">Hora Entrada</Label><Input id="horaEntrada" type="time" value={formState.horaEntrada} onChange={handleInputChange} /></div>
                <div className="grid gap-2"><Label htmlFor="notaFiscal">Nota Fiscal</Label><Input id="notaFiscal" value={formState.notaFiscal || ""} onChange={handleInputChange} /></div>
                <div className="grid gap-2"><Label htmlFor="placa">Placa</Label><IMaskInput mask={[{ mask: 'aaa-0000' }, { mask: 'aaa0a00' }]} id="placa" placeholder="N/A se não houver" value={formState.placa || ""} onAccept={(value) => handleMaskedInputChange("placa", value as string)} prepare={(str) => str.toUpperCase()} as={ForwardedInput} className={cn(formErrors.common.placa && "border-red-500")} />{formErrors.common.placa && <p className="text-red-500 text-xs">{formErrors.common.placa}</p>}</div>
+                <div className="flex items-center space-x-2 sm:col-span-2">
+                  <Checkbox id="usaEstacionamento" checked={formState.usaEstacionamento} onCheckedChange={(checked) => handleCheckboxChange("usaEstacionamento", checked as boolean)} />
+                  <Label htmlFor="usaEstacionamento">Usa Estacionamento?</Label>
+              </div>
                <div className="grid gap-2 sm:col-span-2"><Label htmlFor="observacao">Observações</Label><Textarea id="observacao" value={formState.observacao || ""} onChange={handleInputChange} /></div>
            </div>
            </>

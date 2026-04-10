@@ -1,13 +1,45 @@
 {
   "rules": {
+    ".read": "auth != null",
+    "visitantes": {
+      "$id": {
+        ".write": "auth != null && ( auth.token.email === 'thiago_gja27@hotmail.com' || auth.token.email === 'newton_costa@tegporto.com.br' || auth.token.email === 'paulo_matos@tegporto.com.br' || auth.token.email === 'clodoaldo_d_santos@tegporto.com.br' || (auth.token.email === 'seguranca_patrimonial@tegporto.com.br' && newData.exists()) )"
+      }
+    },
     "refeicoes": {
-      ".read": true,
-      ".write": true,
-      ".indexOn": [
-        "prefixo",
-        "vigilante",
-        "data"
-      ]
+       ".indexOn": ["prefixo", "vigilante", "data"],
+       "$id": {
+        ".write": "auth != null && ( auth.token.email === 'thiago_gja27@hotmail.com' || auth.token.email === 'newton_costa@tegporto.com.br' || auth.token.email === 'paulo_matos@tegporto.com.br' || auth.token.email === 'clodoaldo_d_santos@tegporto.com.br' || (auth.token.email === 'seguranca_patrimonial@tegporto.com.br' && newData.exists()) )"
+      }
+    },
+    "tpas": {
+       ".indexOn": ["documento", "status", "dataEntrada"],
+       "$id": {
+        ".write": "auth != null && ( auth.token.email === 'thiago_gja27@hotmail.com' || auth.token.email === 'newton_costa@tegporto.com.br' || auth.token.email === 'paulo_matos@tegporto.com.br' || auth.token.email === 'clodoaldo_d_santos@tegporto.com.br' || (auth.token.email === 'seguranca_patrimonial@tegporto.com.br' && newData.exists()) )"
+      }
+    },
+    "consumos": {
+      "$id": {
+        ".write": "auth != null && ( auth.token.email === 'thiago_gja27@hotmail.com' || auth.token.email === 'newton_costa@tegporto.com.br' || auth.token.email === 'paulo_matos@tegporto.com.br' || auth.token.email === 'clodoaldo_d_santos@tegporto.com.br' || (auth.token.email === 'seguranca_patrimonial@tegporto.com.br' && newData.exists()) )"
+      }
+    },
+    "navios": {
+      ".write": "auth != null && ( auth.token.email === 'thiago_gja27@hotmail.com' || auth.token.email === 'newton_costa@tegporto.com.br' || auth.token.email === 'paulo_matos@tegporto.com.br' || auth.token.email === 'clodoaldo_d_santos@tegporto.com.br' )"
+    },
+    "compliance": {
+      ".write": "auth != null && ( auth.token.email === 'thiago_gja27@hotmail.com' || auth.token.email === 'newton_costa@tegporto.com.br' || auth.token.email === 'paulo_matos@tegporto.com.br' || auth.token.email === 'clodoaldo_d_santos@tegporto.com.br' )"
+    },
+    "ocorrencias_compliance": {
+      ".write": "auth != null && ( auth.token.email === 'thiago_gja27@hotmail.com' || auth.token.email === 'newton_costa@tegporto.com.br' || auth.token.email === 'paulo_matos@tegporto.com.br' || auth.token.email === 'clodoaldo_d_santos@tegporto.com.br' )"
+    },
+    "historico_navios": {
+      ".write": "auth != null && ( auth.token.email === 'thiago_gja27@hotmail.com' || auth.token.email === 'newton_costa@tegporto.com.br' || auth.token.email === 'paulo_matos@tegporto.com.br' || auth.token.email === 'clodoaldo_d_santos@tegporto.com.br' )"
+    },
+    "mapa": {
+      ".write": "auth != null && ( auth.token.email === 'thiago_gja27@hotmail.com' || auth.token.email === 'newton_costa@tegporto.com.br' || auth.token.email === 'paulo_matos@tegporto.com.br' || auth.token.email === 'clodoaldo_d_santos@tegporto.com.br' )"
+    },
+    "parking_lot": {
+      ".write": "auth != null && ( auth.token.email === 'thiago_gja27@hotmail.com' || auth.token.email === 'newton_costa@tegporto.com.br' || auth.token.email === 'paulo_matos@tegporto.com.br' || auth.token.email === 'clodoaldo_d_santos@tegporto.com.br' || auth.token.email === 'seguranca_patrimonial@tegporto.com.br' )"
     }
   }
 }
