@@ -171,7 +171,7 @@ export function TPAsSection() {
     }
 
     setFormState(newFormState);
-    handleComplianceCheck(tpa.documento);
+    handleComplianceCheck(tpa.documento || '');
     setIsReEntryMode(true);
     setIsFormOpen(true);
   };
@@ -181,14 +181,15 @@ export function TPAsSection() {
         setIsReEntryMode(false);
         const isOutro = !destinos.includes(selectedTPA.destino || "");
         setFormState({
+          ...initialFormState,
           ...selectedTPA,
           dataEntrada: toBrDate(selectedTPA.dataEntrada),
-          dataSaida: toBrDate(selectedTPA.dataSaida),
+          dataSaida: toBrDate(selectedTPA.dataSaida || ''),
           credencial: selectedTPA.credencial || "azul",
-          destino: isOutro ? "Outros" : selectedTPA.destino,
+          destino: isOutro ? "Outros" : selectedTPA.destino || "",
         });
         setOutroDestino(isOutro ? selectedTPA.destino || "" : "");
-        handleComplianceCheck(selectedTPA.documento);
+        handleComplianceCheck(selectedTPA.documento || '');
     }
   }, [selectedTPA, isFormOpen])
 
@@ -200,26 +201,26 @@ export function TPAsSection() {
     });
   }
 
-  const validateForm = () => {
+ const validateForm = () => {
     const newErrors: Partial<Record<keyof Omit<Tpa, "id" | "status"> | 'outroDestino', string>> = {};
     if (!formState.nome.trim()) newErrors.nome = "Nome é obrigatório";
     if (!formState.funcao.trim()) newErrors.funcao = "Função é obrigatória";
     if (!formState.empresa.trim()) newErrors.empresa = "Empresa é obrigatória";
     if (!formState.dataEntrada.trim()) newErrors.dataEntrada = "Data de entrada é obrigatória";
     if (!formState.horaEntrada.trim()) newErrors.horaEntrada = "Hora de entrada é obrigatória";
-    if (!formState.vigilante.trim()) newErrors.vigilante = "Vigilante é obrigatório";
-    if (!formState.numeroCip.trim()) newErrors.numeroCip = "Número CIP é obrigatório";
+    if (!formState.vigilante || !formState.vigilante.trim()) newErrors.vigilante = "Vigilante é obrigatório";
+    if (!formState.numeroCip || !formState.numeroCip.trim()) newErrors.numeroCip = "Número CIP é obrigatório";
     if (formState.destino === "Outros" && !outroDestino.trim()) {
         (newErrors as any).outroDestino = "Especifique o destino se 'Outros'.";
     }
 
-    const unmaskedDoc = formState.documento.replace(/\D/g, '');
-    const complianceResult = checkCompliance(formState.documento);
+    const unmaskedDoc = (formState.documento || '').replace(/\D/g, '');
+    const complianceResult = checkCompliance(formState.documento || '');
     const isCreateMode = !selectedTPA && !isReEntryMode;
 
     if (complianceResult.isCritical) {
         newErrors.documento = `REGISTRO BLOQUEADO: ${complianceResult.ocorrencia?.motivo}`;
-    } else if (!formState.documento.trim()) {
+    } else if (!formState.documento || !formState.documento.trim()) {
         newErrors.documento = "Documento (CPF) é obrigatório.";
     } else if (unmaskedDoc.length < 11) {
         newErrors.documento = "Documento (CPF) deve ter 11 dígitos.";
