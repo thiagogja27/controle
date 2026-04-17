@@ -241,37 +241,38 @@ export function TPAsSection() {
     return Object.keys(newErrors).length === 0;
   };
 
-  const filtered = useMemo(() => registros.filter(r => {
-    if (!r) return false;
-
+  const filtered = useMemo(() => {
     const searchLower = search.toLowerCase().trim();
     const searchNumbers = search.replace(/\D/g, '');
 
-    const textMatch = !searchLower || (
-      (r.nome || '').toLowerCase().includes(searchLower) ||
-      (r.documento || '').replace(/\D/g, '').includes(searchNumbers) ||
-      (r.funcao || '').toLowerCase().includes(searchLower) ||
-      (r.empresa || '').toLowerCase().includes(searchLower) ||
-      (r.placa || '').toLowerCase().includes(searchLower)
-    );
+    return registros.filter(r => {
+        if (!r) return false;
 
-    const dateMatch = (() => {
-      if (searchLower) return true; // if searching, don't filter by date
-      if (!dataInicio && !dataFim) {
-        const today = new Date().toISOString().split('T')[0];
-        const isPresent = r.status === 'presente';
-        const exitedToday = r.dataSaida === today;
-        return isPresent || exitedToday;
-      }
-      if (!r.dataEntrada) return false;
-      const entrada = r.dataEntrada;
-      const afterStart = dataInicio ? entrada >= dataInicio : true;
-      const beforeEnd = dataFim ? entrada <= dataFim : true;
-      return afterStart && beforeEnd;
-    })();
+        const textMatch = !searchLower ||
+            (r.nome || '').toLowerCase().includes(searchLower) ||
+            (r.empresa || '').toLowerCase().includes(searchLower) ||
+            (r.funcao || '').toLowerCase().includes(searchLower) ||
+            (searchNumbers && (r.documento || '').replace(/\D/g, '').includes(searchNumbers)) ||
+            (r.placa || '').toLowerCase().replace(/[-\s]/g, '').includes(searchLower.replace(/[-\s]/g, ''));
 
-    return textMatch && dateMatch;
-  }), [registros, search, dataInicio, dataFim]);
+        const dateMatch = (() => {
+            if (!dataInicio && !dataFim) {
+                if (searchLower) {
+                    return true;
+                }
+                const today = new Date().toISOString().split('T')[0];
+                return r.status === 'presente' || r.dataSaida === today;
+            }
+            if (!r.dataEntrada) return false;
+            const entrada = r.dataEntrada;
+            const afterStart = dataInicio ? entrada >= dataInicio : true;
+            const beforeEnd = dataFim ? entrada <= dataFim : true;
+            return afterStart && beforeEnd;
+        })();
+
+        return textMatch && dateMatch;
+    });
+  }, [registros, search, dataInicio, dataFim]);
 
   const presentes = registros.filter(r => r && r.status === "presente").length
   const sairamHoje = useMemo(() => {

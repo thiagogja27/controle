@@ -203,37 +203,44 @@ export function ConsumoSection() {
     }
   }, [isFormOpen, selectedConsumo])
 
-  const filteredConsumos = useMemo(() => consumos.filter(consumo => {
+  const filteredConsumos = useMemo(() => {
     const searchLower = search.toLowerCase().trim();
-    const textMatch = !searchLower || (
-      consumo.veiculo.toLowerCase().includes(searchLower) ||
-      consumo.placa.toLowerCase().includes(searchLower) ||
-      consumo.produto.toLowerCase().includes(searchLower) ||
-      consumo.notaFiscal.toLowerCase().includes(searchLower) ||
-      (consumo.tipoServico && consumo.tipoServico.toLowerCase().includes(searchLower)) ||
-      consumo.navio.toLowerCase().includes(searchLower) ||
-      consumo.empresa.toLowerCase().includes(searchLower) ||
-      consumo.individuos.some(individuo =>
-        individuo.nome.toLowerCase().includes(searchLower) || (individuo.documento && individuo.documento.includes(searchLower))
-      )
-    );
+    const searchNumbers = search.replace(/\D/g, '');
 
-    const dateMatch = (() => {
-        if (!dataInicio && !dataFim) {
-            if (searchLower) {
-                return true;
+    return consumos.filter(consumo => {
+        if (!consumo) return false;
+
+        const textMatch = !searchLower ||
+            (consumo.veiculo || '').toLowerCase().includes(searchLower) ||
+            (consumo.placa || '').toLowerCase().replace(/[-\s]/g, '').includes(searchLower.replace(/[-\s]/g, '')) ||
+            (consumo.produto || '').toLowerCase().includes(searchLower) ||
+            (consumo.notaFiscal || '').toLowerCase().includes(searchLower) ||
+            (consumo.tipoServico || '').toLowerCase().includes(searchLower) ||
+            (consumo.navio || '').toLowerCase().includes(searchLower) ||
+            (consumo.empresa || '').toLowerCase().includes(searchLower) ||
+            consumo.individuos.some(individuo =>
+                (individuo.nome || '').toLowerCase().includes(searchLower) ||
+                (searchNumbers && (individuo.documento || '').replace(/\D/g, '').includes(searchNumbers))
+            );
+
+        const dateMatch = (() => {
+            if (!dataInicio && !dataFim) {
+                if (searchLower) {
+                    return true;
+                }
+                const today = new Date().toISOString().split('T')[0];
+                return consumo.data === today || consumo.individuos.some(i => i.status === 'presente');
             }
-            const today = new Date().toISOString().split('T')[0];
-            return consumo.data === today;
-        }
-        const entrada = consumo.data;
-        const afterStart = dataInicio ? entrada >= dataInicio : true;
-        const beforeEnd = dataFim ? entrada <= dataFim : true;
-        return afterStart && beforeEnd;
-    })();
+            if (!consumo.data) return false;
+            const entrada = consumo.data;
+            const afterStart = dataInicio ? entrada >= dataInicio : true;
+            const beforeEnd = dataFim ? entrada <= dataFim : true;
+            return afterStart && beforeEnd;
+        })();
 
-    return textMatch && dateMatch;
-  }), [consumos, search, dataInicio, dataFim]);
+        return textMatch && dateMatch;
+    });
+  }, [consumos, search, dataInicio, dataFim]);
 
   const { totalRegistros, presentes, totalIndividuos, totalTeg, totalTeag } = useMemo(() => {
     const allIndividuos = consumos.flatMap(c => c.individuos || []);
@@ -662,7 +669,7 @@ export function ConsumoSection() {
                         <Input id="dataFim" type="date" value={dataFim} onChange={e => setDataFim(e.target.value)} />
                     </div>
                     <div className="flex gap-2 md:col-span-3 lg:col-span-2">
-                         <Button variant="outline" onClick={() => { setDataInicio(""); setDataFim(""); }} className="w-1/2"><XCircle className="mr-2 h-4 w-4"/>Limpar</Button>
+                         <Button variant="outline" onClick={() => { setSearch(""); setDataInicio(""); setDataFim(""); }} className="w-1/2"><XCircle className="mr-2 h-4 w-4"/>Limpar</Button>
                         <Button onClick={handleAddNew} className="w-1/2"><Plus className="mr-2 h-4 w-4" />Novo Registro</Button>
                     </div>
                 </div>

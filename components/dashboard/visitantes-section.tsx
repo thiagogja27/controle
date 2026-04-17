@@ -225,6 +225,7 @@ export function VisitantesSection() {
       setIsReEntryMode(false);
       const isOutro = !destinos.includes(selectedVisitante.destino || "");
       setFormState({
+        ...initialFormState,
         ...selectedVisitante,
         destino: isOutro ? "Outros" : selectedVisitante.destino,
         credencial: selectedVisitante.credencial || "azul",
@@ -283,6 +284,8 @@ export function VisitantesSection() {
       return docs;
   }, [visitantes]);
 
+
+
   const filteredVisitantes = useMemo(() => {
     const searchLower = search.toLowerCase().trim();
     const searchNumbers = search.replace(/\D/g, '');
@@ -290,21 +293,25 @@ export function VisitantesSection() {
     return visitantes.filter(v => {
         if (!v) return false;
 
-        const textMatch = !searchLower || (
+        const textMatch = !searchLower ||
             (v.nome || '').toLowerCase().includes(searchLower) ||
             (v.empresa || '').toLowerCase().includes(searchLower) ||
-            (v.documento || '').replace(/\D/g, '').includes(searchNumbers) ||
-            (v.placa || '').toLowerCase().includes(searchLower)
-        );
+            (searchNumbers && (v.documento || '').replace(/\D/g, '').includes(searchNumbers)) ||
+            (v.placa || '').toLowerCase().replace(/[-\s]/g, '').includes(searchLower.replace(/[-\s]/g, ''));
 
         const dateMatch = (() => {
-            if (searchLower) return true;
+            // If no date range is selected...
             if (!dataInicio && !dataFim) {
+                // ... and there's a search term, don't filter by date.
+                if (searchLower) {
+                    return true;
+                }
+                // ... and there's no search term, show the default view.
                 const today = new Date().toISOString().split('T')[0];
-                const isPresent = v.status === 'presente';
-                const exitedToday = v.dataSaida === today;
-                return isPresent || exitedToday;
+                return v.status === 'presente' || v.dataSaida === today;
             }
+
+            // If a date range IS selected, filter by it.
             if (!v.dataEntrada) return false;
             const entrada = v.dataEntrada;
             const afterStart = dataInicio ? entrada >= dataInicio : true;
@@ -314,8 +321,7 @@ export function VisitantesSection() {
 
         return textMatch && dateMatch;
     });
-}, [visitantes, search, dataInicio, dataFim]);
-
+  }, [visitantes, search, dataInicio, dataFim]);
 
   const clearError = (field: string, personIndex?: number) => {
     if (typeof personIndex === 'number') {
@@ -1180,9 +1186,7 @@ export function VisitantesSection() {
                        <CredencialBadge credencial={v.credencial} />
                      </td>
                      <td className="px-4 py-3">
-                       <span className={cn("text-xs font-semibold", v.credencial === 'verde' ? 'text-green-600' : v.credencial === 'vermelho' ? 'text-red-600' : 'text-blue-600')}>
-                         {v.credencial ? v.credencial.charAt(0).toUpperCase() + v.credencial.slice(1) : '-'}
-                       </span>
+                       <span className={cn("text-xs font-semibold", v.credencial === 'verde' ? 'text-green-600' : v.credencial === 'vermelho' ? 'text-red-600' : 'text-blue-600')}>{v.credencial ? v.credencial.charAt(0).toUpperCase() + v.credencial.slice(1) : '-'}</span>
                      </td>
                      <td className="px-4 py-3">{v.documento || '-'}</td>
                      <td className="px-4 py-3">{v.empresa || '-'}</td>

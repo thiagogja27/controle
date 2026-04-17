@@ -28,6 +28,7 @@ const categoriaConfig = {
 const initialFormState: Omit<RefeicaoPolicial, "id"> = {
   individuos: [{ id: `new-${Date.now()}`, nome: "", status: "presente", dataSaida: "", horaSaida: "" }],
   categoria: "pm",
+  prefixoViatura: "",
   data: "",
   hora: "",
 }
@@ -91,37 +92,41 @@ export function RefeicoesSection() {
   useEffect(() => {
     if (isFormOpen && selectedRefeicao) {
         setFormState({
-          ...selectedRefeicao,
-          individuos: selectedRefeicao.individuos.map((ind: IndividuoRefeicao) => ({ ...ind, dataSaida: ind.dataSaida || "", horaSaida: ind.horaSaida || "" })),
-        })
+            ...initialFormState,
+            ...selectedRefeicao,
+            individuos: selectedRefeicao.individuos.map((ind: IndividuoRefeicao) => ({ ...ind, dataSaida: ind.dataSaida || "", horaSaida: ind.horaSaida || "" })),
+        });
     }
-  }, [isFormOpen, selectedRefeicao])
+}, [isFormOpen, selectedRefeicao]);
 
-  const filteredRefeicoes = refeicoes.filter(r => {
-    const searchLower = search.toLowerCase().trim();
-    const textMatch = !searchLower || (
-      (r.categoria && r.categoria.toLowerCase().includes(searchLower)) ||
-      r.individuos?.some((i: IndividuoRefeicao) => i.nome.toLowerCase().includes(searchLower))
-    );
 
-    const dateMatch = (() => {
-        if (!dataInicio && !dataFim) {
-            if (searchLower) {
-                return true;
+  const filteredRefeicoes = useMemo(() => {
+    return refeicoes.filter(r => {
+        const searchLower = search.toLowerCase().trim();
+        
+        const textMatch = !searchLower || 
+            (r.categoria && r.categoria.toLowerCase().includes(searchLower)) ||
+            (r.prefixoViatura && r.prefixoViatura.toLowerCase().includes(searchLower)) ||
+            r.individuos?.some((i: IndividuoRefeicao) => i.nome.toLowerCase().includes(searchLower));
+
+        const dateMatch = (() => {
+            if (!dataInicio && !dataFim) {
+                if (searchLower) {
+                    return true;
+                }
+                const today = new Date().toISOString().split('T')[0];
+                return r.data === today || r.individuos?.some((ind: IndividuoRefeicao) => ind.status === 'presente');
             }
-            const today = new Date().toISOString().split('T')[0];
-            const entryDateIsToday = r.data === today;
-            const exitDateIsToday = r.individuos?.some((ind: IndividuoRefeicao) => ind.dataSaida === today);
-            return entryDateIsToday || exitDateIsToday;
-        }
-        const entrada = r.data;
-        const afterStart = dataInicio ? entrada >= dataInicio : true;
-        const beforeEnd = dataFim ? entrada <= dataFim : true;
-        return afterStart && beforeEnd;
-    })();
+            if (!r.data) return false;
+            const entrada = r.data;
+            const afterStart = dataInicio ? entrada >= dataInicio : true;
+            const beforeEnd = dataFim ? entrada <= dataFim : true;
+            return afterStart && beforeEnd;
+        })();
 
-    return textMatch && dateMatch;
-  });
+        return textMatch && dateMatch;
+    });
+  }, [refeicoes, search, dataInicio, dataFim]);
 
   const allIndividuos = filteredRefeicoes.flatMap(r => r.individuos?.map((i: IndividuoRefeicao) => ({ ...i, categoria: r.categoria })) || [])
   const totalPM = allIndividuos.filter(i => i.categoria === "pm").length
@@ -418,7 +423,7 @@ export function RefeicoesSection() {
                     <Input id="dataFim" type="date" value={dataFim} onChange={e => setDataFim(e.target.value)} />
                 </div>
                 <div className="flex gap-2 md:col-span-3 lg:col-span-2">
-                      <Button variant="outline" onClick={() => { setDataInicio(""); setDataFim(""); }} className="w-1/2"><XCircle className="mr-2 h-4 w-4"/>Limpar</Button>
+                      <Button variant="outline" onClick={() => { setSearch(""); setDataInicio(""); setDataFim(""); }} className="w-1/2"><XCircle className="mr-2 h-4 w-4"/>Limpar</Button>
                     <Button onClick={handleAddNew} className="w-1/2"><Plus className="mr-2 h-4 w-4" />Registrar Refeição</Button>
                 </div>
             </div>
@@ -450,8 +455,9 @@ export function RefeicoesSection() {
                         </div>
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div className="grid gap-2"><Label htmlFor="prefixoViatura">Prefixo Viatura</Label><Input id="prefixoViatura" value={formState.prefixoViatura} onChange={handleInputChange} /></div>
                         <div className="grid gap-2"><Label htmlFor="data">Data Entrada</Label><Input id="data" type="date" value={formState.data} onChange={handleInputChange} /></div>
-                        <div className="grid gap-2"><Label htmlFor="hora">Hora Entrada</Label><Input id="hora" type="time" value={formState.hora} onChange={handleInputChange} /></div>
+                        <div className="grid gap-2 sm:col-span-2"><Label htmlFor="hora">Hora Entrada</Label><Input id="hora" type="time" value={formState.hora} onChange={handleInputChange} /></div>
                         <div className="grid gap-3 sm:col-span-2"><Label>Categoria</Label><div className="grid grid-cols-3 gap-3"><div className="flex items-center gap-3 rounded-lg border border-border bg-secondary/30 p-3"><Checkbox id="cat-pm" checked={formState.categoria === "pm"} onCheckedChange={() => handleCategoryChange("pm")} /><Label htmlFor="cat-pm" className="flex cursor-pointer items-center gap-2 font-normal"><Shield className="h-4 w-4 text-blue-400" />PM</Label></div><div className="flex items-center gap-3 rounded-lg border border-border bg-secondary/30 p-3"><Checkbox id="cat-pc" checked={formState.categoria === "pc"} onCheckedChange={() => handleCategoryChange("pc")} /><Label htmlFor="cat-pc" className="flex cursor-pointer items-center gap-2 font-normal"><Users className="h-4 w-4 text-amber-400" />PC</Label></div><div className="flex items-center gap-3 rounded-lg border border-border bg-secondary/30 p-3"><Checkbox id="cat-pr" checked={formState.categoria === "pr"} onCheckedChange={() => handleCategoryChange("pr")} /><Label htmlFor="cat-pr" className="flex cursor-pointer items-center gap-2 font-normal"><Shield className="h-4 w-4 text-green-400" />PR</Label></div></div></div>
                     </div>
                     
@@ -563,6 +569,7 @@ export function RefeicoesSection() {
                     <thead>
                         <tr className="border-b border-border text-left text-xs text-muted-foreground uppercase">
                         <th className="px-4 py-3 font-medium">Nome</th>
+                        <th className="px-4 py-3 font-medium">Prefixo</th>
                         <th className="px-4 py-3 font-medium">Status</th>
                         <th className="px-4 py-3 font-medium">Entrada</th>
                         <th className="px-4 py-3 font-medium">Saída</th>
@@ -583,6 +590,7 @@ export function RefeicoesSection() {
                                         {(refeicao as any).isOffline && <Tooltip><TooltipTrigger><WifiOff className="h-3 w-3 text-amber-500 animate-pulse" /></TooltipTrigger><TooltipContent>Aguardando conexão para sincronizar grupo</TooltipContent></Tooltip>}
                                     </div>
                                 </td>
+                                <td className="px-4 py-3 font-medium">{refeicao.prefixoViatura || 'N/A'}</td>
                                 <td className="px-4 py-3"><span className={cn("inline-flex items-center rounded-full px-2 py-1 text-xs font-semibold", individuo.status === "presente" ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300" : "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300")}>{individuo.status === "presente" ? "Presente" : "Saiu"}</span></td>
                                 <td className="px-4 py-3 tabular-nums text-muted-foreground">{formatDateTime(refeicao.data, refeicao.hora)}</td>
                                 <td className="px-4 py-3 tabular-nums text-muted-foreground">

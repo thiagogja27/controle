@@ -71,6 +71,7 @@ export interface Visitante {
   notaFiscal?: string;
   horaEntrada?: string;
   horaSaida?: string;
+  usaEstacionamento?: boolean;
 }
 
 export interface Tpa {
@@ -132,6 +133,7 @@ export interface RefeicaoPolicial {
   data: string;
   hora: string;
   individuos: IndividuoRefeicao[];
+  prefixoViatura?: string;
 }
 
 

@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useEffect, forwardRef } from "react"
-import { Plus, Search, Loader2, MoreVertical, Trash2, AlertTriangle } from "lucide-react"
+import { useState, useEffect, forwardRef, useMemo } from "react"
+import { Plus, Search, Loader2, MoreVertical, Trash2, AlertTriangle, XCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -35,7 +35,6 @@ const ForwardedInput: any = forwardRef<HTMLInputElement, any>((props, ref) => {
 });
 ForwardedInput.displayName = 'ForwardedInput';
 
-// Adjusted to match the OcorrenciaCompliance interface from store.ts
 const initialFormState: Omit<OcorrenciaCompliance, "id" | "registradoPor"> = {
   nomeIndividuo: "",
   documentoIndividuo: "",
@@ -47,7 +46,9 @@ const initialFormState: Omit<OcorrenciaCompliance, "id" | "registradoPor"> = {
 export function ComplianceSection() {
   const { data: ocorrencias, loading, addItem, updateItem, deleteItem } = useOcorrenciasCompliance()
   const { user } = useAuth();
-  const [search, setSearch] = useState("")
+  const [search, setSearch] = useState("");
+  const [dataInicio, setDataInicio] = useState("");
+  const [dataFim, setDataFim] = useState("");
   const [isFormOpen, setIsFormOpen] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false)
@@ -56,24 +57,41 @@ export function ComplianceSection() {
 
   useEffect(() => {
     if (isFormOpen && selectedOcorrencia) {
-      // Ensure all fields from the selected item are populated, including isCritical
       setFormState({
         nomeIndividuo: selectedOcorrencia.nomeIndividuo,
         documentoIndividuo: selectedOcorrencia.documentoIndividuo,
         dataOcorrencia: selectedOcorrencia.dataOcorrencia,
         motivo: selectedOcorrencia.motivo,
-        isCritical: selectedOcorrencia.isCritical || false, // Default to false if undefined
+        isCritical: selectedOcorrencia.isCritical || false, 
       })
     } else {
-      // Reset form to its initial state when closing or adding new
       setFormState(initialFormState)
     }
   }, [isFormOpen, selectedOcorrencia])
 
-  const filteredOcorrencias = ocorrencias.filter(o => 
-    o.nomeIndividuo.toLowerCase().includes(search.toLowerCase()) ||
-    o.documentoIndividuo.includes(search)
-  )
+  const filteredOcorrencias = useMemo(() => {
+    const searchLower = search.toLowerCase().trim();
+    const searchNumbers = search.replace(/\D/g, '');
+
+    return ocorrencias.filter(o => {
+        const textMatch = !searchLower || 
+            o.nomeIndividuo.toLowerCase().includes(searchLower) ||
+            (searchNumbers && o.documentoIndividuo.replace(/\D/g, '').includes(searchNumbers));
+
+        const dateMatch = (() => {
+            if (!dataInicio && !dataFim) {
+                return true; 
+            }
+            if (!o.dataOcorrencia) return false;
+            const ocorrenciaDate = o.dataOcorrencia;
+            const afterStart = dataInicio ? ocorrenciaDate >= dataInicio : true;
+            const beforeEnd = dataFim ? ocorrenciaDate <= dataFim : true;
+            return afterStart && beforeEnd;
+        })();
+
+        return textMatch && dateMatch;
+    });
+  }, [ocorrencias, search, dataInicio, dataFim]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { id, value } = e.target
@@ -135,7 +153,7 @@ export function ComplianceSection() {
     try {
         const dataToSave: Omit<OcorrenciaCompliance, 'id'> = {
             ...formState, 
-            registradoPor: user?.email || "sistema", // Capture user email
+            registradoPor: user?.email || "sistema",
         };
 
         if (selectedOcorrencia) {
@@ -170,15 +188,28 @@ export function ComplianceSection() {
     <TooltipProvider>
       <div className="space-y-6">
           <Card>
-              <CardHeader className="flex flex-row items-center justify-between">
-                  <CardTitle>Controle de Compliance</CardTitle>
-                  <Button onClick={handleAddNew}><Plus className="mr-2 h-4 w-4" /> Adicionar Ocorrência</Button>
-              </CardHeader>
-              <CardContent>
-                  <div className="relative mb-4">
-                      <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                      <Input placeholder="Buscar por nome ou documento..." value={search} onChange={e => setSearch(e.target.value)} className="w-full pl-8" />
-                  </div>
+              <CardContent className="pt-6">
+                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 items-end">
+                    <div className="lg:col-span-2 grid gap-2">
+                        <Label htmlFor="search">Busca</Label>
+                        <div className="relative">
+                            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                            <Input id="search" placeholder="Buscar por nome ou documento..." value={search} onChange={e => setSearch(e.target.value)} className="w-full pl-8" />
+                        </div>
+                    </div>
+                    <div className="grid gap-2">
+                        <Label htmlFor="dataInicio">Data Início</Label>
+                        <Input id="dataInicio" type="date" value={dataInicio} onChange={e => setDataInicio(e.target.value)} />
+                    </div>
+                    <div className="grid gap-2">
+                        <Label htmlFor="dataFim">Data Fim</Label>
+                        <Input id="dataFim" type="date" value={dataFim} onChange={e => setDataFim(e.target.value)} />
+                    </div>
+                    <div className="flex gap-2 lg:col-span-2">
+                         <Button variant="outline" onClick={() => { setSearch(""); setDataInicio(""); setDataFim(""); }} className="w-1/2"><XCircle className="mr-2 h-4 w-4"/>Limpar</Button>
+                        <Button onClick={handleAddNew} className="w-1/2"><Plus className="mr-2 h-4 w-4" />Adicionar</Button>
+                    </div>
+                </div>
               </CardContent>
           </Card>
 

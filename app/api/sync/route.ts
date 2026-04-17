@@ -62,7 +62,17 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: false, message: 'Ação inválida ou ID ausente para atualização.' }, { status: 400 });
 
   } catch (error) {
-    console.error("Erro fatal na API de sincronização:", error);
+    console.error("--- ERRO DETALHADO NA API DE SINCRONIZAÇÃO ---");
+    console.error("Timestamp:", new Date().toISOString());
+    if (error instanceof Error) {
+      console.error("Error Name:", error.name);
+      console.error("Error Message:", error.message);
+      console.error("Error Stack:", error.stack);
+    } else {
+      console.error("Erro não padrão:", error);
+    }
+    console.error("--- FIM DO ERRO DETALHADO ---");
+
     const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido no servidor';
     return NextResponse.json({ success: false, message: `Erro ao sincronizar: ${errorMessage}` }, { status: 500 });
   }

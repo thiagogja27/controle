@@ -1,5 +1,5 @@
-.env.local
+
+# Secret files
+serviceAccountKey.json
 node_modules
-pnpm-debug.log
-.next
-.env.local
+node_modules
