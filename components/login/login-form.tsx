@@ -26,7 +26,7 @@ export function LoginForm() {
       await login(email, password)
       router.push("/") // Redirect to dashboard on successful login
     } catch (err) {
-      setError("Falha no login. Verifique seu e-mail e senha.")
+      setError("Falha no login. Verifique seu e-mail ou senha.")
       console.error(err)
     } finally {
       setIsLoading(false)
