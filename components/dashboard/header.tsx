@@ -46,6 +46,12 @@ export function Header() {
                 height={42}
                 priority
             />
+            {user && (
+              <div className="ml-3 hidden sm:flex items-center gap-3">
+                <div className="h-6 w-px bg-border/50" />
+                <span className="text-xl sm:text-2xl font-extrabold tracking-tight">RDSP</span>
+              </div>
+            )}
         </div>
       
       <div className="flex flex-1 items-center justify-end gap-2">
