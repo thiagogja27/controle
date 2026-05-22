@@ -39,20 +39,20 @@ export function LoginForm({ introComplete }: LoginFormProps) {
   }
 
   useEffect(() => {
-    let subtitleTimeout: ReturnType<typeof window.setTimeout>
-    let logosTimeout: ReturnType<typeof window.setTimeout>
+    let subtitleTimeout: ReturnType<typeof setTimeout> | undefined
+    let logosTimeout: ReturnType<typeof setTimeout> | undefined
 
     if (introComplete) {
-      subtitleTimeout = window.setTimeout(() => setShowSubtitle(true), 350)
-      logosTimeout = window.setTimeout(() => setShowLogos(true), 650)
+      subtitleTimeout = setTimeout(() => setShowSubtitle(true), 350)
+      logosTimeout = setTimeout(() => setShowLogos(true), 650)
     } else {
       setShowSubtitle(false)
       setShowLogos(false)
     }
 
     return () => {
-      window.clearTimeout(subtitleTimeout)
-      window.clearTimeout(logosTimeout)
+      if (subtitleTimeout) clearTimeout(subtitleTimeout)
+      if (logosTimeout) clearTimeout(logosTimeout)
     }
   }, [introComplete])
 
