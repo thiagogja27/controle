@@ -125,7 +125,9 @@ function ParticlesBackgroundComponent() {
   );
 
   return (
-    <div className={`absolute inset-0 z-0 overflow-hidden bg-[#04070f] transition-opacity duration-700 ease-out ${init ? "opacity-100" : "opacity-0"}`}>
+    <div className={`absolute inset-0 z-0 overflow-hidden bg-[#04070f] transition-opacity duration-1000 ease-out ${
+      init ? "opacity-100" : "opacity-0"
+    }`}>
       {particlesElement}
     </div>
   );
