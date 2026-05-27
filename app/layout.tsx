@@ -4,8 +4,8 @@ import { ClientLayout } from '@/components/client-layout'
 
 export const metadata = {
   manifest: "/manifest.json",
-  title: "Controle Project",
-  description: "Controle Project PWA",
+  title: "Sistema RDSP",
+  description: "Controle Patrimonial",
 };
 
 const inter = Inter({
