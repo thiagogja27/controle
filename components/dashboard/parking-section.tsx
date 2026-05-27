@@ -1,3 +1,4 @@
+
 'use client';
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -42,7 +43,10 @@ export function ParkingSection() {
                 </TooltipTrigger>
                 <TooltipContent>
                   {space.status === 'occupied' ? (
-                    <p>Ocupado por: {space.occupied_by_plate}</p>
+                    <div>
+                      <p>Ocupado por: {space.visitor_name || 'Carregando...'}</p>
+                      <p>Placa: {space.occupied_by_plate}</p>
+                    </div>
                   ) : (
                     <p>Vaga disponível</p>
                   )}

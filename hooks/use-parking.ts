@@ -1,13 +1,19 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { ref, onValue, get, set, query, orderByChild, equalTo, limitToFirst } from 'firebase/database';
-import { db } from '@/lib/firebase'; // Correção: importa a instância 'db' corretamente
+import { db } from '@/lib/firebase';
 
 interface ParkingSpace {
   id: number;
   status: 'available' | 'occupied';
   occupied_by_plate?: string;
   visitor_id?: string;
+  visitor_name?: string;
+}
+
+// A interface foi corrigida de 'name' para 'nome' para corresponder ao banco de dados.
+interface Visitor {
+    nome: string;
 }
 
 export function useParking() {
@@ -15,11 +21,37 @@ export function useParking() {
   const [loading, setLoading] = useState<boolean>(true);
 
   useEffect(() => {
-    const spacesRef = ref(db, 'parking_lot/spaces'); // Correção: usa 'db' em vez de 'database'
-    const unsubscribe = onValue(spacesRef, (snapshot) => {
+    const spacesRef = ref(db, 'parking_lot/spaces');
+    
+    const unsubscribe = onValue(spacesRef, async (snapshot) => {
       const data = snapshot.val();
-      const spacesArray = data ? Object.values(data) : [];
-      setSpaces(spacesArray as ParkingSpace[]);
+      if (data) {
+        const spacesArray = Object.values(data) as ParkingSpace[];
+
+        const enrichedSpaces = await Promise.all(
+          spacesArray.map(async (space) => {
+            if (space.status === 'occupied' && space.visitor_id) {
+              try {
+                const visitorRef = ref(db, `visitantes/${space.visitor_id}`);
+                const visitorSnapshot = await get(visitorRef);
+                if (visitorSnapshot.exists()) {
+                  const visitorData = visitorSnapshot.val() as Visitor;
+                  // Correção: Usa 'visitorData.nome' em vez de 'visitorData.name'.
+                  return { ...space, visitor_name: visitorData.nome || 'Nome não encontrado' };
+                }
+              } catch (error) {
+                console.error("Erro ao buscar nome do visitante:", error);
+                return { ...space, visitor_name: 'Erro de busca' };
+              }
+            }
+            return space;
+          })
+        );
+        
+        setSpaces(enrichedSpaces);
+      } else {
+        setSpaces([]);
+      }
       setLoading(false);
     });
 
@@ -29,7 +61,7 @@ export function useParking() {
   const occupySpace = useCallback(async (plate: string, visitorId: string) => {
     if (!plate) return;
 
-    const spacesRef = ref(db, 'parking_lot/spaces'); // Correção: usa 'db'
+    const spacesRef = ref(db, 'parking_lot/spaces');
     const availableSpaceQuery = query(
       spacesRef,
       orderByChild('status'),
@@ -42,7 +74,7 @@ export function useParking() {
       if (snapshot.exists()) {
         const spaceData = snapshot.val();
         const spaceId = Object.keys(spaceData)[0];
-        const spaceToUpdateRef = ref(db, `parking_lot/spaces/${spaceId}`); // Correção: usa 'db'
+        const spaceToUpdateRef = ref(db, `parking_lot/spaces/${spaceId}`);
         await set(spaceToUpdateRef, {
           ...spaceData[spaceId],
           status: 'occupied',
@@ -61,7 +93,7 @@ export function useParking() {
   const freeSpace = useCallback(async (plate: string) => {
     if (!plate) return;
 
-    const spacesRef = ref(db, 'parking_lot/spaces'); // Correção: usa 'db'
+    const spacesRef = ref(db, 'parking_lot/spaces');
      const occupiedSpaceQuery = query(
       spacesRef,
       orderByChild('occupied_by_plate'),
@@ -74,7 +106,7 @@ export function useParking() {
       if (snapshot.exists()) {
         const spaceData = snapshot.val();
         const spaceId = Object.keys(spaceData)[0];
-        const spaceToUpdateRef = ref(db, `parking_lot/spaces/${spaceId}`); // Correção: usa 'db'
+        const spaceToUpdateRef = ref(db, `parking_lot/spaces/${spaceId}`);
 
         await set(spaceToUpdateRef, {
             ...spaceData[spaceId],
