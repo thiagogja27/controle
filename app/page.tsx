@@ -1,26 +1,38 @@
-'use client'
 
-import { useState, useMemo } from "react"
-import { Header } from "@/components/dashboard/header"
-import { Navigation } from "@/components/dashboard/navigation"
-import { PainelSection } from "@/components/dashboard/painel-section"
-import { VisitantesSection } from "@/components/dashboard/visitantes-section"
-import { ComplianceSection } from "@/components/dashboard/compliance-section"
-import { RefeicoesSection } from "@/components/dashboard/refeicoes-section"
-import { TPAsSection } from "@/components/dashboard/tpas-section"
-import { ConsumoSection } from "@/components/dashboard/consumo-section"
-import { ReportsSection } from "@/components/dashboard/reports-section"
-import { SettingsSection } from "@/components/dashboard/settings-section"
-import { MapaTerminalSection } from "@/components/dashboard/mapa-terminal-section"
-import { DocumentacaoSection } from "@/components/dashboard/documentacao-section"
-import { ParkingSection } from "@/components/dashboard/parking-section" // Importa a nova seção
+'use client';
+
+import { useState, useMemo } from 'react';
+import { Header } from '@/components/dashboard/header';
+import { Navigation } from '@/components/dashboard/navigation';
+import { PainelSection } from '@/components/dashboard/painel-section';
+import { VisitantesSection } from '@/components/dashboard/visitantes-section';
+import { ComplianceSection } from '@/components/dashboard/compliance-section';
+import { RefeicoesSection } from '@/components/dashboard/refeicoes-section';
+import { TPAsSection } from '@/components/dashboard/tpas-section';
+import { ConsumoSection } from '@/components/dashboard/consumo-section';
+import { ReportsSection } from '@/components/dashboard/reports-section';
+import { SettingsSection } from '@/components/dashboard/settings-section';
+import { MapaTerminalSection } from '@/components/dashboard/mapa-terminal-section';
+import { DocumentacaoSection } from '@/components/dashboard/documentacao-section';
+import { ParkingSection } from '@/components/dashboard/parking-section';
+import { ParkingInitializer } from '@/components/dashboard/parking-initializer';
+
+// Componente wrapper para a seção de estacionamento
+const ParkingPage = () => {
+  return (
+    <>
+      <ParkingInitializer />
+      <ParkingSection />
+    </>
+  );
+};
 
 export default function Dashboard() {
-  const [activeSection, setActiveSection] = useState("dashboard")
+  const [activeSection, setActiveSection] = useState('dashboard');
 
   const handleSectionChange = (section: string) => {
-    setActiveSection(section)
-  }
+    setActiveSection(section);
+  };
 
   const sectionComponents: { [key: string]: React.ComponentType } = useMemo(() => ({
     dashboard: PainelSection,
@@ -33,7 +45,7 @@ export default function Dashboard() {
     reports: ReportsSection,
     settings: SettingsSection,
     documentacao: DocumentacaoSection,
-    parking: ParkingSection, // Adiciona a nova seção aqui
+    parking: ParkingPage, // Usa o componente wrapper
   }), []);
 
   const ActiveComponent = sectionComponents[activeSection] || PainelSection;
@@ -48,5 +60,5 @@ export default function Dashboard() {
         </div>
       </main>
     </div>
-  )
+  );
 }
