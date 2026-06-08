@@ -472,19 +472,27 @@ export function VisitantesSection() {
 
   const handleConfirmDelete = async () => {
     if (!selectedVisitante || !isOnline) return
+
     setIsSaving(true)
     try {
-      await deleteItem(selectedVisitante.id)
-      toast.success("Visitante excluído com sucesso!");
-      setIsDeleteConfirmOpen(false)
-      setSelectedVisitante(null)
+        // Adicionado: Liberar a vaga de estacionamento se estiver em uso
+        if (selectedVisitante.usaEstacionamento && selectedVisitante.placa) {
+            await freeSpace(selectedVisitante.placa);
+            toast.info(`Vaga liberada para a placa ${selectedVisitante.placa}.`);
+        }
+
+        await deleteItem(selectedVisitante.id)
+
+        toast.success("Visitante excluído com sucesso!");
+        setIsDeleteConfirmOpen(false)
+        setSelectedVisitante(null)
     } catch (error) {
-      console.error("Erro ao excluir visitante:", error)
-      toast.error("Erro ao excluir o visitante.")
+        console.error("Erro ao excluir visitante:", error)
+        toast.error("Erro ao excluir o visitante.")
     } finally {
-      setIsSaving(false)
+        setIsSaving(false)
     }
-  }
+}
 
   const validateForm = () => {
     const commonErrors: FormErrors = {};
