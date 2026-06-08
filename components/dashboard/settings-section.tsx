@@ -39,7 +39,6 @@ export function SettingsSection() {
     setHasMounted(true)
   }, [])
 
-  // Update local state when the store changes (e.g., after initial load from localStorage)
   useEffect(() => {
     setLocalMaxHours(maxPermanenceHours.toString())
     setLocalVoiceAlerts(voiceAlerts)
@@ -53,7 +52,6 @@ export function SettingsSection() {
     setTimeout(() => {
       let settingsChanged = false
       
-      // --- Save Max Permanence Hours ---
       const hours = parseInt(localMaxHours, 10)
       if (!isNaN(hours) && hours > 0) {
         if (hours !== maxPermanenceHours) {
@@ -70,7 +68,6 @@ export function SettingsSection() {
         return
       }
 
-      // --- Save Voice Alert Settings ---
       if (localVoiceAlerts !== voiceAlerts) {
         setVoiceAlerts(localVoiceAlerts)
         settingsChanged = true
@@ -88,7 +85,6 @@ export function SettingsSection() {
         settingsChanged = true
       }
 
-      // --- Provide Feedback ---
       if (settingsChanged) {
         toast({
           title: "Configurações salvas!",
@@ -103,13 +99,12 @@ export function SettingsSection() {
       }
       
       setIsSaving(false)
-    }, 500) // Simulate network delay for better UX
+    }, 500)
   }
 
-  // Prevents hydration errors by showing a loading state until the component has mounted
   if (!hasMounted) {
     return (
-      <Card>
+      <Card className="max-w-3xl mx-auto">
         <CardHeader>
           <CardTitle>Parâmetros e Alertas</CardTitle>
           <CardDescription>Ajuste as regras de negócio e os alertas do sistema.</CardDescription>
@@ -129,19 +124,19 @@ export function SettingsSection() {
 
   return (
     <div className="grid gap-6">
-      <Card>
+      <Card className="max-w-3xl mx-auto w-full">
         <CardHeader>
           <CardTitle>Parâmetros e Alertas</CardTitle>
           <CardDescription>
             Ajuste as regras de negócio e os alertas do sistema. Clique em "Salvar Alterações" no final para aplicar.
           </CardDescription>
         </CardHeader>
-        <CardContent className="grid gap-8">
+        <CardContent className="space-y-8 py-6">
           {/* --- General Parameters --- */}
-          <div className="flex items-center justify-between space-x-2">
+          <div className="flex items-center justify-between space-x-4 px-1">
             <Label htmlFor="max-permanence" className="flex flex-col space-y-1">
               <span>Tempo Máximo de Permanência (horas)</span>
-              <span className="text-xs font-normal leading-snug text-muted-foreground">
+              <span className="text-sm font-normal leading-snug text-muted-foreground">
                 Define o limite para o alerta de permanência excedida de visitantes.
               </span>
             </Label>
@@ -159,43 +154,45 @@ export function SettingsSection() {
           <Separator />
 
           {/* --- Voice Alerts --- */}
-          <div>
-             <h3 className="text-lg font-medium">Alertas de Voz</h3>
-             <p className="text-sm text-muted-foreground mt-1">
+          <div className="space-y-4 px-1">
+            <div>
+              <h3 className="text-lg font-medium">Alertas de Voz</h3>
+              <p className="text-sm text-muted-foreground mt-1">
                 Ative ou desative a narração por voz para eventos importantes.
-             </p>
-          </div>
-          
-          <div className="flex items-center justify-between space-x-2">
-            <Label htmlFor="voice-alerts-visitantes" className="flex flex-col space-y-1">
-              <span>Novos Visitantes</span>
-              <span className="text-xs font-normal leading-snug text-muted-foreground">Anuncia a entrada de um novo visitante.</span>
-            </Label>
-            <Switch id="voice-alerts-visitantes" checked={localVoiceAlerts} onCheckedChange={setLocalVoiceAlerts} disabled={isSaving} />
-          </div>
-          
-          <div className="flex items-center justify-between space-x-2">
-            <Label htmlFor="voice-alerts-refeicoes" className="flex flex-col space-y-1">
-              <span>Novas Refeições</span>
-              <span className="text-xs font-normal leading-snug text-muted-foreground">Anuncia o registro de uma nova refeição de policial.</span>
-            </Label>
-            <Switch id="voice-alerts-refeicoes" checked={localVoiceAlertsRefeicoes} onCheckedChange={setLocalVoiceAlertsRefeicoes} disabled={isSaving} />
-          </div>
-          
-          <div className="flex items-center justify-between space-x-2">
-            <Label htmlFor="voice-alerts-tpas" className="flex flex-col space-y-1">
-              <span>Novos TPAs</span>
-              <span className="text-xs font-normal leading-snug text-muted-foreground">Anuncia a entrada de um novo TPA.</span>
-            </Label>
-            <Switch id="voice-alerts-tpas" checked={localVoiceAlertsTPAs} onCheckedChange={setLocalVoiceAlertsTPAs} disabled={isSaving} />
-          </div>
-          
-          <div className="flex items-center justify-between space-x-2">
-            <Label htmlFor="voice-alerts-consumo" className="flex flex-col space-y-1">
-              <span>Novo Consumo de Bordo</span>
-              <span className="text-xs font-normal leading-snug text-muted-foreground">Anuncia um novo registro de consumo de bordo.</span>
-            </Label>
-            <Switch id="voice-alerts-consumo" checked={localVoiceAlertsConsumo} onCheckedChange={setLocalVoiceAlertsConsumo} disabled={isSaving} />
+              </p>
+            </div>
+            <div className="rounded-md border">
+              <ul className="divide-y divide-border">
+                <li className="grid grid-cols-[1fr_auto] items-start gap-x-4 gap-y-2 p-4">
+                  <Label htmlFor="voice-alerts-visitantes" className="flex flex-col space-y-1 cursor-pointer">
+                    <span>Novos Visitantes</span>
+                    <span className="text-sm font-normal leading-snug text-muted-foreground">Anuncia a entrada de um novo visitante.</span>
+                  </Label>
+                  <Switch id="voice-alerts-visitantes" checked={localVoiceAlerts} onCheckedChange={setLocalVoiceAlerts} disabled={isSaving} />
+                </li>
+                <li className="grid grid-cols-[1fr_auto] items-start gap-x-4 gap-y-2 p-4">
+                  <Label htmlFor="voice-alerts-refeicoes" className="flex flex-col space-y-1 cursor-pointer">
+                    <span>Novas Refeições</span>
+                    <span className="text-sm font-normal leading-snug text-muted-foreground">Anuncia o registro de uma nova refeição de policial.</span>
+                  </Label>
+                  <Switch id="voice-alerts-refeicoes" checked={localVoiceAlertsRefeicoes} onCheckedChange={setLocalVoiceAlertsRefeicoes} disabled={isSaving} />
+                </li>
+                <li className="grid grid-cols-[1fr_auto] items-start gap-x-4 gap-y-2 p-4">
+                  <Label htmlFor="voice-alerts-tpas" className="flex flex-col space-y-1 cursor-pointer">
+                    <span>Novos TPAs</span>
+                    <span className="text-sm font-normal leading-snug text-muted-foreground">Anuncia a entrada de um novo TPA.</span>
+                  </Label>
+                  <Switch id="voice-alerts-tpas" checked={localVoiceAlertsTPAs} onCheckedChange={setLocalVoiceAlertsTPAs} disabled={isSaving} />
+                </li>
+                <li className="grid grid-cols-[1fr_auto] items-start gap-x-4 gap-y-2 p-4">
+                  <Label htmlFor="voice-alerts-consumo" className="flex flex-col space-y-1 cursor-pointer">
+                    <span>Novo Consumo de Bordo</span>
+                    <span className="text-sm font-normal leading-snug text-muted-foreground">Anuncia um novo registro de consumo de bordo.</span>
+                  </Label>
+                  <Switch id="voice-alerts-consumo" checked={localVoiceAlertsConsumo} onCheckedChange={setLocalVoiceAlertsConsumo} disabled={isSaving} />
+                </li>
+              </ul>
+            </div>
           </div>
         </CardContent>
         <CardFooter className="border-t px-6 py-4">
