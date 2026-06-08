@@ -113,14 +113,14 @@ export function LoginForm({ introComplete }: LoginFormProps) {
           alt="TEAG Logo"
           width={150}
           height={42}
-          className="object-contain"
+          className="object-contain pointer-events-none select-none"
         />
         <img
           src="/baltech-logo.png"
           alt="BalTech Solutions Logo"
           width={150}
           height={42}
-          className="object-contain"
+          className="object-contain pointer-events-none select-none"
         />
       </div>
     </>

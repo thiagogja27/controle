@@ -22,6 +22,12 @@ const sections = [
     icon: Users,
   },
   {
+    id: "consumo",
+    label: "Consumo de Bordo",
+    description: "Gestão de estoque",
+    icon: Package,
+  },
+  {
     id: "compliance",
     label: "Compliance",
     description: "Registro de ocorrências",
@@ -50,12 +56,6 @@ const sections = [
     label: "Refeições Policiais",
     description: "Controle de refeições",
     icon: Utensils,
-  },
-  {
-    id: "consumo",
-    label: "Consumo de Bordo",
-    description: "Gestão de estoque",
-    icon: Package,
   },
   {
     id: "reports",
