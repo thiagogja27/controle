@@ -60,18 +60,18 @@ export function LoginForm({ introComplete }: LoginFormProps) {
     <>
       <div className="z-10 mb-8 flex w-full max-w-md flex-col items-center justify-center text-center gap-6">
         <div className={`space-y-4 ${introComplete ? 'animate-rdsp-soft' : 'opacity-100'}`}>
-          <h1 className="text-6xl font-black tracking-tight text-white sm:text-7xl md:text-8xl">
+          <h1 className="text-6xl font-black tracking-tight text-white sm:text-7xl md:text-8xl select-none">
             RDSP
           </h1>
-          <p className={`text-sm text-slate-300 ${showSubtitle ? 'animate-fade-up-soft' : 'opacity-0 pointer-events-none'}`}>
+          <p className={`text-sm text-slate-300 select-none ${showSubtitle ? 'animate-fade-up-soft' : 'opacity-0 pointer-events-none'}`}>
             Registro de Dados de Segurança Patrimonial
           </p>
         </div>
       </div>
       <Card className={`origin-top z-10 w-full max-w-md overflow-hidden rounded-[2rem] border border-white/20 bg-white/10 shadow-2xl shadow-slate-950/40 backdrop-blur-xl ${introComplete ? 'animate-card-drop' : 'opacity-0 pointer-events-none'}`}>
         <CardHeader className="text-center px-6 pt-8">
-          <CardTitle className="text-3xl font-bold text-white">Acesso Restrito</CardTitle>
-          <CardDescription className="text-slate-200/80">
+          <CardTitle className="text-3xl font-bold text-white select-none">Acesso Restrito</CardTitle>
+          <CardDescription className="text-slate-200/80 select-none">
             Faça login para acessar o sistema
           </CardDescription>
         </CardHeader>
