@@ -443,13 +443,13 @@ export function RefeicoesSection() {
                      <div className="rounded-lg border bg-secondary/30 p-4 space-y-3">
                         <div className="flex items-center justify-between">
                             <Label>Policiais</Label>
-                            <Button type="button" variant="outline" size="sm" onClick={addIndividuo} disabled={!!selectedRefeicao}><Plus className="mr-1 h-3 w-3" />Adicionar</Button>
+                            <Button type="button" variant="outline" size="sm" onClick={addIndividuo}><Plus className="mr-1 h-3 w-3" />Adicionar</Button>
                         </div>
                         <div className="space-y-3">
                             {formState.individuos.map((ind: IndividuoRefeicao, index: number) => (
                                 <div key={ind.id || index} className="grid grid-cols-[1fr_auto] items-end gap-2">
                                     <Input placeholder={`Nome do policial ${index + 1}`} value={ind.nome} onChange={e => handleIndividuoChange(index, "nome", e.target.value)} />
-                                    {formState.individuos.length > 1 && !selectedRefeicao && <Button type="button" variant="ghost" size="icon" onClick={() => removeIndividuo(index)} className="shrink-0 text-destructive hover:text-destructive"><X className="h-4 w-4" /></Button>}
+                                    {formState.individuos.length > 1 && <Button type="button" variant="ghost" size="icon" onClick={() => removeIndividuo(index)} className="shrink-0 text-destructive hover:text-destructive"><X className="h-4 w-4" /></Button>}
                                 </div>
                             ))}
                         </div>
