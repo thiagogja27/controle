@@ -2,12 +2,9 @@
 
 import { useState, useMemo } from "react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip as RechartsTooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts';
-import { useVisitantes } from "@/hooks/use-firebase";
+import { useVisitantes, useRefeicoes, useConsumos, useTPAs } from "@/hooks/use-firebase";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Building, UserCheck, UserMinus, Users, Ship, Anchor, AlertTriangle, User, Sailboat, FileText } from "lucide-react";
-import { useConsumo } from "@/hooks/use-firebase-bordo";
-import { useRefeicoes } from "@/hooks/use-firebase";
-import { useTPAs } from "@/hooks/use-firebase-tpa";
 import { useSettingsStore } from "@/lib/settings-store";
 import { cn } from "@/lib/utils";
 
@@ -46,7 +43,7 @@ function formatarNome(nome: string) {
 
 export default function DashboardPage() {
   const { data: visitantes, loading: loadingVisitantes } = useVisitantes();
-  const { data: consumo, loading: loadingConsumo } = useConsumo();
+  const { data: consumo, loading: loadingConsumo } = useConsumos();
   const { data: refeicoes, loading: loadingRefeicoes } = useRefeicoes();
   const { data: tpas, loading: loadingTPAs } = useTPAs();
   const maxPermanenceHours = useSettingsStore(state => state.maxPermanenceHours);
