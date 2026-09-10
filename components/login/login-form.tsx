@@ -107,22 +107,6 @@ export function LoginForm({ introComplete }: LoginFormProps) {
           </form>
         </CardContent>
       </Card>
-      <div className={`mt-8 flex flex-wrap items-center justify-center gap-8 transition-all duration-700 ease-out ${showLogos ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'}`}>
-        <img
-          src="/teag-logo.png"
-          alt="TEAG Logo"
-          width={150}
-          height={42}
-          className="object-contain"
-        />
-        <img
-          src="/baltech-logo.png"
-          alt="BalTech Solutions Logo"
-          width={150}
-          height={42}
-          className="object-contain"
-        />
-      </div>
     </>
   )
 }
