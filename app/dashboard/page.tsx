@@ -70,7 +70,8 @@ export default function DashboardPage() {
 
     const consumoPorEmpresa = consumo.reduce((acc, item) => {
       const empresa = item.empresa || 'desconhecida';
-      acc[empresa] = (acc[empresa] || 0) + item.quantidade;
+      const quantidade = item.individuos ? item.individuos.length : 0;
+      acc[empresa] = (acc[empresa] || 0) + quantidade;
       return acc;
     }, {} as Record<string, number>);
     const consumoData = Object.entries(consumoPorEmpresa).map(([name, value]) => ({ name, value }));
@@ -179,6 +180,7 @@ export default function DashboardPage() {
                 <ResponsiveContainer width="100%" height={300}>
                     <PieChart>
                         <Pie data={visitantesPorDestino} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={100} labelLine={false} label={({ cx, cy, midAngle, innerRadius, outerRadius, percent, index }) => {
+                            if (midAngle === undefined || midAngle === null || percent === undefined || percent === null) return null;
                             const RADIAN = Math.PI / 180;
                             const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
                             const x = cx + radius * Math.cos(-midAngle * RADIAN);
